@@ -1,0 +1,30 @@
+{"message": "What is our refund policy?", "expected_intent": "knowledge_search"}
+{"message": "How do I reset a customer's password?", "expected_intent": "knowledge_search"}
+{"message": "Explain the difference between Pro and Team plans.", "expected_intent": "knowledge_search"}
+{"message": "Where can I find the onboarding guide?", "expected_intent": "knowledge_search"}
+{"message": "Tell me about our SOC 2 controls.", "expected_intent": "knowledge_search"}
+{"message": "Draft an email to Acme thanking them for the meeting.", "expected_intent": "email_drafting"}
+{"message": "Write a follow-up email to a prospect who went silent.", "expected_intent": "email_drafting"}
+{"message": "Compose a reply to this support ticket apologizing for the delay.", "expected_intent": "email_drafting"}
+{"message": "Draft an outreach message for a cold lead.", "expected_intent": "email_drafting"}
+{"message": "Send an introduction email to the new partner contact.", "expected_intent": "email_drafting"}
+{"message": "New lead from yesterday's webinar - John from Globex wants pricing.", "expected_intent": "lead_support"}
+{"message": "Capture this lead: Sara, sara@beta.io, interested in a demo.", "expected_intent": "lead_support"}
+{"message": "Qualify this prospect for me.", "expected_intent": "lead_support"}
+{"message": "Track a new lead from the trade show.", "expected_intent": "lead_support"}
+{"message": "We have an interested customer asking about partnership.", "expected_intent": "lead_support"}
+{"message": "Schedule a meeting with the design team for Thursday.", "expected_intent": "workflow_action"}
+{"message": "Update the CRM with this conversation.", "expected_intent": "workflow_action"}
+{"message": "Book a 30-minute slot with engineering.", "expected_intent": "workflow_action"}
+{"message": "Summarize the Q3 plan document for me.", "expected_intent": "document_summary"}
+{"message": "Give me a tl;dr of the SOC 2 report.", "expected_intent": "document_summary"}
+{"message": "Key points from the customer interview notes?", "expected_intent": "document_summary"}
+{"message": "Hey there, how's your day going?", "expected_intent": "general_assistant"}
+{"message": "Thanks for the help yesterday.", "expected_intent": "general_assistant"}
+{"message": "Let's plan the next quarter together.", "expected_intent": "general_assistant"}
+{"message": "Tell me a joke about programming.", "expected_intent": "out_of_scope"}
+{"message": "What's the weather like today?", "expected_intent": "out_of_scope"}
+{"message": "Give me a stocks tip for Monday.", "expected_intent": "out_of_scope"}
+{"message": "Hi", "expected_intent": "clarification"}
+{"message": "ok", "expected_intent": "clarification"}
+{"message": "Yes", "expected_intent": "clarification"}
