@@ -22,7 +22,19 @@ class ApprovalStatus(StrEnum):
     NEEDS_MORE_INFO = "needs_more_info"
 
 
+class MessageClass(StrEnum):
+    """High-level message classification (Stage 1 of routing)."""
+    CAPABILITY_OR_HELP = "capability_or_help"
+    CONVERSATIONAL = "conversational"
+    CORRECTION_OR_META = "correction_or_meta"
+    BUSINESS_KNOWLEDGE = "business_knowledge"
+    WORKFLOW_REQUEST = "workflow_request"
+    UNCLEAR = "unclear"
+    OUT_OF_SCOPE = "out_of_scope"
+
+
 class Intent(StrEnum):
+    """Specific intent classification (Stage 2 of routing)."""
     GENERAL_ASSISTANT = "general_assistant"
     KNOWLEDGE_SEARCH = "knowledge_search"
     LEAD_SUPPORT = "lead_support"

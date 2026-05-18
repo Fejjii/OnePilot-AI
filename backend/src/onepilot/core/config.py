@@ -19,6 +19,8 @@ class Settings(BaseSettings):
 
     LANGSMITH_API_KEY: str = ""
     LANGSMITH_TRACING: bool = False
+    LANGSMITH_PROJECT: str = "onepilot-ai"
+    LANGSMITH_ENDPOINT: str = ""
     SERPER_API_KEY: str = ""
 
     JWT_SECRET: str = "change-me-in-production"

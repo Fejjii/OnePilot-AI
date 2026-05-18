@@ -1,0 +1,44 @@
+{
+  "test_name": "intent_classification",
+  "timestamp": "2026-05-18T17:01:31.982817+00:00",
+  "total": 30,
+  "correct": 30,
+  "accuracy": 1.0,
+  "per_intent_accuracy": {
+    "knowledge_search": 1.0,
+    "email_drafting": 1.0,
+    "lead_support": 1.0,
+    "workflow_action": 1.0,
+    "document_summary": 1.0,
+    "general_assistant": 1.0,
+    "out_of_scope": 1.0,
+    "clarification": 1.0
+  },
+  "confusion": {
+    "knowledge_search": {
+      "knowledge_search": 5
+    },
+    "email_drafting": {
+      "email_drafting": 5
+    },
+    "lead_support": {
+      "lead_support": 5
+    },
+    "workflow_action": {
+      "workflow_action": 3
+    },
+    "document_summary": {
+      "document_summary": 3
+    },
+    "general_assistant": {
+      "general_assistant": 3
+    },
+    "out_of_scope": {
+      "out_of_scope": 3
+    },
+    "clarification": {
+      "clarification": 3
+    }
+  },
+  "failures": []
+}

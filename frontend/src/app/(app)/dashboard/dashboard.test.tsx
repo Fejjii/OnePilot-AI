@@ -19,6 +19,38 @@ const HEALTH = {
   },
 };
 
+const PROVIDER_DIAGNOSTICS = {
+  providers: [
+    {
+      name: "OpenAI LLM",
+      category: "llm",
+      configured: false,
+      healthy: false,
+      active: false,
+      fallback_used: true,
+      mode: "fallback",
+      model: "fallback-v1",
+      reason: "OPENAI_API_KEY not set",
+      last_checked_at: "2024-01-01T00:00:00Z",
+      details: { provider: "fallback" },
+    },
+    {
+      name: "Qdrant",
+      category: "vector",
+      configured: true,
+      healthy: true,
+      active: true,
+      fallback_used: false,
+      mode: "live",
+      model: null,
+      reason: null,
+      last_checked_at: "2024-01-01T00:00:00Z",
+      details: { provider: "qdrant" },
+    },
+  ],
+  checked_at: "2024-01-01T00:00:00Z",
+};
+
 describe("DashboardPage", () => {
   let restoreFetch: () => void;
 
@@ -26,6 +58,7 @@ describe("DashboardPage", () => {
     window.localStorage.setItem("onepilot_token", "test-token");
     restoreFetch = installFetchMock([
       { method: "GET", url: "/health", response: { body: HEALTH } },
+      { method: "GET", url: "/providers", response: { body: PROVIDER_DIAGNOSTICS } },
       {
         method: "GET",
         url: "/conversations",
@@ -78,7 +111,7 @@ describe("DashboardPage", () => {
       expect(screen.getByText("7")).toBeInTheDocument(); // leads
     });
 
-    expect(screen.getByText(/provider mode/i)).toBeInTheDocument();
+    expect(screen.getByText(/provider diagnostics/i)).toBeInTheDocument();
     expect(screen.getByText(/quick actions/i)).toBeInTheDocument();
   });
 });

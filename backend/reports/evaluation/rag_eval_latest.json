@@ -1,0 +1,100 @@
+{
+  "test_name": "rag_retrieval",
+  "timestamp": "2026-05-18T17:01:31.993101+00:00",
+  "total_queries": 5,
+  "total_hits": 0,
+  "precision_at_3": 0.0,
+  "recall_at_3": 0.0,
+  "avg_relevance_score": 0.0,
+  "queries_with_results": 0,
+  "queries_without_results": 0,
+  "category_performance": {
+    "policy": {
+      "count": 1,
+      "hits": 0,
+      "precision": 0.0
+    },
+    "billing": {
+      "count": 1,
+      "hits": 0,
+      "precision": 0.0
+    },
+    "security": {
+      "count": 1,
+      "hits": 0,
+      "precision": 0.0
+    },
+    "integrations": {
+      "count": 1,
+      "hits": 0,
+      "precision": 0.0
+    },
+    "data": {
+      "count": 1,
+      "hits": 0,
+      "precision": 0.0
+    }
+  },
+  "query_results": [
+    {
+      "query": "What is the refund policy?",
+      "expected_documents": [
+        "refund_policy.md",
+        "terms_of_service.md"
+      ],
+      "retrieved_count": 0,
+      "retrieved_titles": [],
+      "hit": false,
+      "relevance_score": 0.0,
+      "category": "policy"
+    },
+    {
+      "query": "How do I upgrade my plan?",
+      "expected_documents": [
+        "pricing_plans.md",
+        "billing_faq.md"
+      ],
+      "retrieved_count": 0,
+      "retrieved_titles": [],
+      "hit": false,
+      "relevance_score": 0.0,
+      "category": "billing"
+    },
+    {
+      "query": "What security measures are in place?",
+      "expected_documents": [
+        "security_overview.md",
+        "data_privacy.md"
+      ],
+      "retrieved_count": 0,
+      "retrieved_titles": [],
+      "hit": false,
+      "relevance_score": 0.0,
+      "category": "security"
+    },
+    {
+      "query": "Can I integrate with Slack?",
+      "expected_documents": [
+        "integrations.md",
+        "slack_guide.md"
+      ],
+      "retrieved_count": 0,
+      "retrieved_titles": [],
+      "hit": false,
+      "relevance_score": 0.0,
+      "category": "integrations"
+    },
+    {
+      "query": "How do I export my data?",
+      "expected_documents": [
+        "data_export.md",
+        "api_docs.md"
+      ],
+      "retrieved_count": 0,
+      "retrieved_titles": [],
+      "hit": false,
+      "relevance_score": 0.0,
+      "category": "data"
+    }
+  ]
+}

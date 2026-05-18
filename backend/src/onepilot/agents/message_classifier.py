@@ -1,0 +1,427 @@
+"""Message class classifier (Stage 1 of routing).
+
+This module provides semantic, generalizable classification of user messages into
+high-level message classes. It uses scored semantic indicators rather than
+hardcoded phrase matching to ensure robustness across different wordings.
+
+The classifier is deterministic and rule-based for auditability and reproducibility.
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+
+from onepilot.core.constants import MessageClass
+from onepilot.core.logging import get_logger
+
+logger = get_logger(__name__)
+
+# ---------------------------------------------------------------------------
+# Semantic indicator patterns
+# ---------------------------------------------------------------------------
+
+# Each pattern group scores presence of semantic indicators for a message class.
+# Higher score = stronger signal for that class.
+
+# Capability/Help indicators
+_CAPABILITY_PATTERNS = [
+    # Assistant/system references (only when not talking about business services)
+    (re.compile(r"\bassistant\b", re.IGNORECASE), 1.5),
+    (re.compile(r"\bonepilot\b", re.IGNORECASE), 2.0),
+    # Help/capability/feature questions (assistant-focused)
+    (
+        re.compile(
+            r"\bwhat (can|do|does) (you|this|the assistant)\b.*\b(do|help|assist)\b",
+            re.IGNORECASE,
+        ),
+        3.0,
+    ),
+    (
+        re.compile(
+            r"\b(help|capability|capabilities|feature|features|tool|tools|function|functions"
+            r"|able to|available)(\s+me|\s+you|\s+do)?\b",
+            re.IGNORECASE,
+        ),
+        2.0,
+    ),
+    # Direct capability questions
+    (re.compile(r"\bshow me what (you can|this can)\b", re.IGNORECASE), 2.5),
+]
+
+# Conversational indicators
+_CONVERSATIONAL_PATTERNS = [
+    # Greetings (even very short ones)
+    (re.compile(r"^\s*(hi|hey|hello|yo|sup|howdy|greetings)(\s|!|\.|\?|$)", re.IGNORECASE), 3.5),
+    # Thanks
+    (re.compile(r"\b(thanks?|thank you|thx|appreciate|grateful)\b", re.IGNORECASE), 2.5),
+    # Acknowledgments (even short ones)
+    (re.compile(r"^\s*(ok|okay|got it|sure|alright|sounds good|perfect)(\s|!|\.|\?|$)", re.IGNORECASE), 3.0),
+    # Small talk
+    (
+        re.compile(
+            r"\b(how are you|how'?s (it going|your day)|nice to meet|good (morning|afternoon|evening))\b",
+            re.IGNORECASE,
+        ),
+        2.5,
+    ),
+    # Testing/checking
+    (re.compile(r"\b(test|testing|can you (hear|read|see) me|are you (there|listening))\b", re.IGNORECASE), 2.0),
+]
+
+# Correction/Meta indicators
+_CORRECTION_META_PATTERNS = [
+    # Correction phrases
+    (
+        re.compile(
+            r"\b(not (what|a|the)|wrong|mistake|incorrect|misunderstood|off[-\s]?track"
+            r"|that'?s not|doesn'?t (help|work|make sense)|this is not)\b",
+            re.IGNORECASE,
+        ),
+        3.0,
+    ),
+    # Cancellation/direction change
+    (
+        re.compile(
+            r"^\s*(nevermind|never mind|forget (it|that)|skip|actually|wait|hold on|stop|cancel)\b",
+            re.IGNORECASE,
+        ),
+        3.0,
+    ),
+    # Meta conversation
+    (re.compile(r"\b(unrelated|different (topic|subject)|change (topic|subject)|back to)\b", re.IGNORECASE), 2.5),
+]
+
+# Business knowledge indicators
+_BUSINESS_KNOWLEDGE_PATTERNS = [
+    # Business entity/topic terms - even with "you/your"
+    (
+        re.compile(
+            r"\b(company|business|organization|service|services|product|products"
+            r"|offering|offerings|solution|solutions)\b",
+            re.IGNORECASE,
+        ),
+        2.5,  # Increased weight
+    ),
+    # Policy/documentation terms
+    (
+        re.compile(
+            r"\b(policy|policies|guide|guides|documentation|docs?|knowledge base"
+            r"|faq|manual|handbook|procedure|process)\b",
+            re.IGNORECASE,
+        ),
+        2.5,
+    ),
+    # Business domains
+    (
+        re.compile(
+            r"\b(pricing|price|cost|refund|payment|billing|subscription"
+            r"|integration|integrations|api|support|security|privacy"
+            r"|onboarding|setup|configuration|deployment|escalation)\b",
+            re.IGNORECASE,
+        ),
+        3.0,  # Increased weight
+    ),
+    # Search/explain intent with business context
+    (
+        re.compile(
+            r"\b(what|how|why|when|where|explain|tell me about|describe|details? about)\b.*\b(service|integration|policy|pricing|support|onboarding)\b",
+            re.IGNORECASE,
+        ),
+        2.5,
+    ),
+    # "Your/you" in business context (e.g., "your services", "your pricing")
+    (
+        re.compile(
+            r"\b(your|you)\b.{0,50}\b(service|product|solution|pricing|policy|integration|api|platform|system)\b",
+            re.IGNORECASE,
+        ),
+        2.0,
+    ),
+]
+
+# Workflow/action indicators
+_WORKFLOW_PATTERNS = [
+    # Action verbs
+    (
+        re.compile(
+            r"\b(draft|write|compose|create|update|schedule|book|send|approve|reject"
+            r"|qualify|capture|save|store|remember|log|summarize|sync|set up)\b",
+            re.IGNORECASE,
+        ),
+        2.0,
+    ),
+    # Business objects + customer/lead context
+    (
+        re.compile(
+            r"\b(email|message|mail|reply|lead|prospect|customer|meeting|appointment"
+            r"|crm|ticket|invoice|document|report|summary|call)\b",
+            re.IGNORECASE,
+        ),
+        1.5,
+    ),
+    # Customer/lead mentions (e.g., "new customer", "interested customer")
+    (
+        re.compile(
+            r"\b(new|interested|potential)\s+(customer|lead|prospect|client)\b",
+            re.IGNORECASE,
+        ),
+        2.5,
+    ),
+    # Combined action + object
+    (
+        re.compile(
+            r"\b(draft|write|compose).*(email|message|mail)"
+            r"|\b(create|update|qualify|capture).*(lead|prospect)"
+            r"|\b(schedule|book|set up).*(meeting|appointment|call)"
+            r"|\b(approve|reject).*(request|action|proposal)"
+            r"|\b(summarize|key points).*(document|report|this)\b",
+            re.IGNORECASE,
+        ),
+        3.0,
+    ),
+]
+
+# Out-of-scope indicators
+_OUT_OF_SCOPE_PATTERNS = [
+    (
+        re.compile(
+            r"\b(weather|joke|love poem|story|song|game|play|entertain"
+            r"|stock\s+(price|tip)|crypto(currency)?|lottery|gambling)\b",
+            re.IGNORECASE,
+        ),
+        3.5,
+    ),
+    (
+        re.compile(
+            r"\b(write (me )?a (story|poem|song)|generate an? image|draw|paint"
+            r"|sing|tell (me )?a joke)\b",
+            re.IGNORECASE,
+        ),
+        3.5,
+    ),
+    (
+        re.compile(
+            r"\b(murder|kill|harm|illegal|hack into|bypass authentication|exploit)\b",
+            re.IGNORECASE,
+        ),
+        4.0,
+    ),
+    # Stock/financial queries
+    (
+        re.compile(r"\b(stock price|share price|Tesla|Apple|Microsoft).*(stock|share|price)\b", re.IGNORECASE),
+        3.0,
+    ),
+]
+
+# Minimum message length for classification
+_MIN_CHARS_FOR_CLASSIFICATION = 4
+
+# Thresholds for classification
+_SCORE_THRESHOLD_HIGH = 2.8  # Strong signal (lowered slightly)
+_SCORE_THRESHOLD_MEDIUM = 2.0  # Medium signal
+_SCORE_THRESHOLD_LOW = 1.5  # Weak signal
+
+
+@dataclass(slots=True)
+class MessageClassResult:
+    """Result of message classification."""
+
+    message_class: MessageClass
+    confidence: float
+    reason: str
+    scores: dict[MessageClass, float]
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+
+def classify_message(message: str) -> MessageClassResult:
+    """Classify a user message into a high-level MessageClass.
+
+    Uses semantic scoring rather than exact phrase matching for robustness.
+    Priority order:
+    1. Out of scope (highest priority)
+    2. Correction/meta
+    3. Conversational
+    4. Capability/help
+    5. Workflow request
+    6. Business knowledge
+    7. Unclear (fallback)
+
+    Args:
+        message: The user message to classify
+
+    Returns:
+        MessageClassResult with classification, confidence, and scoring details
+    """
+    cleaned = (message or "").strip()
+
+    # Very short messages: check if they're greetings/acknowledgments first
+    if len(cleaned) < _MIN_CHARS_FOR_CLASSIFICATION:
+        # Check if it's a very short greeting or acknowledgment
+        for pattern, _ in _CONVERSATIONAL_PATTERNS:
+            if pattern.search(cleaned):
+                return MessageClassResult(
+                    message_class=MessageClass.CONVERSATIONAL,
+                    confidence=0.75,
+                    reason="short_conversational",
+                    scores={},
+                )
+        # Otherwise, it's too short to classify
+        return MessageClassResult(
+            message_class=MessageClass.UNCLEAR,
+            confidence=0.6,
+            reason="message_too_short",
+            scores={},
+        )
+
+    # Calculate scores for each message class
+    scores: dict[MessageClass, float] = {
+        MessageClass.OUT_OF_SCOPE: _score_patterns(cleaned, _OUT_OF_SCOPE_PATTERNS),
+        MessageClass.CORRECTION_OR_META: _score_patterns(cleaned, _CORRECTION_META_PATTERNS),
+        MessageClass.CONVERSATIONAL: _score_patterns(cleaned, _CONVERSATIONAL_PATTERNS),
+        MessageClass.CAPABILITY_OR_HELP: _score_patterns(cleaned, _CAPABILITY_PATTERNS),
+        MessageClass.WORKFLOW_REQUEST: _score_patterns(cleaned, _WORKFLOW_PATTERNS),
+        MessageClass.BUSINESS_KNOWLEDGE: _score_patterns(cleaned, _BUSINESS_KNOWLEDGE_PATTERNS),
+    }
+
+    # Apply priority-based classification
+    # 1. Out of scope (highest priority)
+    if scores[MessageClass.OUT_OF_SCOPE] >= _SCORE_THRESHOLD_HIGH:
+        return MessageClassResult(
+            message_class=MessageClass.OUT_OF_SCOPE,
+            confidence=_score_to_confidence(scores[MessageClass.OUT_OF_SCOPE]),
+            reason="out_of_scope_indicators",
+            scores=scores,
+        )
+
+    # 2. Correction/meta (high priority to catch user feedback early)
+    if scores[MessageClass.CORRECTION_OR_META] >= _SCORE_THRESHOLD_MEDIUM:
+        return MessageClassResult(
+            message_class=MessageClass.CORRECTION_OR_META,
+            confidence=_score_to_confidence(scores[MessageClass.CORRECTION_OR_META]),
+            reason="correction_or_meta_indicators",
+            scores=scores,
+        )
+
+    # 3. Conversational (greetings, thanks, acknowledgments)
+    if scores[MessageClass.CONVERSATIONAL] >= _SCORE_THRESHOLD_MEDIUM:
+        return MessageClassResult(
+            message_class=MessageClass.CONVERSATIONAL,
+            confidence=_score_to_confidence(scores[MessageClass.CONVERSATIONAL]),
+            reason="conversational_indicators",
+            scores=scores,
+        )
+
+    # 4. Capability/help questions (before general knowledge search)
+    if scores[MessageClass.CAPABILITY_OR_HELP] >= _SCORE_THRESHOLD_MEDIUM:
+        # Disambiguate: "What services do you offer?" vs "What can you do for me?"
+        # If business knowledge is also medium/strong, prefer business knowledge
+        if scores[MessageClass.BUSINESS_KNOWLEDGE] >= _SCORE_THRESHOLD_MEDIUM:
+            return MessageClassResult(
+                message_class=MessageClass.BUSINESS_KNOWLEDGE,
+                confidence=_score_to_confidence(scores[MessageClass.BUSINESS_KNOWLEDGE]),
+                reason="business_knowledge_trumps_capability",
+                scores=scores,
+            )
+        return MessageClassResult(
+            message_class=MessageClass.CAPABILITY_OR_HELP,
+            confidence=_score_to_confidence(scores[MessageClass.CAPABILITY_OR_HELP]),
+            reason="capability_or_help_indicators",
+            scores=scores,
+        )
+
+    # 5. Workflow request (actions on business objects)
+    if scores[MessageClass.WORKFLOW_REQUEST] >= _SCORE_THRESHOLD_HIGH:
+        return MessageClassResult(
+            message_class=MessageClass.WORKFLOW_REQUEST,
+            confidence=_score_to_confidence(scores[MessageClass.WORKFLOW_REQUEST]),
+            reason="workflow_request_indicators",
+            scores=scores,
+        )
+
+    # 6. Business knowledge (lower threshold, but must have some signal)
+    if scores[MessageClass.BUSINESS_KNOWLEDGE] >= _SCORE_THRESHOLD_LOW:
+        return MessageClassResult(
+            message_class=MessageClass.BUSINESS_KNOWLEDGE,
+            confidence=_score_to_confidence(scores[MessageClass.BUSINESS_KNOWLEDGE]),
+            reason="business_knowledge_indicators",
+            scores=scores,
+        )
+
+    # 7. Fallback: unclear if no strong signals
+    max_score = max(scores.values()) if scores else 0.0
+    if max_score < _SCORE_THRESHOLD_LOW:
+        return MessageClassResult(
+            message_class=MessageClass.UNCLEAR,
+            confidence=0.5,
+            reason="no_strong_indicators",
+            scores=scores,
+        )
+
+    # Edge case: some signal but not enough for classification
+    best_class = max(scores, key=scores.get)  # type: ignore[arg-type]
+    return MessageClassResult(
+        message_class=best_class,
+        confidence=0.6,
+        reason="weak_indicators",
+        scores=scores,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Helper functions
+# ---------------------------------------------------------------------------
+
+
+def _score_patterns(message: str, patterns: list[tuple[re.Pattern[str], float]]) -> float:
+    """Score a message against a list of patterns.
+
+    Args:
+        message: The message to score
+        patterns: List of (pattern, score) tuples
+
+    Returns:
+        Total score (sum of all matching pattern scores)
+    """
+    score = 0.0
+    for pattern, weight in patterns:
+        if pattern.search(message):
+            score += weight
+    return score
+
+
+def _score_to_confidence(score: float) -> float:
+    """Convert a raw score to a confidence value between 0.0 and 1.0.
+
+    Uses a sigmoid-like transformation to map scores to confidence.
+    Higher scores = higher confidence, capped at 0.95.
+
+    Args:
+        score: Raw pattern matching score
+
+    Returns:
+        Confidence value between 0.0 and 1.0
+    """
+    if score >= 5.0:
+        return 0.95
+    elif score >= 4.0:
+        return 0.90
+    elif score >= 3.0:
+        return 0.85
+    elif score >= 2.5:
+        return 0.80
+    elif score >= 2.0:
+        return 0.75
+    elif score >= 1.5:
+        return 0.70
+    elif score >= 1.0:
+        return 0.65
+    else:
+        return 0.60
+
+
+__all__ = ["classify_message", "MessageClassResult"]

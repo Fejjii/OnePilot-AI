@@ -343,6 +343,14 @@ See [docs/limitations_roadmap.md](docs/limitations_roadmap.md) for the full list
 
 ---
 
+## Contact
+
+**Sofien Fejji**  
+- GitHub: [Fejjii](https://github.com/Fejjii)
+- Email: sofien.fejji93@hotmail.com
+
+---
+
 ## License
 
 This project is part of an AI Engineering bootcamp capstone.

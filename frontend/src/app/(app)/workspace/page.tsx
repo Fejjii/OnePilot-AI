@@ -1,7 +1,8 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   MessageSquare,
@@ -27,6 +28,7 @@ import { ApprovalBanner } from "@/components/domain/approval-banner";
 import { WeakEvidenceWarning } from "@/components/domain/weak-evidence-warning";
 import { ConfidenceBadge } from "@/components/domain/confidence-badge";
 import { IntentBadge } from "@/components/domain/intent-badge";
+import { MicrophoneInput } from "@/components/domain/microphone-input";
 import {
   useChatMutation,
   useConversation,
@@ -40,14 +42,21 @@ import {
 import type {
   ChatResponse,
   Citation,
+  ConversationDetailResponse,
   MessageResponse,
   ToolCallTrace,
   TraceStep,
 } from "@/types/api";
 
-interface PendingUserMessage {
-  content: string;
-  createdAt: string;
+/** Ephemeral UI state for an in-flight POST /chat tied to one conversation target. */
+interface InFlightSend {
+  /** Conversation id being continued, or null when starting a new conversation. */
+  conversationId: string | null;
+  pendingUser: {
+    content: string;
+    createdAt: string;
+  };
+  response: ChatResponse | null;
 }
 
 export default function WorkspacePage() {
@@ -60,102 +69,225 @@ export default function WorkspacePage() {
 
 function WorkspaceInner() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-  // URL is the source of truth for the active conversation id; this avoids
-  // syncing duplicate state into useEffect.
-  const activeId = searchParams.get("conversation");
+  const queryClient = useQueryClient();
+
+  const urlConversationId = searchParams.get("conversation");
+  const [navigationOverride, setNavigationOverride] =
+    useState<string | null | undefined>(undefined);
+
+  // Apply navigation immediately while URL (useSearchParams) lags behind router.replace.
+  const activeConversationId =
+    navigationOverride !== undefined &&
+    navigationOverride !== urlConversationId
+      ? navigationOverride
+      : urlConversationId;
 
   const conversations = useConversations();
-  const conversationDetail = useConversation(activeId);
+  const conversationDetail = useConversation(activeConversationId);
   const chat = useChatMutation();
 
-  // Local snapshot of latest assistant ChatResponse so we can show citations,
-  // trace, and approval banner inline without re-fetching the conversation
-  // just for them.
-  const [latestResponse, setLatestResponse] = useState<ChatResponse | null>(null);
-  const [pendingUserMessage, setPendingUserMessage] =
-    useState<PendingUserMessage | null>(null);
-  // React-recommended pattern for deriving state from a value change without
-  // an effect: store the previous value alongside the state we want to reset.
-  // Guard so we don't blow away the just-arrived response when starting a new
-  // conversation (URL changes from null → newId after the mutation resolves).
-  const [prevActiveId, setPrevActiveId] = useState<string | null>(activeId);
-  if (prevActiveId !== activeId) {
-    setPrevActiveId(activeId);
-    if (latestResponse && latestResponse.conversation_id !== activeId) {
-      setLatestResponse(null);
+  const [inFlight, setInFlight] = useState<InFlightSend | null>(null);
+  const [viewEpoch, setViewEpoch] = useState(0);
+
+  const activeConversation = useMemo<ConversationDetailResponse | null>(() => {
+    if (!activeConversationId) return null;
+    if (conversationDetail.data?.id !== activeConversationId) return null;
+    return conversationDetail.data;
+  }, [activeConversationId, conversationDetail.data]);
+
+  const persistedMessages = useMemo<MessageResponse[]>(
+    () => activeConversation?.messages ?? [],
+    [activeConversation],
+  );
+
+  const inFlightAppliesToView = useMemo(() => {
+    if (!inFlight) return false;
+    if (inFlight.conversationId === activeConversationId) return true;
+    if (
+      activeConversationId &&
+      inFlight.response?.conversation_id === activeConversationId
+    ) {
+      return true;
     }
-    if (pendingUserMessage) {
-      setPendingUserMessage(null);
-    }
-  }
+    return false;
+  }, [inFlight, activeConversationId]);
 
   const messages = useMemo<MessageResponse[]>(() => {
-    const base = conversationDetail.data?.messages ?? [];
+    const base = persistedMessages;
+    if (!inFlight || !inFlightAppliesToView) return base;
+
     const additions: MessageResponse[] = [];
 
-    // Optimistic user bubble while the chat call is in flight (or until the
-    // conversation detail re-fetch catches up with it).
-    if (pendingUserMessage) {
-      const lastUser = [...base].reverse().find((m) => m.role === "user");
-      if (!lastUser || lastUser.content !== pendingUserMessage.content) {
-        additions.push({
-          id: "pending-user",
-          role: "user",
-          content: pendingUserMessage.content,
-          intent: null,
-          confidence: 0,
-          citations: [],
-          tool_calls: [],
-          created_at: pendingUserMessage.createdAt,
-        });
-      }
+    const lastUser = [...base].reverse().find((m) => m.role === "user");
+    if (!lastUser || lastUser.content !== inFlight.pendingUser.content) {
+      additions.push({
+        id: "pending-user",
+        role: "user",
+        content: inFlight.pendingUser.content,
+        intent: null,
+        confidence: 0,
+        citations: [],
+        tool_calls: [],
+        created_at: inFlight.pendingUser.createdAt,
+      });
     }
 
-    // Optimistic assistant bubble using the just-returned ChatResponse, until
-    // the conversation detail refetch returns it as persisted history.
+    const response = inFlight.response;
     if (
-      latestResponse &&
-      latestResponse.final_response &&
-      !base.find((m) => m.id === latestResponse.message_id)
+      response?.final_response &&
+      !base.find((m) => m.id === response.message_id)
     ) {
       additions.push({
-        id: latestResponse.message_id,
+        id: response.message_id,
         role: "assistant",
-        content: latestResponse.final_response,
-        intent: latestResponse.intent,
-        confidence: latestResponse.confidence,
-        citations: latestResponse.citations,
-        tool_calls: latestResponse.tool_calls,
+        content: response.final_response,
+        intent: response.intent,
+        confidence: response.confidence,
+        citations: response.citations,
+        tool_calls: response.tool_calls,
         created_at: new Date().toISOString(),
+        trace_mode: response.trace_mode,
+        trace_id: response.trace_id,
+        trace_url: response.trace_url,
+        span_count: response.span_count,
       });
     }
 
     return [...base, ...additions];
-  }, [conversationDetail.data, pendingUserMessage, latestResponse]);
+  }, [persistedMessages, inFlight, inFlightAppliesToView]);
 
-  function selectConversation(id: string | null) {
+  const panelData = useMemo<PanelData | null>(() => {
+    const lastAssistant = [...messages]
+      .reverse()
+      .find((m) => m.role === "assistant");
+    if (!lastAssistant) return null;
+
+    const liveResponse =
+      inFlightAppliesToView &&
+      inFlight?.response &&
+      inFlight.response.message_id === lastAssistant.id &&
+      inFlight.response.conversation_id === activeConversationId
+        ? inFlight.response
+        : null;
+
+    if (liveResponse) {
+      return panelDataFromChatResponse(liveResponse);
+    }
+
+    if (
+      activeConversationId &&
+      activeConversation?.id !== activeConversationId
+    ) {
+      return null;
+    }
+
+    return panelDataFromMessage(lastAssistant);
+  }, [
+    messages,
+    inFlight,
+    inFlightAppliesToView,
+    activeConversationId,
+    activeConversation?.id,
+  ]);
+
+  const panelSourceConversationId = useMemo(() => {
+    if (inFlightAppliesToView && inFlight?.response) {
+      return inFlight.response.conversation_id;
+    }
+    return activeConversationId;
+  }, [inFlightAppliesToView, inFlight, activeConversationId]);
+
+  const approvalRequired =
+    inFlightAppliesToView && (inFlight?.response?.approval_required ?? false);
+  const approvalId =
+    inFlightAppliesToView && inFlight?.response
+      ? (inFlight.response.approval_id ?? null)
+      : null;
+
+  useEffect(() => {
+    if (!inFlight?.response || !activeConversationId) return;
+    if (activeConversation?.id !== activeConversationId) return;
+    const persisted = activeConversation.messages.some(
+      (m) => m.id === inFlight.response?.message_id,
+    );
+    if (!persisted) return;
+    const id = window.setTimeout(() => setInFlight(null), 0);
+    return () => window.clearTimeout(id);
+  }, [activeConversation, inFlight, activeConversationId]);
+
+  useWorkspaceDevDiagnostics(
+    urlConversationId,
+    navigationOverride,
+    activeConversationId,
+    conversationDetail.data?.id ?? null,
+    activeConversation?.id ?? null,
+    panelSourceConversationId,
+    inFlight?.conversationId ?? null,
+    inFlight?.response?.conversation_id ?? null,
+    inFlightAppliesToView,
+    messages.length,
+    viewEpoch,
+  );
+
+  function navigateToConversation(
+    id: string | null,
+    opts?: { keepInFlight?: boolean },
+  ) {
+    if (process.env.NODE_ENV === "development") {
+      console.debug("[workspace] navigateToConversation", {
+        id,
+        keepInFlight: opts?.keepInFlight ?? false,
+        from: activeConversationId,
+      });
+    }
+
+    if (!opts?.keepInFlight) {
+      setInFlight(null);
+      chat.reset();
+    }
+
+    setNavigationOverride(id);
+    setViewEpoch((e) => e + 1);
+
+    void queryClient.cancelQueries({ queryKey: ["conversation"] });
+
     const params = new URLSearchParams(searchParams.toString());
     if (id) params.set("conversation", id);
     else params.delete("conversation");
-    router.replace(`/workspace${params.toString() ? `?${params}` : ""}`);
+    const qs = params.toString();
+    const href = qs ? `${pathname}?${qs}` : pathname;
+    router.replace(href, { scroll: false });
   }
 
   async function handleSend(message: string) {
     const trimmed = message.trim();
     if (!trimmed) return;
-    setPendingUserMessage({
-      content: trimmed,
-      createdAt: new Date().toISOString(),
+
+    const sendTargetId = activeConversationId;
+    setInFlight({
+      conversationId: sendTargetId,
+      pendingUser: {
+        content: trimmed,
+        createdAt: new Date().toISOString(),
+      },
+      response: null,
     });
+
     try {
       const response = await chat.mutateAsync({
         message: trimmed,
-        conversation_id: activeId ?? undefined,
+        conversation_id: sendTargetId ?? undefined,
       });
-      setLatestResponse(response);
-      if (!activeId) {
-        selectConversation(response.conversation_id);
+      setInFlight((prev) => {
+        if (!prev || prev.conversationId !== sendTargetId) return null;
+        return { ...prev, response };
+      });
+      if (!sendTargetId) {
+        navigateToConversation(response.conversation_id, {
+          keepInFlight: true,
+        });
       }
       if (response.approval_required) {
         toast.info("Approval requested", {
@@ -166,47 +298,11 @@ function WorkspaceInner() {
       const msg =
         err instanceof ApiRequestError ? err.message : "Failed to send message";
       toast.error("Could not send message", { description: msg });
-      // Roll back the optimistic user message on failure so the user can retry.
-      setPendingUserMessage(null);
+      setInFlight(null);
     }
-    // On success we intentionally keep pendingUserMessage until the
-    // conversation detail refetch catches up; the messages memo deduplicates.
   }
 
-  // Derive panel data: prefer the most recent ChatResponse; fall back to the
-  // last assistant message persisted on the conversation.
-  const panelData = useMemo<PanelData | null>(() => {
-    if (latestResponse) {
-      return {
-        citations: latestResponse.citations,
-        toolCalls: latestResponse.tool_calls,
-        traceSteps: latestResponse.trace_steps,
-        approvalRequired: latestResponse.approval_required,
-        approvalId: latestResponse.approval_id ?? null,
-        safetyFlags: latestResponse.safety_flags,
-        usage: latestResponse.usage,
-        confidence: latestResponse.confidence,
-        intent: latestResponse.intent,
-        weakEvidence: detectWeakEvidence(latestResponse),
-      };
-    }
-    const lastAssistant = [...messages]
-      .reverse()
-      .find((m) => m.role === "assistant");
-    if (!lastAssistant) return null;
-    return {
-      citations: lastAssistant.citations,
-      toolCalls: lastAssistant.tool_calls,
-      traceSteps: [],
-      approvalRequired: false,
-      approvalId: null,
-      safetyFlags: [],
-      usage: {},
-      confidence: lastAssistant.confidence,
-      intent: lastAssistant.intent ?? null,
-      weakEvidence: false,
-    };
-  }, [latestResponse, messages]);
+  const viewKey = activeConversationId ?? "new";
 
   return (
     <div className="flex flex-col gap-4 lg:h-[calc(100vh-7rem)]">
@@ -217,7 +313,7 @@ function WorkspaceInner() {
           <Button
             variant="outline"
             leftIcon={<Plus className="h-4 w-4" />}
-            onClick={() => selectConversation(null)}
+            onClick={() => navigateToConversation(null)}
           >
             New conversation
           </Button>
@@ -226,27 +322,112 @@ function WorkspaceInner() {
 
       <div className="grid flex-1 gap-4 lg:grid-cols-[280px_1fr_320px] lg:overflow-hidden">
         <ConversationsSidebar
-          activeId={activeId}
-          onSelect={selectConversation}
+          activeId={activeConversationId}
+          onSelect={navigateToConversation}
           conversations={conversations}
         />
         <ChatColumn
-          activeId={activeId}
+          key={`chat-${viewKey}-${viewEpoch}`}
+          activeId={activeConversationId}
           messages={messages}
           isSending={chat.isPending}
-          isLoading={conversationDetail.isLoading && !!activeId}
+          isLoading={
+            !!activeConversationId &&
+            conversationDetail.isFetching &&
+            !activeConversation
+          }
           isError={conversationDetail.isError}
           onRetry={() => conversationDetail.refetch()}
           onSend={handleSend}
-          approvalRequired={
-            latestResponse?.approval_required ?? false
-          }
-          approvalId={latestResponse?.approval_id ?? null}
+          approvalRequired={approvalRequired}
+          approvalId={approvalId}
         />
-        <DetailsPanel data={panelData} sending={chat.isPending} />
+        <DetailsPanel
+          key={`details-${viewKey}-${viewEpoch}`}
+          data={panelData}
+          sending={chat.isPending && !panelData}
+        />
       </div>
     </div>
   );
+}
+
+function useWorkspaceDevDiagnostics(
+  urlConversationId: string | null,
+  navigationOverride: string | null | undefined,
+  activeConversationId: string | null,
+  detailId: string | null,
+  activeConversationMatchId: string | null,
+  panelSourceConversationId: string | null,
+  inFlightConversationId: string | null,
+  inFlightResponseConversationId: string | null,
+  inFlightAppliesToView: boolean,
+  messageCount: number,
+  viewEpoch: number,
+) {
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+    console.debug("[workspace] state", {
+      urlConversationId,
+      navigationOverride,
+      activeConversationId,
+      detailId,
+      activeConversationMatchId,
+      panelSourceConversationId,
+      inFlightConversationId,
+      inFlightResponseConversationId,
+      inFlightAppliesToView,
+      messageCount,
+      viewEpoch,
+    });
+  }, [
+    urlConversationId,
+    navigationOverride,
+    activeConversationId,
+    detailId,
+    activeConversationMatchId,
+    panelSourceConversationId,
+    inFlightConversationId,
+    inFlightResponseConversationId,
+    inFlightAppliesToView,
+    messageCount,
+    viewEpoch,
+  ]);
+}
+
+function panelDataFromChatResponse(resp: ChatResponse): PanelData {
+  return {
+    citations: resp.citations,
+    toolCalls: resp.tool_calls,
+    traceSteps: resp.trace_steps,
+    approvalRequired: resp.approval_required,
+    approvalId: resp.approval_id ?? null,
+    safetyFlags: resp.safety_flags,
+    usage: resp.usage,
+    confidence: resp.confidence,
+    intent: resp.intent,
+    weakEvidence: detectWeakEvidence(resp),
+    traceMode: resp.trace_mode,
+    traceUrl: resp.trace_url ?? null,
+  };
+}
+
+function panelDataFromMessage(msg: MessageResponse): PanelData {
+  return {
+    citations: msg.citations,
+    toolCalls: msg.tool_calls,
+    traceSteps: [],
+    approvalRequired: false,
+    approvalId: null,
+    safetyFlags: [],
+    usage: {},
+    confidence: msg.confidence,
+    intent: msg.intent ?? null,
+    weakEvidence:
+      msg.intent === "knowledge_search" && msg.citations.length === 0,
+    traceMode: msg.trace_mode ?? "local",
+    traceUrl: msg.trace_url ?? null,
+  };
 }
 
 function detectWeakEvidence(resp: ChatResponse): boolean {
@@ -298,6 +479,8 @@ function ConversationsSidebar({
               <li key={conv.id}>
                 <button
                   type="button"
+                  aria-label={conv.title}
+                  aria-current={activeId === conv.id ? "true" : undefined}
                   onClick={() => onSelect(conv.id)}
                   className={cn(
                     "block w-full rounded-md px-2 py-2 text-left transition-colors",
@@ -350,12 +533,19 @@ function ChatColumn({
 }: ChatColumnProps) {
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages.length, isSending]);
+
+  useEffect(() => {
+    if (!activeId && messages.length === 0 && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [activeId, messages.length]);
 
   function submit() {
     if (!draft.trim() || isSending) return;
@@ -402,6 +592,7 @@ function ChatColumn({
       <div className="border-t border-slate-100 bg-white px-4 py-3">
         <div className="flex items-end gap-2">
           <textarea
+            ref={textareaRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -413,6 +604,15 @@ function ChatColumn({
             rows={2}
             placeholder="Ask the AI assistant… (Shift+Enter for newline)"
             className="block w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+          />
+          <MicrophoneInput
+            onTranscript={(transcript) => {
+              setDraft((prev) => {
+                const combined = prev ? `${prev} ${transcript}` : transcript;
+                return combined;
+              });
+            }}
+            disabled={isSending}
           />
           <Button
             onClick={submit}
@@ -456,6 +656,8 @@ interface PanelData {
   confidence: number;
   intent: string | null;
   weakEvidence: boolean;
+  traceMode?: string;
+  traceUrl?: string | null;
 }
 
 interface DetailsPanelProps {
@@ -535,6 +737,8 @@ function DetailsPanel({ data, sending }: DetailsPanelProps) {
               <ToolTracePanel
                 toolCalls={data.toolCalls}
                 traceSteps={data.traceSteps}
+                traceMode={data.traceMode}
+                traceUrl={data.traceUrl}
               />
             </section>
 

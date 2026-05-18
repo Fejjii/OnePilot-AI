@@ -25,6 +25,13 @@ class TestRuleBasedIntent:
             ("Tell me a joke please.", Intent.OUT_OF_SCOPE),
             ("What's the weather like?", Intent.OUT_OF_SCOPE),
             ("ok", Intent.CLARIFICATION),
+            # User corrections and meta-comments
+            ("That's not what I meant.", Intent.GENERAL_ASSISTANT),
+            ("This is not a related conversation about the services that you do.", Intent.GENERAL_ASSISTANT),
+            ("Wrong, that doesn't help.", Intent.GENERAL_ASSISTANT),
+            ("You misunderstood my question.", Intent.GENERAL_ASSISTANT),
+            ("Nevermind, I'll do it myself.", Intent.GENERAL_ASSISTANT),
+            ("Actually, forget about that.", Intent.GENERAL_ASSISTANT),
         ],
     )
     def test_classify_known_examples(self, message: str, expected: Intent) -> None:

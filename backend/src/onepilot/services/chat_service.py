@@ -5,7 +5,7 @@ Drives the conversation lifecycle:
 2. Resolve (or create) the conversation.
 3. Persist the user turn.
 4. Build agent state with last-N history.
-5. Run the LangGraph workflow.
+5. Run the LangGraph workflow with tracing.
 6. Persist the assistant turn + record usage + audit log.
 7. Return the assistant message id for the API layer.
 """
@@ -21,6 +21,10 @@ from onepilot.agents.workflow import run_agent
 from onepilot.core.config import Settings
 from onepilot.core.constants import UsageFeature
 from onepilot.core.logging import get_logger
+from onepilot.observability.tracing import (
+    get_tracing_provider,
+    sanitize_metadata,
+)
 from onepilot.repositories.models import Conversation, Message
 from onepilot.schemas.agents import AgentState
 from onepilot.security.auth import Principal
@@ -52,6 +56,20 @@ def handle_chat(
     history_turns: int = 10,
 ) -> ChatOutcome:
     started = time.monotonic()
+
+    # Start trace
+    tracing_provider = get_tracing_provider()
+    trace_metadata = sanitize_metadata(
+        {
+            "organization_id": principal.organization_id,
+            "user_id": principal.user_id,
+            "conversation_id": conversation_id or "new",
+            "message_length": len(message),
+            "has_context": bool(context),
+        }
+    )
+    trace_context = tracing_provider.start_trace("chat.handle", trace_metadata)
+
     quota_service.check_and_increment(
         session,
         principal.organization_id,
@@ -94,7 +112,11 @@ def handle_chat(
         message=message,
         history=history,
         context=context,
+        trace_context=trace_context,
     )
+
+    # Finalize trace
+    tracing_provider.finalize_trace(trace_context)
 
     assistant_msg = conversation_service.append_message(
         session,
@@ -113,22 +135,31 @@ def handle_chat(
             "approval_id": state.approval_id,
             "safety_flags": state.safety_flags,
             "usage": state.usage_metadata,
+            "trace_mode": state.trace_mode,
+            "trace_id": state.trace_id,
+            "trace_url": state.trace_url,
         },
     )
 
     duration_ms = int((time.monotonic() - started) * 1000)
+    usage_meta = state.usage_metadata or {}
     usage_service.record(
         session,
         organization_id=principal.organization_id,
         user_id=principal.user_id,
         feature=UsageFeature.CHAT_MESSAGES.value,
-        provider="onepilot.chat_service",
-        tool_calls=len(state.tool_calls),
+        model=usage_meta.get("model"),
+        provider=usage_meta.get("provider"),
+        input_tokens=int(usage_meta.get("input_tokens", 0)),
+        output_tokens=int(usage_meta.get("output_tokens", 0)),
+        fallback_used=bool(usage_meta.get("fallback_used", False)),
+        tool_calls=len(state.tool_calls) or int(usage_meta.get("tool_calls", 0)),
         latency_ms=duration_ms,
         metadata={
             "intent": state.intent.value if state.intent else None,
             "approval_required": state.approval_required,
             "safety_flags": state.safety_flags,
+            "trace_mode": state.trace_mode,
         },
     )
     audit_service.record(
@@ -143,6 +174,7 @@ def handle_chat(
             "confidence": state.confidence,
             "approval_required": state.approval_required,
             "safety_flags": state.safety_flags,
+            "trace_mode": state.trace_mode,
         },
     )
     session.commit()
@@ -153,6 +185,7 @@ def handle_chat(
         conversation_id=conversation.id,
         intent=state.intent.value if state.intent else None,
         approval_required=state.approval_required,
+        trace_mode=state.trace_mode,
     )
     return ChatOutcome(
         conversation=conversation, assistant_message=assistant_msg, state=state

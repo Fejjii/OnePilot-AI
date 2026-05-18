@@ -21,6 +21,7 @@ import type {
   DocumentListResponse,
   DocumentResponse,
   HealthResponse,
+  ProviderDiagnosticResponse,
   LeadCreate,
   LeadListResponse,
   LeadResponse,
@@ -28,13 +29,20 @@ import type {
   MemoryListResponse,
   MemoryWriteRequest,
   AnswerResponse,
+  BillingPlansResponse,
+  BillingSummaryResponse,
+  InvoicePreviewResponse,
   UsageEventListResponse,
   UsageSummaryResponse,
 } from "@/types/api";
 
 export const queryKeys = {
   health: ["health"] as const,
+  providerDiagnostics: ["providers", "diagnostics"] as const,
   usageSummary: ["usage", "summary"] as const,
+  billingSummary: ["billing", "summary"] as const,
+  billingInvoice: ["billing", "invoice-preview"] as const,
+  billingPlans: ["billing", "plans"] as const,
   conversations: (offset = 0, limit = 50) =>
     ["conversations", { offset, limit }] as const,
   conversation: (id: string) => ["conversation", id] as const,
@@ -64,12 +72,43 @@ export function useHealth(opts?: { enabled?: boolean }) {
   });
 }
 
+export function useProviderDiagnostics(opts?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: queryKeys.providerDiagnostics,
+    queryFn: () => api.get<ProviderDiagnosticResponse>("/providers"),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
 // --- Usage ------------------------------------------------------------------
 
 export function useUsageSummary() {
   return useQuery({
     queryKey: queryKeys.usageSummary,
     queryFn: () => api.get<UsageSummaryResponse>("/usage/summary"),
+  });
+}
+
+export function useBillingSummary() {
+  return useQuery({
+    queryKey: queryKeys.billingSummary,
+    queryFn: () => api.get<BillingSummaryResponse>("/billing/summary"),
+  });
+}
+
+export function useBillingInvoicePreview() {
+  return useQuery({
+    queryKey: queryKeys.billingInvoice,
+    queryFn: () => api.get<InvoicePreviewResponse>("/billing/invoice-preview"),
+  });
+}
+
+export function useBillingPlans() {
+  return useQuery({
+    queryKey: queryKeys.billingPlans,
+    queryFn: () => api.get<BillingPlansResponse>("/billing/plans"),
   });
 }
 
@@ -103,6 +142,8 @@ export function useConversation(
     queryFn: () =>
       api.get<ConversationDetailResponse>(`/conversations/${id}`),
     enabled: !!id,
+    // Never show a previous conversation's cache while the id is changing.
+    staleTime: 0,
     ...opts,
   });
 }

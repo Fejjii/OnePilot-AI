@@ -14,6 +14,13 @@ import {
   CheckCircle2,
   AlertTriangle,
   Plus,
+  Mail,
+  Search,
+  Calendar,
+  DollarSign,
+  Users2,
+  MessageSquare as TwilioIcon,
+  Cloud,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { MetricCard } from "@/components/ui/metric-card";
@@ -23,15 +30,17 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { UsageProgress } from "@/components/domain/usage-progress";
 import { IntentBadge } from "@/components/domain/intent-badge";
+import { Badge } from "@/components/ui/badge";
 import {
   useApprovals,
   useConversations,
   useDocuments,
-  useHealth,
+  useProviderDiagnostics,
   useLeads,
   useUsageSummary,
 } from "@/lib/queries";
 import { formatRelativeTime } from "@/lib/utils";
+import type { ProviderDiagnostic, ProviderMode } from "@/types/api";
 
 export default function DashboardPage() {
   const conversations = useConversations(0, 50);
@@ -39,12 +48,25 @@ export default function DashboardPage() {
   const leads = useLeads();
   const approvals = useApprovals();
   const usage = useUsageSummary();
-  const health = useHealth();
+  const diagnostics = useProviderDiagnostics();
 
   const conversationsLoading = conversations.isLoading;
   const documentsLoading = documents.isLoading;
   const leadsLoading = leads.isLoading;
   const approvalsLoading = approvals.isLoading;
+
+  const coreProviders = diagnostics.data?.providers.filter(
+    (p) =>
+      p.category === "llm" ||
+      p.category === "embeddings" ||
+      p.category === "vector" ||
+      p.category === "database"
+  );
+  const allCoreLive =
+    coreProviders && coreProviders.every((p) => p.mode === "live");
+  const hasMixedModes =
+    diagnostics.data &&
+    diagnostics.data.providers.some((p) => p.mode === "mock" || p.mode === "fallback");
 
   return (
     <div className="space-y-6">
@@ -158,49 +180,80 @@ export default function DashboardPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Provider mode</CardTitle>
-              <span className="text-[11px] text-slate-500">
-                Backend reports providers in /health
-              </span>
+              <CardTitle>Provider diagnostics</CardTitle>
+              <Link
+                href="/settings"
+                className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+              >
+                View details →
+              </Link>
             </CardHeader>
             <CardContent>
-              {health.isLoading ? (
+              {diagnostics.isLoading ? (
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {Array.from({ length: 4 }).map((_, i) => (
+                  {Array.from({ length: 6 }).map((_, i) => (
                     <div
                       key={i}
                       className="h-16 animate-pulse rounded-md bg-slate-100"
                     />
                   ))}
                 </div>
-              ) : !health.data ? (
-                <ErrorState onRetry={() => health.refetch()} />
+              ) : !diagnostics.data ? (
+                <ErrorState onRetry={() => diagnostics.refetch()} />
               ) : (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <ProviderRow
-                    name="OpenAI"
-                    icon={Sparkles}
-                    enabled={health.data.providers.openai}
-                    fallbackLabel="Deterministic stub"
-                  />
-                  <ProviderRow
-                    name="Qdrant vector store"
-                    icon={Database}
-                    enabled={health.data.providers.qdrant}
-                    fallbackLabel="In-memory cosine search"
-                  />
-                  <ProviderRow
-                    name="Redis cache"
-                    icon={Cpu}
-                    enabled={health.data.providers.redis}
-                    fallbackLabel="Process cache"
-                  />
-                  <ProviderRow
-                    name="LangSmith tracing"
-                    icon={Activity}
-                    enabled={health.data.providers.langsmith}
-                    fallbackLabel="Local trace steps"
-                  />
+                <div className="space-y-3">
+                  {hasMixedModes && (
+                    <div className="rounded-md border border-amber-200 bg-amber-50/50 px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                        <p className="text-[11px] text-amber-900">
+                          {allCoreLive
+                            ? "Core providers are live, but some SaaS providers are using mock adapters."
+                            : "Mixed provider modes: Some providers are using fallback or mock implementations."}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  <div className="grid gap-2.5 sm:grid-cols-2">
+                    {diagnostics.data.providers
+                      .filter((p) =>
+                        [
+                          "llm",
+                          "embeddings",
+                          "vector",
+                          "cache",
+                          "observability",
+                          "database",
+                        ].includes(p.category)
+                      )
+                      .map((provider) => (
+                        <ProviderCard key={provider.name} provider={provider} />
+                      ))}
+                  </div>
+                  {hasMixedModes && (
+                    <details className="group">
+                      <summary className="cursor-pointer text-[11px] text-indigo-600 hover:text-indigo-700 font-medium">
+                        Show SaaS provider status ({
+                          diagnostics.data.providers.filter((p) =>
+                            ["search", "email", "crm", "calendar", "sms", "billing"].includes(
+                              p.category
+                            )
+                          ).length
+                        })
+                      </summary>
+                      <div className="mt-2 grid gap-2.5 sm:grid-cols-2">
+                        {diagnostics.data.providers
+                          .filter((p) =>
+                            ["search", "email", "crm", "calendar", "sms", "billing"].includes(
+                              p.category
+                            )
+                          )
+                          .map((provider) => (
+                            <ProviderCard key={provider.name} provider={provider} compact />
+                          ))}
+                      </div>
+                    </details>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -282,34 +335,113 @@ export default function DashboardPage() {
   );
 }
 
-interface ProviderRowProps {
-  name: string;
-  icon: typeof Sparkles;
-  enabled: boolean;
-  fallbackLabel: string;
+function getStatusIcon(provider: ProviderDiagnostic) {
+  if (!provider.healthy || provider.mode === "unhealthy") {
+    return <AlertTriangle className="h-3.5 w-3.5 text-red-500" />;
+  }
+  if (provider.mode === "live") {
+    return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />;
+  }
+  if (provider.mode === "local") {
+    return <CheckCircle2 className="h-3.5 w-3.5 text-blue-500" />;
+  }
+  return <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />;
 }
 
-function ProviderRow({ name, icon: Icon, enabled, fallbackLabel }: ProviderRowProps) {
+function getModeBadge(mode: ProviderMode, compact?: boolean) {
+  const toneMap: Record<ProviderMode, "success" | "info" | "warning" | "danger"> = {
+    live: "success",
+    local: "info",
+    mock: "warning",
+    fallback: "warning",
+    missing: "warning",
+    unhealthy: "danger",
+  };
+  const labelMap: Record<ProviderMode, string> = {
+    live: "Live",
+    local: "Local",
+    mock: "Mock",
+    fallback: "Fallback",
+    missing: "Missing",
+    unhealthy: "Error",
+  };
+  
+  if (compact) {
+    return (
+      <div className={`h-2 w-2 rounded-full ${
+        mode === "live" ? "bg-emerald-500" :
+        mode === "local" ? "bg-blue-500" :
+        mode === "unhealthy" ? "bg-red-500" :
+        "bg-amber-500"
+      }`} />
+    );
+  }
+  
+  return <Badge tone={toneMap[mode]}>{labelMap[mode]}</Badge>;
+}
+
+function ProviderCard({
+  provider,
+  compact,
+}: {
+  provider: ProviderDiagnostic;
+  compact?: boolean;
+}) {
+  const renderIcon = () => {
+    const iconClassName = compact ? "h-3.5 w-3.5 text-slate-600 shrink-0" : "h-3.5 w-3.5";
+    const iconMap: Record<string, React.ReactElement> = {
+      "OpenAI LLM": <Sparkles className={iconClassName} />,
+      "OpenAI Embeddings": <Cloud className={iconClassName} />,
+      Qdrant: <Database className={iconClassName} />,
+      Redis: <Cpu className={iconClassName} />,
+      Postgres: <Database className={iconClassName} />,
+      LangSmith: <Activity className={iconClassName} />,
+      Serper: <Search className={iconClassName} />,
+      Gmail: <Mail className={iconClassName} />,
+      HubSpot: <Users2 className={iconClassName} />,
+      "Google Calendar": <Calendar className={iconClassName} />,
+      Twilio: <TwilioIcon className={iconClassName} />,
+      Stripe: <DollarSign className={iconClassName} />,
+    };
+    return iconMap[provider.name] || <Activity className={iconClassName} />;
+  };
+
+  if (compact) {
+    return (
+      <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-2">
+        <div className="flex items-center gap-2 min-w-0">
+          {renderIcon()}
+          <span className="text-[11px] font-medium text-slate-900 truncate">
+            {provider.name}
+          </span>
+        </div>
+        {getModeBadge(provider.mode, true)}
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
       <div className="flex items-start gap-2">
         <div className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-md bg-slate-100 text-slate-600">
-          <Icon className="h-3.5 w-3.5" />
+          {renderIcon()}
         </div>
         <div>
-          <p className="text-xs font-semibold text-slate-900">{name}</p>
+          <p className="text-xs font-semibold text-slate-900">{provider.name}</p>
           <p className="text-[10px] text-slate-500">
-            {enabled ? "Live provider" : fallbackLabel}
+            {provider.mode === "live"
+              ? provider.model || "Operational"
+              : provider.reason?.split(",")[0] || titleize(provider.mode)}
           </p>
         </div>
       </div>
-      {enabled ? (
-        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-      ) : (
-        <AlertTriangle className="h-4 w-4 text-amber-500" />
-      )}
+      {getStatusIcon(provider)}
     </div>
   );
+}
+
+function titleize(str: string) {
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 }
 
 interface QuickActionProps {

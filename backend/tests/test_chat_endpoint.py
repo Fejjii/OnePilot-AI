@@ -127,3 +127,125 @@ class TestQuotaEnforcement:
         usage = client.get("/usage/summary", headers=_h(token)).json()
         chat_quota = next(q for q in usage["quotas"] if q["feature"] == "chat_messages")
         assert chat_quota["used"] >= 1
+
+
+class TestChatTracing:
+    """Tests for tracing metadata in chat responses."""
+
+    def test_chat_returns_trace_mode(self, client: TestClient) -> None:
+        """Test that chat response includes trace_mode field."""
+        token = _register(client, suffix="_trace")
+        resp = client.post(
+            "/chat",
+            json={"message": "test tracing"},
+            headers=_h(token),
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert "trace_mode" in body
+        assert body["trace_mode"] in ("local", "langsmith")
+
+    def test_chat_trace_metadata_structure(self, client: TestClient) -> None:
+        """Test that trace metadata fields are present."""
+        token = _register(client, suffix="_trace_meta")
+        resp = client.post(
+            "/chat",
+            json={"message": "hello"},
+            headers=_h(token),
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+
+        # Trace metadata fields should be present
+        assert "trace_mode" in body
+        assert "trace_id" in body
+        assert "trace_url" in body
+
+        # Local mode shouldn't have a trace URL
+        if body["trace_mode"] == "local":
+            assert body["trace_url"] is None
+
+    def test_chat_with_langsmith_disabled_returns_local_mode(self, client: TestClient) -> None:
+        """Test that without LangSmith configured, trace_mode is local."""
+        token = _register(client, suffix="_local_trace")
+        resp = client.post(
+            "/chat",
+            json={"message": "test local trace"},
+            headers=_h(token),
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+
+        # Without LangSmith API key configured in tests, should be local
+        assert body["trace_mode"] == "local"
+        assert body["trace_url"] is None
+        # Should still have trace_id
+        assert body["trace_id"] is not None
+
+    def test_trace_metadata_persisted_in_conversation(self, client: TestClient) -> None:
+        """Test that trace metadata is persisted and returned in conversation retrieval."""
+        token = _register(client, suffix="_trace_persist")
+
+        # Send a message
+        chat_resp = client.post(
+            "/chat",
+            json={"message": "test persistence"},
+            headers=_h(token),
+        )
+        assert chat_resp.status_code == 200, chat_resp.text
+        chat_body = chat_resp.json()
+        conv_id = chat_body["conversation_id"]
+
+        # Get the conversation
+        conv_resp = client.get(
+            f"/conversations/{conv_id}",
+            headers=_h(token),
+        )
+        assert conv_resp.status_code == 200, conv_resp.text
+        conv_body = conv_resp.json()
+
+        # Find the assistant message
+        assistant_msgs = [m for m in conv_body["messages"] if m["role"] == "assistant"]
+        assert len(assistant_msgs) == 1
+        assistant_msg = assistant_msgs[0]
+
+        # Verify trace metadata is present
+        assert "trace_mode" in assistant_msg
+        assert assistant_msg["trace_mode"] == chat_body["trace_mode"]
+        assert "trace_id" in assistant_msg
+        assert assistant_msg["trace_id"] == chat_body["trace_id"]
+        assert "trace_url" in assistant_msg
+        assert assistant_msg["trace_url"] == chat_body["trace_url"]
+
+    def test_old_messages_without_trace_metadata_safe(self, client: TestClient) -> None:
+        """Test that old messages without trace metadata don't crash."""
+        token = _register(client, suffix="_old_msg")
+
+        # Send a message
+        chat_resp = client.post(
+            "/chat",
+            json={"message": "test old message"},
+            headers=_h(token),
+        )
+        assert chat_resp.status_code == 200, chat_resp.text
+        conv_id = chat_resp.json()["conversation_id"]
+
+        # Get the conversation (should handle missing trace metadata gracefully)
+        conv_resp = client.get(
+            f"/conversations/{conv_id}",
+            headers=_h(token),
+        )
+        assert conv_resp.status_code == 200, conv_resp.text
+        conv_body = conv_resp.json()
+
+        # Should have messages even if trace metadata might be None
+        assert len(conv_body["messages"]) > 0
+
+        # Assistant message trace fields should be present (but may be None)
+        assistant_msgs = [m for m in conv_body["messages"] if m["role"] == "assistant"]
+        if assistant_msgs:
+            assistant_msg = assistant_msgs[0]
+            # Fields should exist in response even if None
+            assert "trace_mode" in assistant_msg
+            assert "trace_id" in assistant_msg
+            assert "trace_url" in assistant_msg

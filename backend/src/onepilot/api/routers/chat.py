@@ -62,6 +62,9 @@ def chat(
             for s in state.trace_steps
         ],
         safety_flags=state.safety_flags,
+        trace_mode=state.trace_mode,
+        trace_id=state.trace_id,
+        trace_url=state.trace_url,
     )
 
 
@@ -126,6 +129,10 @@ def get_conversation(
                 citations=list(m.citations or []),
                 tool_calls=list(m.tool_calls or []),
                 created_at=m.created_at.isoformat(),
+                trace_mode=m.msg_metadata.get("trace_mode") if m.msg_metadata else None,
+                trace_id=m.msg_metadata.get("trace_id") if m.msg_metadata else None,
+                trace_url=m.msg_metadata.get("trace_url") if m.msg_metadata else None,
+                span_count=m.msg_metadata.get("span_count") if m.msg_metadata else None,
             )
             for m in msgs
         ],

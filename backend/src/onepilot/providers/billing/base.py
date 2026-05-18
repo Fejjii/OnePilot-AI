@@ -12,3 +12,11 @@ class BillingProvider(ABC):
 
     @abstractmethod
     def cancel_subscription(self, subscription_id: str) -> dict: ...
+
+    def get_customer_portal_url(self, organization_id: str) -> dict:
+        """Return a customer portal session (mock or live)."""
+        raise NotImplementedError
+
+    def get_invoice_preview(self, organization_id: str, plan_code: str) -> dict:
+        """Return provider-side invoice preview metadata."""
+        raise NotImplementedError

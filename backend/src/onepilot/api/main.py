@@ -19,6 +19,17 @@ logger = get_logger(__name__)
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     logger.info("app_startup", env=settings.APP_ENV, app=settings.APP_NAME)
+
+    # Initialize tracing
+    from onepilot.observability.tracing import initialize_tracing
+
+    initialize_tracing(
+        langsmith_enabled=settings.LANGSMITH_TRACING,
+        langsmith_api_key=settings.LANGSMITH_API_KEY if settings.LANGSMITH_API_KEY else None,
+        langsmith_project=settings.LANGSMITH_PROJECT,
+        langsmith_endpoint=settings.LANGSMITH_ENDPOINT if settings.LANGSMITH_ENDPOINT else None,
+    )
+
     yield
     logger.info("app_shutdown")
 
@@ -94,7 +105,9 @@ def _register_routers(app: FastAPI) -> None:
         leads,
         memory,
         organizations,
+        billing,
         plans,
+        speech,
         usage,
         users,
     )
@@ -104,6 +117,7 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(users.router)
     app.include_router(organizations.router)
     app.include_router(plans.router)
+    app.include_router(billing.router)
     app.include_router(usage.router)
     app.include_router(documents.router)
     app.include_router(knowledge.router)
@@ -112,6 +126,7 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(approvals.router)
     app.include_router(leads.router)
     app.include_router(memory.router)
+    app.include_router(speech.router)
     app.include_router(admin.router)
     app.include_router(demo.router)
 

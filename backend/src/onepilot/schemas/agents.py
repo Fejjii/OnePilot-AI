@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from onepilot.core.constants import Intent
+from onepilot.core.constants import Intent, MessageClass
 from onepilot.schemas.chat import Citation, ToolCallTrace, TraceStep
 
 
@@ -21,8 +21,16 @@ class AgentState(BaseModel):
     conversation_id: str
     message: str
 
+    # Stage 1: Message classification
+    message_class: MessageClass | None = None
+    message_class_confidence: float = 0.0
+    message_class_reason: str = ""
+
+    # Stage 2: Intent classification
     intent: Intent | None = None
     confidence: float = 0.0
+    route_reason: str = ""
+
     selected_tools: list[str] = Field(default_factory=list)
     tool_calls: list[ToolCallTrace] = Field(default_factory=list)
     citations: list[Citation] = Field(default_factory=list)
@@ -33,6 +41,11 @@ class AgentState(BaseModel):
     usage_metadata: dict = Field(default_factory=dict)
     final_response: str | None = None
     trace_steps: list[TraceStep] = Field(default_factory=list)
+
+    # Trace metadata
+    trace_mode: str = "local"  # "local" or "langsmith"
+    trace_id: str | None = None
+    trace_url: str | None = None
 
     history: list[dict] = Field(default_factory=list)
     context: dict = Field(default_factory=dict)

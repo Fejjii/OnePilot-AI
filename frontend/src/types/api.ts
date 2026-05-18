@@ -83,6 +83,48 @@ export interface HealthResponse {
   };
 }
 
+export type ProviderMode =
+  | "live"
+  | "fallback"
+  | "mock"
+  | "local"
+  | "missing"
+  | "unhealthy";
+
+export type ProviderCategory =
+  | "llm"
+  | "embeddings"
+  | "vector"
+  | "cache"
+  | "database"
+  | "observability"
+  | "search"
+  | "email"
+  | "crm"
+  | "calendar"
+  | "sms"
+  | "billing"
+  | "speech";
+
+export interface ProviderDiagnostic {
+  name: string;
+  category: ProviderCategory;
+  configured: boolean;
+  healthy: boolean;
+  active: boolean;
+  fallback_used: boolean;
+  mode: ProviderMode;
+  model?: string | null;
+  reason?: string | null;
+  last_checked_at: string;
+  details?: Record<string, string | number | boolean> | null;
+}
+
+export interface ProviderDiagnosticResponse {
+  providers: ProviderDiagnostic[];
+  checked_at: string;
+}
+
 // Chat & conversations
 
 export interface Citation {
@@ -120,6 +162,10 @@ export interface ChatResponse {
   usage: Record<string, unknown>;
   trace_steps: TraceStep[];
   safety_flags: string[];
+  trace_mode: string;
+  trace_id?: string | null;
+  trace_url?: string | null;
+  span_count?: number | null;
 }
 
 export interface MessageResponse {
@@ -131,6 +177,10 @@ export interface MessageResponse {
   citations: Citation[];
   tool_calls: ToolCallTrace[];
   created_at: string;
+  trace_mode?: string | null;
+  trace_id?: string | null;
+  trace_url?: string | null;
+  span_count?: number | null;
 }
 
 export interface ConversationSummary {
@@ -377,6 +427,104 @@ export interface UsageSummaryResponse {
   total_estimated_cost: number;
 }
 
+// Billing
+
+export interface BillingPeriod {
+  start: string;
+  end: string;
+}
+
+export interface UsageByFeatureItem {
+  feature: string;
+  event_count: number;
+  estimated_cost: number;
+  input_tokens?: number;
+  output_tokens?: number;
+}
+
+export interface UsageByModelItem {
+  model: string;
+  event_count: number;
+  estimated_cost: number;
+  input_tokens?: number;
+  output_tokens?: number;
+}
+
+export interface TokensByModelItem {
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+}
+
+export interface TopUserCostItem {
+  user_id: string;
+  estimated_cost: number;
+  event_count: number;
+}
+
+export interface BillingSummaryResponse {
+  organization_id: string;
+  current_plan: PlanCode | string;
+  billing_period: BillingPeriod;
+  total_estimated_cost: number;
+  currency: string;
+  usage_by_feature: UsageByFeatureItem[];
+  usage_by_model: UsageByModelItem[];
+  tokens_by_model: TokensByModelItem[];
+  remaining_quota: UsageQuota[];
+  overage_estimate: number;
+  top_users: TopUserCostItem[];
+  billing_provider_mode: string;
+  mock_mode: boolean;
+}
+
+export interface InvoiceLineItem {
+  description: string;
+  quantity: number;
+  unit_amount_cents: number;
+  amount_cents: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface InvoicePreviewResponse {
+  organization_id: string;
+  plan_code: PlanCode | string;
+  billing_period: BillingPeriod;
+  base_plan_price_cents: number;
+  estimated_usage_cost: number;
+  estimated_overage_cost: number;
+  total_estimated_due_cents: number;
+  currency: string;
+  line_items: InvoiceLineItem[];
+  mock_stripe: boolean;
+  provider_status: string;
+}
+
+export interface PlanEntitlement {
+  plan_code: PlanCode | string;
+  included_chat_messages: number;
+  included_rag_queries: number;
+  included_speech_minutes: number;
+  included_document_uploads: number;
+  included_storage_mb: number;
+  included_team_members: number;
+  base_price_cents: number;
+  overage_policy: string;
+}
+
+export interface BillingPlansResponse {
+  current_plan: PlanCode | string;
+  entitlements: PlanEntitlement;
+  available_plans: Array<{
+    code: PlanCode | string;
+    name: string;
+    monthly_price_cents: number;
+    limits: PlanLimits;
+    entitlements: PlanEntitlement;
+  }>;
+}
+
 // Plans
 
 export interface PlanLimits {
@@ -409,4 +557,16 @@ export interface SubscriptionResponse {
 export interface CurrentPlanResponse {
   plan: PlanResponse;
   subscription: SubscriptionResponse;
+}
+
+// Speech transcription
+
+export interface TranscribeResponse {
+  transcript: string;
+  language?: string | null;
+  duration?: number | null;
+  provider: string;
+  model: string;
+  fallback_used: boolean;
+  usage: Record<string, unknown>;
 }

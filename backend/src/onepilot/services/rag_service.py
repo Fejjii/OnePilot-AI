@@ -397,6 +397,7 @@ def search(
     weak_evidence = is_weak_evidence(reranked)
     fallback_used = _embedding_fallback(embeddings)
 
+    embed_tokens = max(1, len(query) // 4)
     usage_service.record(
         session,
         organization_id=principal.organization_id,
@@ -405,7 +406,7 @@ def search(
         model=getattr(embeddings, "model", None),
         provider=type(embeddings).__name__,
         fallback_used=fallback_used,
-        input_tokens=max(1, len(query) // 4),
+        embedding_tokens=embed_tokens,
         latency_ms=latency_ms,
         metadata={
             "top_k": top_k,

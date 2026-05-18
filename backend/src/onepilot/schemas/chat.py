@@ -47,6 +47,11 @@ class ChatResponse(BaseModel):
     trace_steps: list[TraceStep] = Field(default_factory=list)
     safety_flags: list[str] = Field(default_factory=list)
 
+    # Trace metadata
+    trace_mode: str = "local"
+    trace_id: str | None = None
+    trace_url: str | None = None
+
 
 class MessageResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -59,6 +64,12 @@ class MessageResponse(BaseModel):
     citations: list = Field(default_factory=list)
     tool_calls: list = Field(default_factory=list)
     created_at: str
+
+    # Trace metadata (for assistant messages only)
+    trace_mode: str | None = None
+    trace_id: str | None = None
+    trace_url: str | None = None
+    span_count: int | None = None
 
 
 class ConversationSummary(BaseModel):

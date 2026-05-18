@@ -2,8 +2,10 @@
 
 Graph:
 
-    classify_intent -> route -> {branch} -> guardrail -> finalize_response
+    classify_message -> classify_intent -> route -> {branch} -> guardrail -> finalize_response
 
+Stage 1 (classify_message): Message classification into high-level classes
+Stage 2 (classify_intent): Intent classification based on message class
 Branches (selected by ``route``):
     - knowledge_search   -> RAG tool
     - email_assistant    -> EmailDraft tool
@@ -16,6 +18,9 @@ The graph is deterministic when no API keys are configured. Each node returns
 a partial state dict so LangGraph can merge updates. We keep the agent itself
 free of business logic — every branch delegates to a tool, and tools delegate
 to services.
+
+Tracing is integrated throughout the workflow using the observability.tracing
+abstraction layer. Supports both local and LangSmith live tracing.
 """
 
 from __future__ import annotations
@@ -28,9 +33,11 @@ from langgraph.graph import END, StateGraph
 from sqlalchemy.orm import Session
 
 from onepilot.agents.intent_classifier import classify as classify_intent_fn
+from onepilot.agents.message_classifier import classify_message as classify_message_fn
 from onepilot.core.config import Settings
 from onepilot.core.constants import Intent
 from onepilot.core.logging import get_logger
+from onepilot.observability.tracing import TraceContext, sanitize_metadata
 from onepilot.schemas.agents import AgentState
 from onepilot.schemas.chat import Citation, ToolCallTrace, TraceStep
 from onepilot.security.auth import Principal
@@ -90,6 +97,7 @@ class AgentDeps:
     session: Session
     principal: Principal
     settings: Settings
+    trace_context: TraceContext | None = None
 
 
 def _ctx(deps: AgentDeps) -> ToolContext:
@@ -141,13 +149,40 @@ def _record_tool_call(state: dict, result: ToolResult) -> None:
 def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
     """Build a compiled LangGraph for one request."""
 
-    def classify_intent_node(state: AgentState) -> dict:
+    def classify_message_node(state: AgentState) -> dict:
+        """Stage 1: Classify message into high-level message class."""
         started = time.monotonic()
-        result = classify_intent_fn(state.message, settings=deps.settings, use_llm=False)
+        result = classify_message_fn(state.message)
+        duration_ms = int((time.monotonic() - started) * 1000)
+        update: dict[str, Any] = {
+            "message_class": result.message_class,
+            "message_class_confidence": result.confidence,
+            "message_class_reason": result.reason,
+            "trace_steps": list(state.trace_steps)
+            + [
+                TraceStep(
+                    step="classify_message",
+                    detail=f"class={result.message_class} reason={result.reason}",
+                    duration_ms=duration_ms,
+                ).model_dump()
+            ],
+        }
+        return update
+
+    def classify_intent_node(state: AgentState) -> dict:
+        """Stage 2: Map message class to specific intent."""
+        started = time.monotonic()
+        result = classify_intent_fn(
+            state.message,
+            message_class=state.message_class,
+            settings=deps.settings,
+            use_llm=False,
+        )
         duration_ms = int((time.monotonic() - started) * 1000)
         update: dict[str, Any] = {
             "intent": result.intent,
             "confidence": result.confidence,
+            "route_reason": f"message_class={state.message_class} -> intent={result.intent}",
             "trace_steps": list(state.trace_steps)
             + [
                 TraceStep(
@@ -253,6 +288,7 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             _ctx(deps),
             message=state.message,
             history=state.history,
+            message_class=state.message_class,
         )
         _record_tool_call(update, result)
         update["draft_output"] = result.output.get("reply", "")
@@ -336,6 +372,7 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
         }
 
     graph: StateGraph = StateGraph(AgentState)
+    graph.add_node("classify_message", classify_message_node)
     graph.add_node("classify_intent", classify_intent_node)
     graph.add_node("route", route_node)
     graph.add_node("knowledge_search", knowledge_search_node)
@@ -347,7 +384,8 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
     graph.add_node("guardrail", guardrail_node)
     graph.add_node("finalize_response", finalize_node)
 
-    graph.set_entry_point("classify_intent")
+    graph.set_entry_point("classify_message")
+    graph.add_edge("classify_message", "classify_intent")
     graph.add_edge("classify_intent", "route")
     graph.add_conditional_edges(
         "route",
@@ -431,9 +469,15 @@ def run_agent(
     message: str,
     history: list[dict] | None = None,
     context: dict | None = None,
+    trace_context: TraceContext | None = None,
 ) -> AgentState:
     """Run the full workflow once and return the final :class:`AgentState`."""
-    deps = AgentDeps(session=session, principal=principal, settings=settings)
+    deps = AgentDeps(
+        session=session,
+        principal=principal,
+        settings=settings,
+        trace_context=trace_context,
+    )
     workflow = make_workflow(deps)
     initial = AgentState(
         organization_id=principal.organization_id,
@@ -442,6 +486,9 @@ def run_agent(
         message=message,
         history=list(history or []),
         context=dict(context or {}),
+        trace_mode=trace_context.mode if trace_context else "local",
+        trace_id=trace_context.trace_id if trace_context else None,
+        trace_url=trace_context.trace_url if trace_context else None,
     )
     final_dict = workflow.invoke(initial)
     return AgentState.model_validate(final_dict)

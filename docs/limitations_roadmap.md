@@ -14,7 +14,7 @@ This document is an honest, professional assessment of the current state of OneP
 | HubSpot CRM | Mocked | In-memory, deterministic. No real HubSpot API calls. |
 | Gmail / Email send | Mocked | Email drafts stored in-memory. No actual emails sent. |
 | Google Calendar | Mocked | In-memory event store. No real calendar integration. |
-| Stripe Billing | Mocked | Plan tiers enforced by code. No real payment processing. |
+| Stripe Billing | Mocked | `MockStripeProvider` + billing-ready APIs; estimated usage costs; no real payment processing. |
 | Serper Web Search | Mocked | Returns canned search results. No real HTTP calls. |
 
 ---
@@ -41,8 +41,9 @@ This document is an honest, professional assessment of the current state of OneP
 13. **No production deployment** — Docker Compose only. No Kubernetes, no cloud-native deployment.
 
 ### Billing & Plans
-14. **No real billing** — plan tiers are enforced but no payment gateway is wired.
-15. **Quota reset** — quotas reset on a calendar-month basis but require a cron job or background worker that is not currently implemented.
+14. **No real billing** — usage cost estimation, invoice preview, and mock Stripe are implemented; live Stripe checkout/webhooks are not.
+15. **Estimated prices** — token rates in `pricing_config.py` must be verified against provider list prices before production.
+16. **Quota reset** — quotas reset on a calendar-month basis but require a cron job or background worker that is not currently implemented.
 
 ---
 

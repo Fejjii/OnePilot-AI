@@ -1,11 +1,16 @@
-"""Intent classifier.
+"""Intent classifier (Stage 2 of routing).
 
-The classifier is deterministic by default — it inspects the user message
-against a small, well-tested rule set and assigns one of the ``Intent`` values.
-If OpenAI is configured we *could* (optionally) ask the LLM for a structured
-JSON classification, but tests never depend on that path. Determinism is more
-important than recall for a demo SaaS agent: every routing decision is
-auditable and reproducible.
+After message classification (Stage 1), this module maps message classes to
+specific intents for tool selection. The mapping is deterministic and rule-based
+for auditability and reproducibility.
+
+Stage 1 (message_classifier.py) identifies high-level message classes:
+- capability_or_help, conversational, correction_or_meta, business_knowledge,
+  workflow_request, unclear, out_of_scope
+
+Stage 2 (this module) maps message classes to specific intents:
+- general_assistant, knowledge_search, email_drafting, lead_support,
+  workflow_action, document_summary, clarification, out_of_scope
 """
 
 from __future__ import annotations
@@ -15,7 +20,7 @@ import re
 from dataclasses import dataclass
 
 from onepilot.core.config import Settings, get_settings
-from onepilot.core.constants import Intent
+from onepilot.core.constants import Intent, MessageClass
 from onepilot.core.logging import get_logger
 from onepilot.providers import get_llm_provider
 from onepilot.providers.llm.base import LLMProvider
@@ -24,16 +29,229 @@ from onepilot.providers.llm.fallback_provider import FallbackLLMProvider
 logger = get_logger(__name__)
 
 # ---------------------------------------------------------------------------
-# Rule set (deterministic fallback)
+# Stage 2: Message class to intent mapping
 # ---------------------------------------------------------------------------
 
-# Each rule is a (keyword regex, intent, confidence) tuple. The first match
-# wins. Order matters; more specific intents should be listed before less
-# specific ones (e.g. ``email`` before ``general``).
+# Direct mappings from message class to intent
+_MESSAGE_CLASS_TO_INTENT: dict[MessageClass, Intent] = {
+    MessageClass.CAPABILITY_OR_HELP: Intent.GENERAL_ASSISTANT,
+    MessageClass.CONVERSATIONAL: Intent.GENERAL_ASSISTANT,
+    MessageClass.CORRECTION_OR_META: Intent.GENERAL_ASSISTANT,
+    MessageClass.BUSINESS_KNOWLEDGE: Intent.KNOWLEDGE_SEARCH,
+    MessageClass.UNCLEAR: Intent.CLARIFICATION,
+    MessageClass.OUT_OF_SCOPE: Intent.OUT_OF_SCOPE,
+}
 
-_KEYWORD_RULES: list[tuple[re.Pattern[str], Intent, float]] = [
-    # Greetings / conversational openers — match first to avoid being eaten by
-    # the "how/why/?" knowledge_search rule.
+# Workflow requests need deeper inspection to route correctly
+_EMAIL_PATTERNS = [
+    re.compile(
+        r"\b(draft|write|compose|reply to|send)\b.*\b(email|message|mail|reply|response)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\b(follow[- ]?up|outreach|cold email|introduction email)\b", re.IGNORECASE),
+]
+
+_LEAD_PATTERNS = [
+    re.compile(
+        r"\b(new (lead|prospect)|interested (customer|buyer)|sales inquiry)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(lead|prospect|customer inquiry|qualify|capture)\b",
+        re.IGNORECASE,
+    ),
+]
+
+_DOCUMENT_SUMMARY_PATTERNS = [
+    re.compile(r"\b(summari[sz]e|summary of|tl;dr|key points)\b", re.IGNORECASE),
+]
+
+_WORKFLOW_ACTION_PATTERNS = [
+    re.compile(
+        r"\b(schedule|book a|book (the|an?)|update (?:the )?crm|sync to crm"
+        r"|send invoice|create ticket|approve|reject)\b",
+        re.IGNORECASE,
+    ),
+]
+
+# Minimum message length for intent classification
+_MIN_CHARS_FOR_INTENT = 4
+
+
+@dataclass(slots=True)
+class IntentResult:
+    """Result of intent classification (Stage 2)."""
+
+    intent: Intent
+    confidence: float
+    source: str  # "rules" or "llm"
+    reason: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+
+def classify(
+    message: str,
+    message_class: MessageClass | None = None,
+    *,
+    settings: Settings | None = None,
+    llm: LLMProvider | None = None,
+    use_llm: bool = False,
+) -> IntentResult:
+    """Classify a message into an Intent (Stage 2 of routing).
+
+    If message_class is provided, uses Stage 2 mapping logic.
+    If not provided, falls back to legacy keyword-based classification for backward compatibility.
+
+    Args:
+        message: The user message
+        message_class: Optional message class from Stage 1 classification
+        settings: Optional settings override
+        llm: Optional LLM provider override
+        use_llm: Whether to use LLM classification (requires OpenAI)
+
+    Returns:
+        IntentResult with intent, confidence, source, and reason
+    """
+    cleaned = (message or "").strip()
+    if len(cleaned) < _MIN_CHARS_FOR_INTENT:
+        return IntentResult(
+            intent=Intent.CLARIFICATION,
+            confidence=0.6,
+            source="rules",
+            reason="message_too_short",
+        )
+
+    # Stage 2: Use message class if provided
+    if message_class is not None:
+        return _classify_from_message_class(cleaned, message_class)
+
+    # Legacy fallback: keyword-based classification for backward compatibility
+    # This path is used when Stage 1 is skipped (e.g., in old tests)
+    logger.warning("intent_classifier_called_without_message_class", message_preview=cleaned[:50])
+    return _classify_legacy(cleaned, settings=settings, llm=llm, use_llm=use_llm)
+
+
+def _classify_from_message_class(message: str, message_class: MessageClass) -> IntentResult:
+    """Stage 2: Map message class to specific intent.
+
+    Args:
+        message: The user message
+        message_class: Message class from Stage 1
+
+    Returns:
+        IntentResult with mapped intent
+    """
+    # Direct mappings (most message classes map 1:1 to intents)
+    if message_class in _MESSAGE_CLASS_TO_INTENT:
+        intent = _MESSAGE_CLASS_TO_INTENT[message_class]
+        return IntentResult(
+            intent=intent,
+            confidence=0.85,
+            source="rules",
+            reason=f"message_class:{message_class}",
+        )
+
+    # Workflow requests need deeper inspection
+    if message_class == MessageClass.WORKFLOW_REQUEST:
+        return _classify_workflow_intent(message)
+
+    # Fallback (shouldn't happen with well-designed Stage 1)
+    logger.warning("unexpected_message_class", message_class=message_class)
+    return IntentResult(
+        intent=Intent.GENERAL_ASSISTANT,
+        confidence=0.5,
+        source="rules",
+        reason=f"fallback_from:{message_class}",
+    )
+
+
+def _classify_workflow_intent(message: str) -> IntentResult:
+    """Classify workflow requests into specific workflow intents.
+
+    Args:
+        message: The user message
+
+    Returns:
+        IntentResult with workflow-specific intent
+    """
+    # Check for email drafting
+    for pattern in _EMAIL_PATTERNS:
+        if pattern.search(message):
+            return IntentResult(
+                intent=Intent.EMAIL_DRAFTING,
+                confidence=0.82,
+                source="rules",
+                reason="workflow:email_drafting",
+            )
+
+    # Check for lead support
+    for pattern in _LEAD_PATTERNS:
+        if pattern.search(message):
+            return IntentResult(
+                intent=Intent.LEAD_SUPPORT,
+                confidence=0.85,
+                source="rules",
+                reason="workflow:lead_support",
+            )
+
+    # Check for document summary
+    for pattern in _DOCUMENT_SUMMARY_PATTERNS:
+        if pattern.search(message):
+            return IntentResult(
+                intent=Intent.DOCUMENT_SUMMARY,
+                confidence=0.78,
+                source="rules",
+                reason="workflow:document_summary",
+            )
+
+    # Check for general workflow actions
+    for pattern in _WORKFLOW_ACTION_PATTERNS:
+        if pattern.search(message):
+            return IntentResult(
+                intent=Intent.WORKFLOW_ACTION,
+                confidence=0.82,
+                source="rules",
+                reason="workflow:workflow_action",
+            )
+
+    # Fallback: generic workflow action or clarification
+    return IntentResult(
+        intent=Intent.CLARIFICATION,
+        confidence=0.6,
+        source="rules",
+        reason="workflow:unclear",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Legacy classification (backward compatibility)
+# ---------------------------------------------------------------------------
+
+# Legacy keyword rules for backward compatibility with old tests
+_LEGACY_KEYWORD_RULES: list[tuple[re.Pattern[str], Intent, float]] = [
+    # User corrections / meta comments
+    (
+        re.compile(
+            r"\b(not (what|a|the)|wrong|mistake|incorrect|misunderstood|off[-\s]?track|unrelated"
+            r"|that'?s not|doesn'?t (help|work|make sense)|this is not)\b",
+            re.IGNORECASE,
+        ),
+        Intent.GENERAL_ASSISTANT,
+        0.88,
+    ),
+    (
+        re.compile(
+            r"^\s*(nevermind|never mind|forget it|skip|actually|wait|hold on)\b",
+            re.IGNORECASE,
+        ),
+        Intent.GENERAL_ASSISTANT,
+        0.85,
+    ),
+    # Greetings / conversational
     (
         re.compile(
             r"^\s*(hi|hey|hello|yo|thanks|thank you|good (morning|afternoon|evening))\b",
@@ -41,11 +259,6 @@ _KEYWORD_RULES: list[tuple[re.Pattern[str], Intent, float]] = [
         ),
         Intent.GENERAL_ASSISTANT,
         0.85,
-    ),
-    (
-        re.compile(r"^\s*let'?s\s+(plan|brainstorm|chat|talk)\b", re.IGNORECASE),
-        Intent.GENERAL_ASSISTANT,
-        0.8,
     ),
     # Email drafting
     (
@@ -56,23 +269,10 @@ _KEYWORD_RULES: list[tuple[re.Pattern[str], Intent, float]] = [
         Intent.EMAIL_DRAFTING,
         0.82,
     ),
-    (
-        re.compile(r"\b(follow[- ]?up|outreach|cold email|introduction email)\b", re.IGNORECASE),
-        Intent.EMAIL_DRAFTING,
-        0.78,
-    ),
     # Lead support
     (
         re.compile(
-            r"\b(new (lead|prospect)|interested (customer|buyer)|sales inquiry)\b",
-            re.IGNORECASE,
-        ),
-        Intent.LEAD_SUPPORT,
-        0.85,
-    ),
-    (
-        re.compile(
-            r"\b(lead|prospect|customer inquiry|qualify|capture)\b",
+            r"\b(new (lead|prospect)|interested (customer|buyer)|sales inquiry|lead|prospect|qualify|capture)\b",
             re.IGNORECASE,
         ),
         Intent.LEAD_SUPPORT,
@@ -84,7 +284,7 @@ _KEYWORD_RULES: list[tuple[re.Pattern[str], Intent, float]] = [
         Intent.DOCUMENT_SUMMARY,
         0.78,
     ),
-    # Workflow action (book / schedule / update CRM / send / approve)
+    # Workflow action
     (
         re.compile(
             r"\b(schedule|book a|book (the|an?)|update (?:the )?crm|sync to crm"
@@ -94,7 +294,7 @@ _KEYWORD_RULES: list[tuple[re.Pattern[str], Intent, float]] = [
         Intent.WORKFLOW_ACTION,
         0.82,
     ),
-    # Knowledge search (lower-priority, generic "wh-" questions)
+    # Knowledge search (lower priority)
     (
         re.compile(
             r"\b(what|how|why|when|where|explain|tell me about|policy|docs?|guide|knowledge base)\b",
@@ -110,97 +310,60 @@ _KEYWORD_RULES: list[tuple[re.Pattern[str], Intent, float]] = [
     ),
 ]
 
-# Out-of-scope rules — anything that clearly isn't business productivity.
-_OUT_OF_SCOPE_RULES: list[re.Pattern[str]] = [
+_LEGACY_OUT_OF_SCOPE_RULES: list[re.Pattern[str]] = [
     re.compile(r"\b(weather|joke|love poem|stock(s)? tip|crypto price)\b", re.IGNORECASE),
     re.compile(r"\b(write me a story|generate an image|sing a song)\b", re.IGNORECASE),
     re.compile(r"\b(murder|illegal|hack into|bypass authentication)\b", re.IGNORECASE),
 ]
 
-# Clarification rules — when the user message is too short or vague.
-_MIN_CHARS_FOR_INTENT = 4
 
-
-@dataclass(slots=True)
-class IntentResult:
-    intent: Intent
-    confidence: float
-    source: str  # "rules" or "llm"
-    reason: str = ""
-
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
-
-
-def classify(
+def _classify_legacy(
     message: str,
     *,
     settings: Settings | None = None,
     llm: LLMProvider | None = None,
     use_llm: bool = False,
 ) -> IntentResult:
-    """Classify ``message`` into an :class:`Intent`.
+    """Legacy classification using keyword rules (backward compatibility).
 
-    The default path is rule-based and deterministic. Pass ``use_llm=True``
-    *and* configure ``OPENAI_API_KEY`` to optionally enable structured LLM
-    classification (still falls back to rules on parse error).
+    This path is used when message_class is not provided to the classify() function.
     """
-    cleaned = (message or "").strip()
-    if len(cleaned) < _MIN_CHARS_FOR_INTENT:
-        return IntentResult(
-            intent=Intent.CLARIFICATION,
-            confidence=0.6,
-            source="rules",
-            reason="message_too_short",
-        )
-
-    for pattern in _OUT_OF_SCOPE_RULES:
-        if pattern.search(cleaned):
+    # Check out-of-scope first
+    for pattern in _LEGACY_OUT_OF_SCOPE_RULES:
+        if pattern.search(message):
             return IntentResult(
                 intent=Intent.OUT_OF_SCOPE,
                 confidence=0.9,
                 source="rules",
-                reason=f"matched:{pattern.pattern}",
+                reason=f"legacy_out_of_scope:{pattern.pattern[:50]}",
             )
 
-    rule_result = _classify_with_rules(cleaned)
-
-    if not use_llm:
-        return rule_result
-
-    settings = settings or get_settings()
-    if not settings.has_openai:
-        return rule_result
-
-    try:
-        llm_result = _classify_with_llm(cleaned, llm=llm or get_llm_provider(settings))
-    except Exception as exc:  # pragma: no cover - LLM exceptions can be flaky
-        logger.warning("intent_llm_failed", error=str(exc))
-        return rule_result
-
-    # Combine: if the LLM disagrees but rule was strong, trust rules; otherwise
-    # trust LLM. This guards against hallucinated intents.
-    if rule_result.confidence >= 0.8 and rule_result.intent != llm_result.intent:
-        return rule_result
-    return llm_result
-
-
-def _classify_with_rules(message: str) -> IntentResult:
-    for pattern, intent, conf in _KEYWORD_RULES:
+    # Try keyword rules
+    for pattern, intent, conf in _LEGACY_KEYWORD_RULES:
         if pattern.search(message):
             return IntentResult(
                 intent=intent,
                 confidence=conf,
                 source="rules",
-                reason=f"matched:{pattern.pattern}",
+                reason=f"legacy_match:{pattern.pattern[:50]}",
             )
+
+    # Try LLM if enabled
+    if use_llm:
+        settings = settings or get_settings()
+        if settings.has_openai:
+            try:
+                llm_result = _classify_with_llm(message, llm=llm or get_llm_provider(settings))
+                return llm_result
+            except Exception as exc:
+                logger.warning("intent_llm_failed", error=str(exc))
+
+    # Final fallback
     return IntentResult(
         intent=Intent.GENERAL_ASSISTANT,
         confidence=0.5,
         source="rules",
-        reason="no_match",
+        reason="legacy_no_match",
     )
 
 
@@ -220,8 +383,10 @@ _INTENT_SCHEMA: dict = {
 
 
 def _classify_with_llm(message: str, *, llm: LLMProvider) -> IntentResult:
+    """Use LLM for intent classification (legacy path)."""
     if isinstance(llm, FallbackLLMProvider):
-        return _classify_with_rules(message)
+        # Use legacy classification when fallback provider is used
+        return _classify_legacy(message)
 
     system = (
         "You classify user messages for a business productivity assistant. "
@@ -241,7 +406,7 @@ def _classify_with_llm(message: str, *, llm: LLMProvider) -> IntentResult:
         intent = Intent(payload.get("intent"))
         confidence = float(payload.get("confidence", 0.6))
     except (ValueError, TypeError, json.JSONDecodeError):
-        return _classify_with_rules(message)
+        return _classify_legacy(message)
 
     return IntentResult(
         intent=intent,
@@ -249,3 +414,6 @@ def _classify_with_llm(message: str, *, llm: LLMProvider) -> IntentResult:
         source="llm",
         reason=str(payload.get("reason", "")),
     )
+
+
+__all__ = ["classify", "IntentResult"]

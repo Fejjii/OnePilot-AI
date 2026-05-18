@@ -1,7 +1,7 @@
 import { vi } from "vitest";
 import type { AnchorHTMLAttributes } from "react";
 
-let pathname = "/dashboard";
+let pathname = "/workspace";
 let searchParams = new URLSearchParams();
 
 export function setMockNextLocation(opts: {
@@ -12,14 +12,40 @@ export function setMockNextLocation(opts: {
   if (opts.search !== undefined) searchParams = new URLSearchParams(opts.search);
 }
 
+function syncLocationFromHref(url: string) {
+  try {
+    const parsed = new URL(url, "http://localhost");
+    setMockNextLocation({
+      pathname: parsed.pathname,
+      search: parsed.search,
+    });
+  } catch {
+    // ignore malformed URLs in tests
+  }
+}
+
 export const navigationMocks = {
   push: vi.fn(),
-  replace: vi.fn(),
+  replace: vi.fn((url: string) => {
+    syncLocationFromHref(url);
+  }),
   prefetch: vi.fn(),
   back: vi.fn(),
   forward: vi.fn(),
   refresh: vi.fn(),
 };
+
+/** Restore router.replace to sync URL immediately (default). */
+export function enableRouterUrlSync() {
+  navigationMocks.replace.mockImplementation((url: string) => {
+    syncLocationFromHref(url);
+  });
+}
+
+/** Simulate Next.js App Router lag: replace is called but searchParams do not update yet. */
+export function blockRouterUrlSync() {
+  navigationMocks.replace.mockImplementation(() => {});
+}
 
 vi.mock("next/navigation", () => ({
   useRouter: () => navigationMocks,

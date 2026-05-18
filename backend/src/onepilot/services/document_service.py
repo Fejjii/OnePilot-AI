@@ -32,6 +32,10 @@ logger = get_logger(__name__)
 VECTOR_COLLECTION_PREFIX: str = "documents_"
 
 
+def _embedding_fallback(embeddings: EmbeddingsProvider) -> bool:
+    return "fallback" in type(embeddings).__name__.lower()
+
+
 @dataclass(slots=True)
 class UploadResult:
     document: Document
@@ -218,6 +222,7 @@ def upload_document(
         resource_id=document.id,
         detail={"title": title, "chunk_count": len(chunk_models), "size_bytes": len(content)},
     )
+    embed_tokens = sum(c.token_count for c in chunks)
     usage_service.record(
         session,
         organization_id=principal.organization_id,
@@ -225,8 +230,8 @@ def upload_document(
         feature=UsageFeature.DOCUMENT_UPLOADS.value,
         model=getattr(embeddings, "model", None),
         provider=type(embeddings).__name__,
-        input_tokens=sum(c.token_count for c in chunks),
-        output_tokens=0,
+        embedding_tokens=embed_tokens,
+        fallback_used=_embedding_fallback(embeddings),
         latency_ms=embed_latency_ms,
         metadata={"document_id": document.id, "chunks": len(chunks)},
     )

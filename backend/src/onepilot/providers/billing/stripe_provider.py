@@ -22,3 +22,9 @@ class StripeProvider(BillingProvider):
 
     def cancel_subscription(self, subscription_id: str) -> dict:
         raise NotImplementedError("Stripe cancel_subscription not yet implemented")
+
+    def get_customer_portal_url(self, organization_id: str) -> dict:
+        raise NotImplementedError("Stripe customer portal not yet implemented")
+
+    def get_invoice_preview(self, organization_id: str, plan_code: str) -> dict:
+        raise NotImplementedError("Stripe invoice preview not yet implemented")

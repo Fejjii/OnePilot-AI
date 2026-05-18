@@ -1,13 +1,20 @@
-import { Wrench, Workflow } from "lucide-react";
+import { Wrench, Workflow, ExternalLink } from "lucide-react";
 import type { ToolCallTrace, TraceStep } from "@/types/api";
 import { titleize } from "@/lib/utils";
 
 interface ToolTracePanelProps {
   toolCalls: ToolCallTrace[];
   traceSteps?: TraceStep[];
+  traceMode?: string;
+  traceUrl?: string | null;
 }
 
-export function ToolTracePanel({ toolCalls, traceSteps }: ToolTracePanelProps) {
+export function ToolTracePanel({
+  toolCalls,
+  traceSteps,
+  traceMode = "local",
+  traceUrl,
+}: ToolTracePanelProps) {
   const hasTools = toolCalls.length > 0;
   const hasSteps = (traceSteps?.length ?? 0) > 0;
 
@@ -21,6 +28,36 @@ export function ToolTracePanel({ toolCalls, traceSteps }: ToolTracePanelProps) {
 
   return (
     <div className="space-y-4">
+      {/* Trace Mode Badge */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-slate-500">
+            Trace mode:
+          </span>
+          <span
+            className={
+              "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide " +
+              (traceMode === "langsmith"
+                ? "bg-indigo-100 text-indigo-700"
+                : "bg-slate-100 text-slate-700")
+            }
+          >
+            {traceMode === "langsmith" ? "LangSmith" : "Local"}
+          </span>
+        </div>
+        {traceMode === "langsmith" && traceUrl && (
+          <a
+            href={traceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100"
+          >
+            <ExternalLink className="h-3 w-3" />
+            Open LangSmith trace
+          </a>
+        )}
+      </div>
+
       {hasSteps && (
         <div>
           <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">

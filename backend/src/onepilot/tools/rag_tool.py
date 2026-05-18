@@ -63,5 +63,9 @@ class RAGTool(Tool):
             duration_ms=duration_ms,
             safety_flags=safety_flags,
             citations=citations,
-            usage={"model": outcome.model, "fallback_used": outcome.fallback_used},
+            usage={
+                "model": outcome.model,
+                "provider": "rag.answer",
+                "fallback_used": outcome.fallback_used,
+            },
         )
