@@ -100,6 +100,7 @@ def _register_routers(app: FastAPI) -> None:
         chat,
         demo,
         documents,
+        evaluation,
         health,
         knowledge,
         leads,
@@ -113,6 +114,7 @@ def _register_routers(app: FastAPI) -> None:
     )
 
     app.include_router(health.router)
+    app.include_router(evaluation.router)
     app.include_router(auth.router)
     app.include_router(users.router)
     app.include_router(organizations.router)

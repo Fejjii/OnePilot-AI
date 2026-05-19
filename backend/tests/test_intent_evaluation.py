@@ -35,7 +35,7 @@ def test_evaluate_skips_invalid_rows(tmp_path: Path) -> None:
     bad = tmp_path / "bad.jsonl"
     bad.write_text(
         '{"message": "ok"}\n'
-        '{"message": "What is x?", "expected_intent": "knowledge_search"}\n'
+        '{"message": "What is our company refund policy?", "expected_intent": "knowledge_search"}\n'
         '{"message": "what", "expected_intent": "not_a_real_intent"}\n',
         encoding="utf-8",
     )

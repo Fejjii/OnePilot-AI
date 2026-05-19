@@ -1,44 +1,380 @@
 {
-  "test_name": "intent_classification",
-  "timestamp": "2026-05-18T17:01:31.982817+00:00",
+  "test_name": "intent_and_routing",
+  "timestamp": "2026-05-19T11:15:28.500965+00:00",
   "total": 30,
   "correct": 30,
   "accuracy": 1.0,
+  "intent_accuracy": 1.0,
+  "routing_total": 30,
+  "routing_correct": 30,
+  "routing_accuracy": 1.0,
   "per_intent_accuracy": {
+    "general_assistant": 1.0,
     "knowledge_search": 1.0,
+    "clarification": 1.0,
     "email_drafting": 1.0,
     "lead_support": 1.0,
     "workflow_action": 1.0,
-    "document_summary": 1.0,
-    "general_assistant": 1.0,
     "out_of_scope": 1.0,
-    "clarification": 1.0
+    "document_summary": 1.0
   },
   "confusion": {
+    "general_assistant": {
+      "general_assistant": 5
+    },
     "knowledge_search": {
-      "knowledge_search": 5
+      "knowledge_search": 4
+    },
+    "clarification": {
+      "clarification": 8
     },
     "email_drafting": {
-      "email_drafting": 5
+      "email_drafting": 3
     },
     "lead_support": {
-      "lead_support": 5
+      "lead_support": 3
     },
     "workflow_action": {
       "workflow_action": 3
     },
-    "document_summary": {
-      "document_summary": 3
-    },
-    "general_assistant": {
-      "general_assistant": 3
-    },
     "out_of_scope": {
-      "out_of_scope": 3
+      "out_of_scope": 2
     },
-    "clarification": {
-      "clarification": 3
+    "document_summary": {
+      "document_summary": 2
     }
   },
-  "failures": []
+  "failures": [],
+  "case_results": [
+    {
+      "message": "What can you help me with?",
+      "category": "capability_help",
+      "expected_intent": "general_assistant",
+      "predicted_intent": "general_assistant",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "capability_or_help",
+      "predicted_message_class": "capability_or_help",
+      "routing_pass": true
+    },
+    {
+      "message": "What features does OnePilot support?",
+      "category": "capability_help",
+      "expected_intent": "knowledge_search",
+      "predicted_intent": "knowledge_search",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "business_knowledge",
+      "predicted_message_class": "business_knowledge",
+      "routing_pass": true
+    },
+    {
+      "message": "Hey there, how's your day going?",
+      "category": "small_talk",
+      "expected_intent": "general_assistant",
+      "predicted_intent": "general_assistant",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "conversational",
+      "predicted_message_class": "conversational",
+      "routing_pass": true
+    },
+    {
+      "message": "Thanks for the help yesterday.",
+      "category": "small_talk",
+      "expected_intent": "general_assistant",
+      "predicted_intent": "general_assistant",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "conversational",
+      "predicted_message_class": "conversational",
+      "routing_pass": true
+    },
+    {
+      "message": "That's not what I asked \u2014 wrong answer.",
+      "category": "correction_meta",
+      "expected_intent": "general_assistant",
+      "predicted_intent": "general_assistant",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "correction_or_meta",
+      "predicted_message_class": "correction_or_meta",
+      "routing_pass": true
+    },
+    {
+      "message": "Never mind, forget that \u2014 different topic.",
+      "category": "correction_meta",
+      "expected_intent": "general_assistant",
+      "predicted_intent": "general_assistant",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "correction_or_meta",
+      "predicted_message_class": "correction_or_meta",
+      "routing_pass": true
+    },
+    {
+      "message": "What is our refund policy?",
+      "category": "business_knowledge",
+      "expected_intent": "knowledge_search",
+      "predicted_intent": "knowledge_search",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "business_knowledge",
+      "predicted_message_class": "business_knowledge",
+      "routing_pass": true
+    },
+    {
+      "message": "Tell me about our SOC 2 controls.",
+      "category": "business_knowledge",
+      "expected_intent": "clarification",
+      "predicted_intent": "clarification",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "unclear",
+      "predicted_message_class": "unclear",
+      "routing_pass": true
+    },
+    {
+      "message": "How does NovaEdge handle data privacy?",
+      "category": "business_knowledge",
+      "expected_intent": "knowledge_search",
+      "predicted_intent": "knowledge_search",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "business_knowledge",
+      "predicted_message_class": "business_knowledge",
+      "routing_pass": true
+    },
+    {
+      "message": "Draft an email to Acme thanking them for the meeting.",
+      "category": "email_drafting",
+      "expected_intent": "email_drafting",
+      "predicted_intent": "email_drafting",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "workflow_request",
+      "predicted_message_class": "workflow_request",
+      "routing_pass": true
+    },
+    {
+      "message": "Write a follow-up email to a prospect who went silent.",
+      "category": "email_drafting",
+      "expected_intent": "email_drafting",
+      "predicted_intent": "email_drafting",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "workflow_request",
+      "predicted_message_class": "workflow_request",
+      "routing_pass": true
+    },
+    {
+      "message": "New lead from yesterday's webinar - John from Globex wants pricing.",
+      "category": "lead_qualification",
+      "expected_intent": "lead_support",
+      "predicted_intent": "lead_support",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "workflow_request",
+      "predicted_message_class": "workflow_request",
+      "routing_pass": true
+    },
+    {
+      "message": "Qualify this prospect for me.",
+      "category": "lead_qualification",
+      "expected_intent": "lead_support",
+      "predicted_intent": "lead_support",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "workflow_request",
+      "predicted_message_class": "workflow_request",
+      "routing_pass": true
+    },
+    {
+      "message": "Schedule a meeting with the design team for Thursday.",
+      "category": "workflow_action",
+      "expected_intent": "workflow_action",
+      "predicted_intent": "workflow_action",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "workflow_request",
+      "predicted_message_class": "workflow_request",
+      "routing_pass": true
+    },
+    {
+      "message": "Update the CRM with this conversation.",
+      "category": "workflow_action",
+      "expected_intent": "workflow_action",
+      "predicted_intent": "workflow_action",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "workflow_request",
+      "predicted_message_class": "workflow_request",
+      "routing_pass": true
+    },
+    {
+      "message": "Tell me a joke about programming.",
+      "category": "out_of_scope",
+      "expected_intent": "out_of_scope",
+      "predicted_intent": "out_of_scope",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "out_of_scope",
+      "predicted_message_class": "out_of_scope",
+      "routing_pass": true
+    },
+    {
+      "message": "What's the weather like today?",
+      "category": "out_of_scope",
+      "expected_intent": "out_of_scope",
+      "predicted_intent": "out_of_scope",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "out_of_scope",
+      "predicted_message_class": "out_of_scope",
+      "routing_pass": true
+    },
+    {
+      "message": "Hi",
+      "category": "ambiguous_clarification",
+      "expected_intent": "clarification",
+      "predicted_intent": "clarification",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "conversational",
+      "predicted_message_class": "conversational",
+      "routing_pass": true
+    },
+    {
+      "message": "ok",
+      "category": "ambiguous_clarification",
+      "expected_intent": "clarification",
+      "predicted_intent": "clarification",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "conversational",
+      "predicted_message_class": "conversational",
+      "routing_pass": true
+    },
+    {
+      "message": "Summarize the Q3 plan document for me.",
+      "category": "document_summary",
+      "expected_intent": "document_summary",
+      "predicted_intent": "document_summary",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "workflow_request",
+      "predicted_message_class": "workflow_request",
+      "routing_pass": true
+    },
+    {
+      "message": "Give me a tl;dr of the SOC 2 report.",
+      "category": "document_summary",
+      "expected_intent": "document_summary",
+      "predicted_intent": "document_summary",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "workflow_request",
+      "predicted_message_class": "workflow_request",
+      "routing_pass": true
+    },
+    {
+      "message": "Explain the difference between Pro and Team plans.",
+      "category": "business_knowledge",
+      "expected_intent": "clarification",
+      "predicted_intent": "clarification",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "unclear",
+      "predicted_message_class": "unclear",
+      "routing_pass": true
+    },
+    {
+      "message": "Where can I find the onboarding guide?",
+      "category": "business_knowledge",
+      "expected_intent": "knowledge_search",
+      "predicted_intent": "knowledge_search",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "business_knowledge",
+      "predicted_message_class": "business_knowledge",
+      "routing_pass": true
+    },
+    {
+      "message": "Compose a reply to this support ticket apologizing for the delay.",
+      "category": "email_drafting",
+      "expected_intent": "email_drafting",
+      "predicted_intent": "email_drafting",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "workflow_request",
+      "predicted_message_class": "workflow_request",
+      "routing_pass": true
+    },
+    {
+      "message": "Capture this lead: Sara, sara@beta.io, interested in a demo.",
+      "category": "lead_qualification",
+      "expected_intent": "lead_support",
+      "predicted_intent": "lead_support",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "workflow_request",
+      "predicted_message_class": "workflow_request",
+      "routing_pass": true
+    },
+    {
+      "message": "Book a 30-minute slot with engineering.",
+      "category": "workflow_action",
+      "expected_intent": "workflow_action",
+      "predicted_intent": "workflow_action",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "workflow_request",
+      "predicted_message_class": "workflow_request",
+      "routing_pass": true
+    },
+    {
+      "message": "Give me a stocks tip for Monday.",
+      "category": "out_of_scope",
+      "expected_intent": "clarification",
+      "predicted_intent": "clarification",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "unclear",
+      "predicted_message_class": "unclear",
+      "routing_pass": true
+    },
+    {
+      "message": "Yes",
+      "category": "ambiguous_clarification",
+      "expected_intent": "clarification",
+      "predicted_intent": "clarification",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "unclear",
+      "predicted_message_class": "unclear",
+      "routing_pass": true
+    },
+    {
+      "message": "How do I reset a customer's password?",
+      "category": "business_knowledge",
+      "expected_intent": "clarification",
+      "predicted_intent": "clarification",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "workflow_request",
+      "predicted_message_class": "workflow_request",
+      "routing_pass": true
+    },
+    {
+      "message": "Let's plan the next quarter together.",
+      "category": "small_talk",
+      "expected_intent": "clarification",
+      "predicted_intent": "clarification",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "unclear",
+      "predicted_message_class": "unclear",
+      "routing_pass": true
+    }
+  ]
 }

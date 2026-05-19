@@ -1,326 +1,148 @@
-# Evaluation
+# Evaluation & Quality
 
-> **Status:** Evaluation harness implemented with JSON and Markdown reporting.
+> **Status:** Deterministic offline evaluation harness, JSON/Markdown reports, `GET /evaluation/summary` API, and an **Evaluation** page in the UI.
 
 ---
 
 ## Philosophy
 
-This evaluation is designed for a capstone project: it demonstrates awareness of AI evaluation best practices without requiring a full MLOps pipeline. The goal is to show that the system behaves correctly, safely, and consistently across the key dimensions that matter for a business AI product.
+These checks are for **capstone/demo quality**: they show how routing, RAG, and safety are tested without requiring RAGAS, LangSmith datasets, or OpenAI keys in CI. They are **not** a replacement for full production RAGAS scoring or human evaluation.
 
 ---
 
-## Running Evaluations
+## Quick start
 
-### Quick Start
-
-Run all evaluations and generate combined report:
+Run all suites and write combined reports:
 
 ```bash
 cd backend
-python -m onepilot.evaluation.run_all_evals
+uv run python -m onepilot.evaluation.run_all_evals
 ```
 
-This will:
-1. Run intent classification evaluation
-2. Run RAG retrieval evaluation
-3. Generate combined JSON and Markdown reports in `reports/evaluation/`
+Outputs:
 
-### Individual Evaluations
+| File | Purpose |
+|------|---------|
+| `reports/evaluation/latest.json` | Combined metrics for API + UI |
+| `reports/evaluation/latest.md` | Human-readable summary |
+| `reports/evaluation/intent_eval_latest.{json,md}` | Routing & intent details |
+| `reports/evaluation/rag_eval_latest.{json,md}` | RAG golden set |
+| `reports/evaluation/safety_eval_latest.{json,md}` | Guardrails & HITL policy |
 
-**Intent Classification:**
-```bash
-python -m onepilot.evaluation.run_intent_eval
-```
-
-**RAG Retrieval:**
-```bash
-python -m onepilot.evaluation.run_rag_eval
-```
-
-### Custom Output
-
-**Save to custom location:**
-```bash
-python -m onepilot.evaluation.run_intent_eval \
-  --json-output custom/path/intent.json \
-  --markdown-output custom/path/intent.md
-```
-
-**JSON output to stdout:**
-```bash
-python -m onepilot.evaluation.run_intent_eval --json
-```
+View in the app: open **Evaluation** in the sidebar (after running the script above).
 
 ---
 
-## Evaluation Dimensions
+## Individual scripts
 
-### 1. Intent Classification Accuracy
+| Script | Dataset |
+|--------|---------|
+| `python -m onepilot.evaluation.run_intent_eval` | `evaluation/datasets/intent_eval.jsonl` |
+| `python -m onepilot.evaluation.run_rag_eval` | `evaluation/datasets/rag_eval.jsonl` |
+| `python -m onepilot.evaluation.run_safety_eval` | `evaluation/datasets/safety_eval.jsonl` |
 
-**What:** Does the router classify user messages into the correct intent?
+---
 
-**Method:** The `backend/src/onepilot/evaluation/run_intent_eval.py` script runs a labeled dataset of sample inputs against the intent classifier and measures accuracy.
+## Metrics (combined `latest.json`)
 
-**Dataset:** 30+ samples spanning all 8 intents:
-- `general_assistant`, `knowledge_search`, `lead_support`, `email_drafting`
-- `document_summary`, `workflow_action`, `out_of_scope`, `clarification`
+| Metric | Meaning |
+|--------|---------|
+| `intent_accuracy` | Stage-2 intent matches labeled intent (two-stage routing) |
+| `routing_accuracy` | Stage-1 message class matches label |
+| `rag_golden_pass_rate` | RAG golden cases pass source + citation + weak-evidence rules |
+| `citation_presence_rate` | Cases where citations expected vs actual (offline heuristic) |
+| `source_hit_rate` | Expected demo doc appears in top retrieved stems |
+| `weak_evidence_correctness` | Out-of-KB / low-confidence cases flagged correctly |
+| `safety_guardrail_pass_rate` | Injection blocked / approval policy cases pass |
+| `total_cases` | Sum of cases across suites |
+| `failed_cases` | Count of failures (listed in report) |
 
-**Metric:** Classification accuracy (correct / total)
+---
 
-**Target:** ≥ 85% accuracy on the labeled dataset
+## What each suite covers
 
-**Run:**
-```bash
-cd backend
-python -m onepilot.evaluation.run_intent_eval
+### Routing & intent (`intent_eval.jsonl`)
+
+- Capability / help, small talk, correction / meta  
+- Business knowledge, email drafting, lead qualification  
+- Workflow actions, out of scope, ambiguous clarification  
+
+Uses production two-stage flow: `classify_message` → `classify(..., message_class=...)`.
+
+### RAG golden (`rag_eval.jsonl`)
+
+- Services & integrations, pricing, refund policy  
+- Onboarding, escalation, security & privacy  
+- German / French / Spanish integration or services queries  
+- Out-of-knowledge query (weak evidence expected)  
+
+Offline keyword scoring over `demo_data/novaedge_docs/` — does **not** call the live vector store (no API cost, deterministic).
+
+### Safety & HITL (`safety_eval.jsonl`)
+
+- Prompt injection, bypass approval, reveal system prompt  
+- Expose API key, send email without approval  
+- Cross-tenant policy assertion, unsupported unsafe requests  
+- Approval gating: `send_email` / `update_crm` require approval; `rag_search` does not  
+
+---
+
+## API
+
+`GET /evaluation/summary` — reads `reports/evaluation/latest.json` if present.
+
+Empty state when no report:
+
+```json
+{
+  "available": false,
+  "message": "Evaluation report not generated yet. Run backend evaluation script.",
+  "run_command": "cd backend && uv run python -m onepilot.evaluation.run_all_evals"
+}
 ```
 
-**Output:**
-- Console summary with accuracy and confusion matrix
-- `reports/evaluation/intent_eval_latest.json` - Machine-readable results
-- `reports/evaluation/intent_eval_latest.md` - Human-readable report
-
-**Example output:**
-```
-Dataset: .../datasets/intent_eval.jsonl
-Total:    32
-Correct:  29
-Accuracy: 90.62%
-
-Per-intent accuracy:
-  general_assistant      4/4   (100%)
-  knowledge_search       5/5   (100%)
-  lead_support          3/4   (75%)
-  ...
-```
+Evaluations are **never** run inside the HTTP request.
 
 ---
 
-### 2. RAG Retrieval Relevance
+## Human-in-the-loop (approval safety)
 
-**What:** Does the retriever return relevant chunks for a given query?
+Documented on the Evaluation page and in `safety_eval` reports:
 
-**Method:** Golden query-document pairs are evaluated. Measures whether the correct document appears in the top-3 results (Precision@3).
-
-**Metric:** Precision@3 and Recall@3
-
-**Target:** ≥ 70% precision@3
-
-**Run:**
-```bash
-cd backend
-python -m onepilot.evaluation.run_rag_eval
-```
-
-**Output:**
-- Console summary with precision/recall metrics
-- `reports/evaluation/rag_eval_latest.json` - Machine-readable results
-- `reports/evaluation/rag_eval_latest.md` - Human-readable report
-
-**Example queries:**
-- "How much does the Growth retainer cost?" → expected: `pricing_plans.md`
-- "What is NovaEdge's refund policy?" → expected: `refund_policy.md`
-- "How does NovaEdge handle data privacy?" → expected: `data_privacy.md`
-
-**Note:** The current RAG eval implementation is a placeholder demonstrating the structure. For production use:
-1. Seed knowledge base with test documents
-2. Implement actual vector search against test queries
-3. Compare retrieved documents against expected_documents list
+- Sensitive actions require approval  
+- AI can draft but not send without approval  
+- Decisions are audit-logged  
+- Admin/Owner roles review the Approvals queue  
 
 ---
 
-### 3. RAG Answer Faithfulness
+## Limitations
 
-**What:** Is the generated answer grounded in the retrieved documents? Does it avoid hallucination?
-
-**Method:** Manual review of a sample of 20 answers against their source chunks. Checklist:
-- [ ] Every factual claim is supported by a citation
-- [ ] No facts are invented that are absent from the source documents
-- [ ] Weak-evidence answers correctly decline to answer
-
-**Note:** This is currently manual because automated faithfulness metrics (RAGAS-style) require embedding-based comparison that is expensive without a dedicated evaluation budget.
+1. Small labeled sets (demo scope, not statistically significant)  
+2. RAG eval uses keyword overlap on demo docs, not live embeddings  
+3. No RAGAS faithfulness / answer relevancy automation  
+4. Multilingual RAG labels are heuristic; human review recommended  
+5. Intent labels document **current** router behavior for regression tracking  
 
 ---
 
-### 4. Safety / Guardrail Tests
+## Future roadmap (optional)
 
-**What:** Are prompt injection attempts blocked? Are out-of-scope requests declined gracefully?
+When budget and stability allow:
 
-**Method:** Automated test suite with known attack patterns.
-
-**Coverage (from `tests/test_security.py` and related):**
-- 15+ prompt injection patterns (all should be blocked)
-- 10+ benign inputs that look suspicious but are legitimate (should not be blocked)
-- Out-of-scope requests (should return `out_of_scope` intent)
-- Cross-tenant access attempts (should return 403)
-
----
-
-### 5. Backend Test Coverage
-
-**Total:** 494 tests passing (3 skipped in default CI/local runs).
-
-| Area | Test Count (approx.) |
-|------|----------------------|
-| Auth & tenancy | ~45 |
-| Plans & quotas | ~20 |
-| Demo data generators | ~15 |
-| Document ingestion & chunking | ~25 |
-| RAG search & answers | ~30 |
-| Agent workflow & intents | ~35 |
-| Tools & approvals | ~25 |
-| Memory | ~15 |
-| Usage events & audit logs | ~11 |
-| LangSmith tracing | ~10 |
-
-Run with coverage:
-```bash
-cd backend
-pytest -v --cov=onepilot --cov-report=term-missing
-```
+| Track | Items |
+|-------|--------|
+| **RAGAS** | Faithfulness, context precision, context recall, answer relevancy |
+| **LangSmith** | Golden datasets, PR regression, multi-model comparison |
+| **CI** | Fail build if metrics drop below thresholds |
+| **Online** | Thumbs-up/down, approval rate, weak-evidence rate over time |
 
 ---
 
-### 6. Tracing and Observability Evaluation
+## Related testing
 
-**What:** Are traces properly captured in both local and LangSmith modes?
-
-**Method:** Tests verify that:
-- Local trace mode works when LangSmith is disabled
-- LangSmith live mode activates when configured with valid API key
-- Trace metadata (trace_id, trace_url) is properly returned
-- Sensitive data is redacted from trace metadata
-
-**Verification:**
-
-**Without LangSmith configured:**
-```bash
-# Provider diagnostics should show:
-# LangSmith: mode=local, reason="LANGSMITH_API_KEY not set"
-
-curl http://localhost:8000/providers | jq '.providers[] | select(.name=="LangSmith")'
-```
-
-**With LangSmith configured:**
-```bash
-# Set environment variables:
-export LANGSMITH_TRACING=true
-export LANGSMITH_API_KEY=your_key_here
-export LANGSMITH_PROJECT=onepilot-ai
-
-# Provider diagnostics should show:
-# LangSmith: mode=live, project=onepilot-ai, healthy=true
-
-# Chat response should include trace_url
-curl -X POST http://localhost:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "test query"}' | jq '.trace_mode, .trace_url'
-```
-
----
-
-### 7. End-to-End Workflow Tests
-
-**What:** Does the full demo scenario (lead inquiry → RAG → email draft → approval) work end-to-end?
-
-**Method:** Integration tests that spin up the FastAPI test client, seed demo data, and run the full chat → approval flow.
-
----
-
-## Evaluation Reports
-
-All evaluation scripts generate both JSON (machine-readable) and Markdown (human-readable) reports in `reports/evaluation/`:
-
-- `intent_eval_latest.json` / `intent_eval_latest.md` - Intent classification results
-- `rag_eval_latest.json` / `rag_eval_latest.md` - RAG retrieval results  
-- `latest.json` / `latest.md` - Combined evaluation summary
-
-### Report Contents
-
-**JSON reports include:**
-- Test name and timestamp
-- All raw metrics and scores
-- Per-category breakdown
-- Individual test case results
-- Full failure details
-
-**Markdown reports include:**
-- Executive summary with pass/fail status
-- Metrics tables
-- Category performance breakdown
-- Visual indicators (✓/✗)
-- Actionable recommendations
-
-### Viewing Reports
-
-```bash
-# View combined summary
-cat reports/evaluation/latest.md
-
-# View intent eval details
-cat reports/evaluation/intent_eval_latest.md
-
-# Parse JSON programmatically
-python -c "import json; print(json.load(open('reports/evaluation/latest.json'))['summary'])"
-```
-
----
-
-## Current Status (Phase 9)
-
-✅ **Implemented:**
-- Intent classification evaluation with 32 test cases
-- RAG retrieval evaluation framework (placeholder implementation)
-- JSON and Markdown report generation
-- Combined evaluation runner (`run_all_evals.py`)
-- LangSmith live tracing with local fallback
-- Trace mode visibility in AI Workspace UI
-- Provider diagnostics for LangSmith status
-
-⚠️ **Limitations:**
-- RAG evaluation uses golden queries but needs vector store integration
-- No automated RAGAS-style faithfulness metrics yet
-- Sample sizes are small (suitable for capstone, not production)
-- Manual review still needed for edge cases
-
-🔄 **In Progress:**
-- Expanding test coverage for tracing
-- Adding more RAG golden query pairs
-- Improving failure case documentation
-
----
-
-## Future Improvements (Post-Capstone)
-
-### RAGAS-Style Evaluation
-When an OpenAI API key is available:
-- **Faithfulness:** cosine similarity between answer and retrieved context
-- **Answer relevance:** similarity between generated answer and original question
-- **Context precision / recall:** how much of the retrieved context is relevant
-
-### LangSmith Dataset Evaluation
-- Upload golden test cases to LangSmith datasets
-- Run evaluations directly in LangSmith platform
-- Compare multiple model versions or configurations
-- Track evaluation metrics over time
-- Set up automated evaluation on PR/deploy
-
-### A/B Testing
-- Compare fallback vs. OpenAI embeddings on retrieval Precision@5
-- Compare LLM-based vs. keyword-based intent classifier accuracy
-
-### Online Evaluation
-- Log user thumbs-up/thumbs-down feedback
-- Track approval rate (what fraction of agent actions are approved vs. rejected)
-- Track weak-evidence rate over time (decreases as more knowledge is uploaded)
-
----
-
-## Limitations of This Evaluation
-
-1. **Small sample sizes** — 20–30 samples are not statistically significant
-2. **Manual labeling** — no inter-annotator agreement calculation
-3. **Fallback providers** — evaluation with fallback embeddings and LLM will understate production quality
-4. **Limited multilingual eval** — multilingual chat/RAG covered by pytest; no separate RAGAS suite per language yet
-5. **No adversarial evaluation** — beyond the prompt injection patterns already tested
+- **494+** backend pytest cases (auth, RAG, agents, approvals, security)  
+- Golden RAG integration tests: `backend/tests/test_golden_rag.py`  
+- Security basics: `backend/tests/test_security_basics.py`  
+- Evaluation API: `backend/tests/test_evaluation_summary.py`  
+- UI: `frontend/src/app/(app)/evaluation/evaluation.test.tsx`

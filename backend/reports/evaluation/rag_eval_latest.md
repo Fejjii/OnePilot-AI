@@ -1,49 +1,26 @@
-# RAG Retrieval Evaluation Report
+# RAG Golden Evaluation Report
 
-**Generated:** 2026-05-18T17:01:31.993101+00:00
+**Generated:** 2026-05-19T11:15:28.529016+00:00
+
+Offline keyword scoring over demo NovaEdge docs (deterministic).
 
 ## Summary
 
-- **Total queries:** 5
-- **Queries with results:** 0
-- **Queries without results:** 0
-- **Precision@3:** 0.00%
-- **Recall@3:** 0.00%
-- **Average relevance score:** 0.000
+- **Total cases:** 10
+- **Golden pass rate:** 100.00%
+- **Source hit rate:** 90.00%
+- **Citation presence rate:** 100.00%
+- **Weak-evidence correctness:** 100.00%
 
-## Category Performance
+## Cases
 
-| Category | Queries | Hits | Precision@3 |
-|----------|---------|------|-------------|
-| billing | 1 | 0 | 0.00% |
-| data | 1 | 0 | 0.00% |
-| integrations | 1 | 0 | 0.00% |
-| policy | 1 | 0 | 0.00% |
-| security | 1 | 0 | 0.00% |
-
-## Query Results
-
-### ✗ What is the refund policy?
-- **Expected:** refund_policy.md, terms_of_service.md
-- **Retrieved:** 0 documents
-- **Hit:** No
-
-### ✗ How do I upgrade my plan?
-- **Expected:** pricing_plans.md, billing_faq.md
-- **Retrieved:** 0 documents
-- **Hit:** No
-
-### ✗ What security measures are in place?
-- **Expected:** security_overview.md, data_privacy.md
-- **Retrieved:** 0 documents
-- **Hit:** No
-
-### ✗ Can I integrate with Slack?
-- **Expected:** integrations.md, slack_guide.md
-- **Retrieved:** 0 documents
-- **Hit:** No
-
-### ✗ How do I export my data?
-- **Expected:** data_export.md, api_docs.md
-- **Retrieved:** 0 documents
-- **Hit:** No
+- **PASS** [services_integrations] What services does NovaEdge offer and what integrations are supported?
+- **PASS** [pricing] What are the pricing plans and what is included in each tier?
+- **PASS** [refund_policy] What is NovaEdge's refund policy for pilots and retainers?
+- **PASS** [onboarding] How does the onboarding process work for new customers?
+- **PASS** [escalation] What is the escalation policy for urgent customer issues?
+- **PASS** [security_privacy] How is customer data protected and what is your privacy policy?
+- **PASS** [multilingual_de] Welche Integrationen unterstützt NovaEdge mit HubSpot und Gmail?
+- **PASS** [multilingual_fr] Quels services NovaEdge propose-t-il pour l'automatisation client?
+- **PASS** [multilingual_es] ¿Cómo se integra NovaEdge con HubSpot y el calendario de Google?
+- **PASS** [out_of_kb] What is the weather in Paris tomorrow?

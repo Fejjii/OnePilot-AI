@@ -15,7 +15,9 @@ pnpm dev                            # http://localhost:3000
 
 The backend FastAPI server must be running at `NEXT_PUBLIC_API_URL` (default
 `http://localhost:8000`). Spin it up from the repo root with
-`uvicorn onepilot.api.main:app --reload` (see `backend/README.md`).
+`uvicorn onepilot.api.main:app --reload` (see root `README.md`).
+
+**Demo login:** `admin@onepilot.ai` / `Demo1234!` (after `python scripts/seed_demo.py`)
 
 ## Scripts
 
@@ -56,9 +58,8 @@ src/
 - `/login` and `/register` — JWT auth via existing FastAPI endpoints.
 - `/dashboard` — Metric cards, recent conversations, provider mode, quota
   progress, and quick actions.
-- `/workspace` — Three-column AI Workspace: conversations sidebar, chat with
-  user/assistant bubbles, intent + confidence badges, optimistic messages,
-  approval banners, and a details panel with citations and tool trace.
+- `/workspace` — AI Workspace + **Email Assistant** (email drafting intent),
+  conversations sidebar, chat, speech-to-text, citations, tool trace, approvals.
 - `/knowledge` — Upload documents, list with status, document detail modal,
   and a grounded-answer form using `POST /knowledge/answer`.
 - `/leads` — Filterable table (status, urgency), row click opens a detail
@@ -67,11 +68,9 @@ src/
   risk badge, and Approve / Reject / Needs more info actions (admin-only).
 - `/memory` — Persistent agent memory with scope badges (user, organization,
   agent), create form with optional TTL, and delete.
-- `/usage` — Quota progress, cost / token / latency aggregates, feature and
-  provider breakdowns. Admin-only audit log and usage event tables (members
-  see an "admin access required" notice).
-- `/settings` — Organization, role, plan with limits, provider status, and
-  security notes.
+- `/usage` — Usage & Admin: quotas, billing preview (mock Stripe), audit log.
+- `/evaluation` — Offline quality metrics (routing, RAG, safety) from backend reports.
+- `/settings` — AI model config (read-only), provider diagnostics, plan limits.
 
 ## Design
 

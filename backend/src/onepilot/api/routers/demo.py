@@ -37,6 +37,11 @@ class SeedResponse(BaseModel):
     total_documents: int
     total_chunks: int
     vector_upsert_count: int
+    leads_created: int = 0
+    approvals_created: int = 0
+    usage_events_created: int = 0
+    audit_logs_created: int = 0
+    operational_skipped: bool = False
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
@@ -67,6 +72,35 @@ def setup_demo(session: DBSession, settings: SettingsDep) -> SetupResponse:
     )
 
 
+def _seed_response(
+    session: DBSession,
+    *,
+    principal: CurrentPrincipal,
+    settings: SettingsDep,
+) -> SeedResponse:
+    result = seed_module.seed_knowledge_base(
+        session,
+        principal=principal,
+        settings=settings,
+    )
+    operational = seed_module.seed_operational_data(
+        session,
+        principal=principal,
+    )
+    return SeedResponse(
+        documents_created=result.documents_created,
+        documents_skipped=result.documents_skipped,
+        total_documents=result.total_documents,
+        total_chunks=result.total_chunks,
+        vector_upsert_count=result.vector_upsert_count,
+        leads_created=operational.leads_created,
+        approvals_created=operational.approvals_created,
+        usage_events_created=operational.usage_events_created,
+        audit_logs_created=operational.audit_logs_created,
+        operational_skipped=operational.skipped,
+    )
+
+
 @router.post("/seed_current_org", response_model=SeedResponse)
 def seed_current_organization_demo(
     principal: CurrentPrincipal,
@@ -77,20 +111,10 @@ def seed_current_organization_demo(
     
     Uses OpenAI embeddings when OPENAI_API_KEY is set, otherwise falls back
     to deterministic embeddings. Automatically reindexes if provider changed.
+    Also seeds operational demo data (leads, approvals, usage, audit) when empty.
     """
     require_admin(principal)
-    result = seed_module.seed_knowledge_base(
-        session,
-        principal=principal,
-        settings=settings,
-    )
-    return SeedResponse(
-        documents_created=result.documents_created,
-        documents_skipped=result.documents_skipped,
-        total_documents=result.total_documents,
-        total_chunks=result.total_chunks,
-        vector_upsert_count=result.vector_upsert_count,
-    )
+    return _seed_response(session, principal=principal, settings=settings)
 
 
 @router.post("/seed", response_model=SeedResponse)
@@ -103,17 +127,7 @@ def seed_demo(
     
     Uses OpenAI embeddings when OPENAI_API_KEY is set, otherwise falls back
     to deterministic embeddings. Automatically reindexes if provider changed.
+    Also seeds operational demo data (leads, approvals, usage, audit) when empty.
     """
     require_admin(principal)
-    result = seed_module.seed_knowledge_base(
-        session,
-        principal=principal,
-        settings=settings,
-    )
-    return SeedResponse(
-        documents_created=result.documents_created,
-        documents_skipped=result.documents_skipped,
-        total_documents=result.total_documents,
-        total_chunks=result.total_chunks,
-        vector_upsert_count=result.vector_upsert_count,
-    )
+    return _seed_response(session, principal=principal, settings=settings)

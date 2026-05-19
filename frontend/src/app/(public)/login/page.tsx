@@ -96,6 +96,18 @@ export default function LoginPage() {
           Create one
         </Link>
       </p>
+
+      <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+        <p className="text-xs font-medium text-slate-700">Demo credentials</p>
+        <p className="mt-1 font-mono text-[11px] text-slate-600">
+          admin@onepilot.ai / Demo1234!
+        </p>
+        <p className="mt-1.5 text-[10px] text-slate-500">
+          Run <span className="font-mono">python scripts/seed_demo.py</span> after
+          starting the backend to load 19 NovaEdge docs, leads, approvals, and usage
+          sample data.
+        </p>
+      </div>
     </div>
   );
 }

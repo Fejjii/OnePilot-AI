@@ -1,0 +1,10 @@
+{"query": "What services does NovaEdge offer and what integrations are supported?", "expected_sources": ["services_overview", "integration_guide", "customer_faq"], "category": "services_integrations", "expect_citations": true, "expect_weak_evidence": false}
+{"query": "What are the pricing plans and what is included in each tier?", "expected_sources": ["pricing_plans"], "category": "pricing", "expect_citations": true, "expect_weak_evidence": false}
+{"query": "What is NovaEdge's refund policy for pilots and retainers?", "expected_sources": ["refund_policy"], "category": "refund_policy", "expect_citations": true, "expect_weak_evidence": false}
+{"query": "How does the onboarding process work for new customers?", "expected_sources": ["onboarding_guide", "customer_faq"], "category": "onboarding", "expect_citations": true, "expect_weak_evidence": false}
+{"query": "What is the escalation policy for urgent customer issues?", "expected_sources": ["escalation_policy"], "category": "escalation", "expect_citations": true, "expect_weak_evidence": false}
+{"query": "How is customer data protected and what is your privacy policy?", "expected_sources": ["data_privacy", "security_policy"], "category": "security_privacy", "expect_citations": true, "expect_weak_evidence": false}
+{"query": "Welche Integrationen unterstützt NovaEdge mit HubSpot und Gmail?", "expected_sources": ["integration_guide"], "category": "multilingual_de", "language": "de", "expect_citations": true, "expect_weak_evidence": false}
+{"query": "Quels services NovaEdge propose-t-il pour l'automatisation client?", "expected_sources": ["services_overview", "company_profile", "customer_faq"], "category": "multilingual_fr", "language": "fr", "expect_citations": true, "expect_weak_evidence": false}
+{"query": "¿Cómo se integra NovaEdge con HubSpot y el calendario de Google?", "expected_sources": ["integration_guide"], "category": "multilingual_es", "language": "es", "expect_citations": true, "expect_weak_evidence": false}
+{"query": "What is the weather in Paris tomorrow?", "expected_sources": [], "category": "out_of_kb", "expect_citations": false, "expect_weak_evidence": true}

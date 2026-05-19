@@ -20,27 +20,30 @@ def test_provider_diagnostics_no_keys(client: TestClient) -> None:
     assert provider_map["Multilingual Support"]["category"] == "application"
     assert provider_map["Multilingual Support"]["active"] is True
 
-    # In test mode (conftest.py sets OPENAI_API_KEY=""), these should be fallback
-    assert provider_map["OpenAI LLM"]["mode"] == "fallback"
+    # In test mode (conftest.py sets OPENAI_API_KEY=""), these should be missing
+    assert provider_map["OpenAI LLM"]["mode"] == "missing"
     assert provider_map["OpenAI LLM"]["configured"] is False
     assert provider_map["OpenAI LLM"]["active"] is False
     assert provider_map["OpenAI LLM"]["fallback_used"] is True
-    
-    assert provider_map["OpenAI Embeddings"]["mode"] == "fallback"
+
+    assert provider_map["OpenAI Embeddings"]["mode"] == "missing"
     assert provider_map["OpenAI Embeddings"]["configured"] is False
-    
-    assert provider_map["Qdrant"]["mode"] == "fallback"
+
+    assert provider_map["OpenAI Speech"]["mode"] == "missing"
+    assert provider_map["OpenAI Speech"]["configured"] is False
+
+    assert provider_map["Qdrant"]["mode"] == "missing"
     assert provider_map["Qdrant"]["configured"] is False
-    
-    assert provider_map["Redis"]["mode"] == "fallback"
+
+    assert provider_map["Redis"]["mode"] == "missing"
     assert provider_map["Redis"]["configured"] is False
-    
-    # LangSmith defaults to local when not configured
-    assert provider_map["LangSmith"]["mode"] == "local"
+
+    # LangSmith without API key
+    assert provider_map["LangSmith"]["mode"] == "missing"
     assert provider_map["LangSmith"]["configured"] is False
-    
-    # SaaS providers default to mock
-    assert provider_map["Serper"]["mode"] == "mock"
+
+    # Serper is optional when not configured
+    assert provider_map["Serper"]["mode"] == "optional"
     assert provider_map["Serper"]["configured"] is False
     
     assert provider_map["Gmail"]["mode"] == "mock"
@@ -67,10 +70,12 @@ def test_provider_diagnostics_saas_providers_mock(client: TestClient) -> None:
     data = response.json()
     provider_map = {p["name"]: p for p in data["providers"]}
     
-    for provider_name in ["Gmail", "HubSpot", "Google Calendar", "Stripe", "Serper"]:
+    for provider_name in ["Gmail", "HubSpot", "Google Calendar", "Stripe", "Twilio"]:
         assert provider_map[provider_name]["mode"] == "mock"
         assert provider_map[provider_name]["active"] is False
         assert provider_map[provider_name]["details"]["mock"] is True
+
+    assert provider_map["Serper"]["mode"] == "optional"
 
 
 def test_provider_diagnostics_postgres_healthy(client: TestClient) -> None:
@@ -128,7 +133,15 @@ def test_provider_diagnostics_response_structure(client: TestClient) -> None:
         assert "fallback_used" in provider
         assert "mode" in provider
         assert "last_checked_at" in provider
-        assert provider["mode"] in ["live", "fallback", "mock", "local", "missing", "unhealthy"]
+        assert provider["mode"] in [
+            "live",
+            "fallback",
+            "mock",
+            "local",
+            "missing",
+            "optional",
+            "unhealthy",
+        ]
 
 
 def test_provider_diagnostics_reasons_for_fallback(client: TestClient) -> None:
@@ -139,12 +152,18 @@ def test_provider_diagnostics_reasons_for_fallback(client: TestClient) -> None:
     data = response.json()
     provider_map = {p["name"]: p for p in data["providers"]}
     
-    # Fallback providers should have a reason
+    # Missing / fallback providers should have a reason
     for provider_name in ["OpenAI LLM", "OpenAI Embeddings", "Qdrant", "Redis"]:
         assert provider_map[provider_name]["reason"] is not None
         assert len(provider_map[provider_name]["reason"]) > 0
-    
-    # Mock providers should have a reason
+
+    # Mock / optional providers should have a reason
     for provider_name in ["Gmail", "HubSpot", "Google Calendar", "Stripe", "Serper"]:
         assert provider_map[provider_name]["reason"] is not None
-        assert "mock" in provider_map[provider_name]["reason"].lower() or "not set" in provider_map[provider_name]["reason"].lower()
+        reason = provider_map[provider_name]["reason"].lower()
+        assert (
+            "mock" in reason
+            or "optional" in reason
+            or "not set" in reason
+            or "capstone" in reason
+        )

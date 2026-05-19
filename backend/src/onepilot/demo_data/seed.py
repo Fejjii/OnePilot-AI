@@ -26,10 +26,28 @@ from onepilot.core.logging import get_logger
 from onepilot.providers import get_embeddings_provider, get_vector_provider
 from onepilot.providers.embeddings.base import EmbeddingsProvider
 from onepilot.providers.vector.base import VectorProvider
+from onepilot.demo_data.generators import (
+    generate_approval_examples,
+    generate_audit_logs,
+    generate_usage_events,
+)
+from onepilot.repositories.approvals import ApprovalRequestRepository
+from onepilot.repositories.audit import AuditLogRepository
 from onepilot.repositories.documents import DocumentChunkRepository, DocumentRepository
-from onepilot.repositories.models import Organization, OrganizationMember, Subscription, User
+from onepilot.repositories.leads import LeadRepository
+from onepilot.repositories.models import (
+    ApprovalRequest,
+    AuditLog,
+    Lead,
+    Organization,
+    OrganizationMember,
+    Subscription,
+    UsageEvent,
+    User,
+)
 from onepilot.repositories.organizations import OrganizationMemberRepository, OrganizationRepository
 from onepilot.repositories.plans import SubscriptionRepository
+from onepilot.repositories.usage_events import UsageEventRepository
 from onepilot.repositories.users import UserRepository
 from onepilot.security.auth import Principal, hash_password
 from onepilot.services import document_service
@@ -43,6 +61,162 @@ DEMO_ORG_NAME = "OnePilot AI"
 DEMO_ORG_SLUG = "onepilot-ai-demo"
 
 NOVAEDGE_DOCS_DIR: Path = Path(__file__).resolve().parent / "novaedge_docs"
+
+_APPROVAL_ACTION_MAP: dict[str, str] = {
+    "send_email_reply": "send_email",
+    "create_calendar_event": "schedule_meeting",
+    "issue_refund": "external_action",
+    "update_crm_deal": "update_crm",
+    "share_external_link": "external_action",
+}
+
+# Curated NovaEdge-style leads for reviewer-friendly demos (deterministic).
+CURATED_DEMO_LEADS: list[dict[str, str]] = [
+    {
+        "name": "Sarah Chen",
+        "company": "Brightline Analytics",
+        "email": "sarah.chen@brightline.io",
+        "source": "demo_request",
+        "status": "qualified",
+        "urgency": "high",
+        "intent": "demo",
+        "pain_point": "Support team overwhelmed during product launches",
+        "summary": "VP Operations exploring AI workspace for support automation and HubSpot sync.",
+        "recommended_next_action": "Schedule discovery call and share Growth plan pricing.",
+    },
+    {
+        "name": "Marcus Webb",
+        "company": "Northwind Legal",
+        "email": "marcus.webb@northwindlegal.com",
+        "source": "referral",
+        "status": "proposal",
+        "urgency": "medium",
+        "intent": "purchase",
+        "pain_point": "Manual email triage for client intake",
+        "summary": "Managing partner wants grounded answers from internal playbooks before client calls.",
+        "recommended_next_action": "Send proposal for Business plan with approval gates enabled.",
+    },
+    {
+        "name": "Elena Rossi",
+        "company": "Helio Commerce",
+        "email": "elena.rossi@heliocommerce.eu",
+        "source": "linkedin",
+        "status": "contacted",
+        "urgency": "medium",
+        "intent": "partnership",
+        "pain_point": "Needs multilingual support for EU customers",
+        "summary": "Head of CX evaluating RAG over policy docs with DE/FR response language.",
+        "recommended_next_action": "Demo multilingual workspace and knowledge search.",
+    },
+    {
+        "name": "James Okonkwo",
+        "company": "Summit Field Services",
+        "email": "j.okonkwo@summitfield.com",
+        "source": "website",
+        "status": "new",
+        "urgency": "low",
+        "intent": "demo",
+        "pain_point": "Technicians repeat the same troubleshooting steps",
+        "summary": "Operations lead downloaded pricing PDF and requested a walkthrough.",
+        "recommended_next_action": "Send onboarding guide and offer a 30-minute demo.",
+    },
+    {
+        "name": "Priya Nair",
+        "company": "Atlas Health Clinics",
+        "email": "priya.nair@atlashealth.org",
+        "source": "conference",
+        "status": "qualified",
+        "urgency": "high",
+        "intent": "purchase",
+        "pain_point": "Strict audit requirements for AI-assisted workflows",
+        "summary": "Compliance officer needs human approval before any external CRM or email action.",
+        "recommended_next_action": "Walk through Approvals queue and audit log export.",
+    },
+    {
+        "name": "Tom Berger",
+        "company": "Riverstone Manufacturing",
+        "email": "tberger@riverstonemfg.com",
+        "source": "outbound_email",
+        "status": "contacted",
+        "urgency": "medium",
+        "intent": "support",
+        "pain_point": "Sales engineers lack a single source of truth for integrations",
+        "summary": "RevOps manager asked about HubSpot + Gmail integration capabilities.",
+        "recommended_next_action": "Share integration guide excerpt from the knowledge base.",
+    },
+    {
+        "name": "Amira Hassan",
+        "company": "Cedar Learning Group",
+        "email": "amira@cedarlearning.edu",
+        "source": "partner",
+        "status": "won",
+        "urgency": "low",
+        "intent": "purchase",
+        "pain_point": "Fragmented internal documentation across teams",
+        "summary": "Closed on Team plan after successful pilot with 19-doc knowledge base.",
+        "recommended_next_action": "Kick off onboarding and index remaining SOP library.",
+    },
+    {
+        "name": "Daniel Cho",
+        "company": "PixelForge Studio",
+        "email": "daniel@pixelforge.studio",
+        "source": "website",
+        "status": "lost",
+        "urgency": "low",
+        "intent": "demo",
+        "pain_point": "Budget constraints for Q2",
+        "summary": "Creative agency liked the workspace but postponed until next quarter.",
+        "recommended_next_action": "Add to nurture sequence with case study follow-up.",
+    },
+    {
+        "name": "Olivia Grant",
+        "company": "FinPulse Advisors",
+        "email": "olivia.grant@finpulse.io",
+        "source": "demo_request",
+        "status": "new",
+        "urgency": "high",
+        "intent": "demo",
+        "pain_point": "Analysts spend hours drafting client update emails",
+        "summary": "COO interested in email drafting with mandatory human approval.",
+        "recommended_next_action": "Demo Email Assistant flow in AI Workspace.",
+    },
+    {
+        "name": "Ryan O'Connor",
+        "company": "BluePeak Logistics",
+        "email": "ryan.oconnor@bluepeaklogistics.com",
+        "source": "referral",
+        "status": "proposal",
+        "urgency": "medium",
+        "intent": "purchase",
+        "pain_point": "Dispatch team needs faster access to escalation policy",
+        "summary": "Director of Operations evaluating RAG for SOP lookup during incidents.",
+        "recommended_next_action": "Run golden query on escalation policy during live demo.",
+    },
+    {
+        "name": "Sophie Laurent",
+        "company": "Maison Belle Retail",
+        "email": "sophie.laurent@maisonbelle.fr",
+        "source": "linkedin",
+        "status": "contacted",
+        "urgency": "medium",
+        "intent": "partnership",
+        "pain_point": "French customer inquiries against English KB articles",
+        "summary": "E-commerce lead testing multilingual RAG with citation fidelity.",
+        "recommended_next_action": "Show French workspace query with English document citations.",
+    },
+    {
+        "name": "Kevin Park",
+        "company": "NovaStack DevTools",
+        "email": "kevin.park@novastack.dev",
+        "source": "website",
+        "status": "qualified",
+        "urgency": "high",
+        "intent": "purchase",
+        "pain_point": "Engineering wants usage visibility and cost controls",
+        "summary": "CTO reviewing Usage & Admin dashboards and quota enforcement.",
+        "recommended_next_action": "Review usage events and invoice preview together.",
+    },
+]
 
 
 def ensure_demo_principal(session: Session, *, settings: Settings) -> Principal:
@@ -116,6 +290,162 @@ class SeedResult:
     total_documents: int
     total_chunks: int
     vector_upsert_count: int
+
+
+@dataclass(slots=True)
+class OperationalSeedResult:
+    leads_created: int
+    approvals_created: int
+    usage_events_created: int
+    audit_logs_created: int
+    skipped: bool
+
+
+def seed_operational_data(
+    session: Session,
+    *,
+    principal: Principal,
+    seed: int = 42,
+) -> OperationalSeedResult:
+    """Seed realistic leads, approvals, usage events, and audit logs (idempotent)."""
+    lead_repo = LeadRepository(session)
+    approval_repo = ApprovalRequestRepository(session)
+    usage_repo = UsageEventRepository(session)
+    audit_repo = AuditLogRepository(session)
+
+    if lead_repo.count_for_org(principal.organization_id) > 0:
+        logger.info(
+            "operational_seed_skipped",
+            organization_id=principal.organization_id,
+            reason="leads already present",
+        )
+        return OperationalSeedResult(
+            leads_created=0,
+            approvals_created=0,
+            usage_events_created=0,
+            audit_logs_created=0,
+            skipped=True,
+        )
+
+    leads_created = 0
+    for row in CURATED_DEMO_LEADS:
+        lead_repo.create(
+            Lead(
+                id=new_id("led"),
+                organization_id=principal.organization_id,
+                name=row["name"],
+                company=row["company"],
+                email=row["email"],
+                status=row["status"],
+                source=row["source"],
+                urgency=row["urgency"],
+                intent=row["intent"],
+                pain_point=row["pain_point"],
+                summary=row["summary"],
+                recommended_next_action=row["recommended_next_action"],
+                created_by=principal.user_id,
+            )
+        )
+        leads_created += 1
+
+    approvals_created = 0
+    for item in generate_approval_examples(
+        8,
+        seed=seed,
+        organization_id=principal.organization_id,
+    ):
+        action_type = _APPROVAL_ACTION_MAP.get(item["action_type"], "external_action")
+        status = item["status"]
+        if status == "needs_more_info":
+            status = "needs_more_info"
+        approval_repo.create(
+            ApprovalRequest(
+                id=new_id("apv"),
+                organization_id=principal.organization_id,
+                action_type=action_type,
+                title=item["summary"][:255],
+                description=item["summary"],
+                proposed_payload={
+                    "demo": True,
+                    "original_action": item["action_type"],
+                    "requester": item["requester"],
+                },
+                risk_level="high" if action_type in {"send_email", "external_action"} else "medium",
+                status=status,
+                reason="Seeded demo approval for capstone review",
+                created_by=principal.user_id,
+                reviewed_by=principal.user_id if status != "pending" else None,
+                reviewed_at=item["decided_at"] if status != "pending" else None,
+                created_at=item["requested_at"],
+            )
+        )
+        approvals_created += 1
+
+    usage_created = 0
+    for item in generate_usage_events(
+        40,
+        seed=seed,
+        organization_id=principal.organization_id,
+        user_id=principal.user_id,
+    ):
+        usage_repo.create(
+            UsageEvent(
+                id=new_id("use"),
+                organization_id=principal.organization_id,
+                user_id=item["user_id"],
+                feature=item["feature"],
+                model=item["model"],
+                provider="openai" if not item["fallback_used"] else "fallback",
+                input_tokens=item["input_tokens"],
+                output_tokens=item["output_tokens"],
+                estimated_cost=item["estimated_cost"],
+                fallback_used=item["fallback_used"],
+                tool_calls=item["tool_calls"],
+                latency_ms=item["latency_ms"],
+                event_metadata={"demo_seed": True},
+                created_at=item["created_at"],
+            )
+        )
+        usage_created += 1
+
+    audit_created = 0
+    for item in generate_audit_logs(
+        25,
+        seed=seed,
+        organization_id=principal.organization_id,
+        user_id=principal.user_id,
+    ):
+        audit_repo.create(
+            AuditLog(
+                id=new_id("aud"),
+                organization_id=principal.organization_id,
+                user_id=item["user_id"],
+                action=item["action"],
+                resource_type=item["resource_type"],
+                resource_id=item["resource_id"],
+                detail=item["detail"],
+                ip_address=item["ip_address"],
+                created_at=item["created_at"],
+            )
+        )
+        audit_created += 1
+
+    session.commit()
+    logger.info(
+        "operational_seed_complete",
+        organization_id=principal.organization_id,
+        leads_created=leads_created,
+        approvals_created=approvals_created,
+        usage_events_created=usage_created,
+        audit_logs_created=audit_created,
+    )
+    return OperationalSeedResult(
+        leads_created=leads_created,
+        approvals_created=approvals_created,
+        usage_events_created=usage_created,
+        audit_logs_created=audit_created,
+        skipped=False,
+    )
 
 
 def seed_knowledge_base(

@@ -61,7 +61,7 @@ No extra deployment steps are required. Users set **Response language** in the A
 ### Demo Login
 
 After seeding, use:
-- **Email:** `admin@novaedge.io`
+- **Email:** `admin@onepilot.ai`
 - **Password:** `Demo1234!`
 
 Or use dev auth mode (enabled by default) — access the app without credentials.

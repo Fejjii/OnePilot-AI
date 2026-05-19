@@ -119,6 +119,12 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  total_chunks      : {seed.get('total_chunks', '?')}")
     print(f"  vector_upserts    : {seed.get('vector_upsert_count', '?')}")
     print(f"  verified_via_api  : {verified_count} document(s) visible")
+    print(f"  leads_created     : {seed.get('leads_created', 0)}")
+    print(f"  approvals_created : {seed.get('approvals_created', 0)}")
+    print(f"  usage_events      : {seed.get('usage_events_created', 0)}")
+    print(f"  audit_logs        : {seed.get('audit_logs_created', 0)}")
+    if seed.get("operational_skipped"):
+        print("  operational_seed  : skipped (data already present)")
 
     if verified_count == 0:
         print("\n[WARN] GET /documents returned 0 — check tenant alignment.")

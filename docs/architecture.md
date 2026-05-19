@@ -7,30 +7,31 @@ OnePilot AI follows a layered, multi-tenant SaaS architecture. Every layer has a
 ```mermaid
 flowchart TB
     subgraph Client ["Client Layer"]
-        Browser["Browser (Next.js)"]
+        Browser["Browser Next.js App"]
     end
 
-    subgraph API ["API Layer (FastAPI)"]
-        Middleware["Middleware<br/>(Request ID, CORS, Logging)"]
-        Routers["Routers<br/>(thin, validation only)"]
-        AuthDep["Auth Dependencies<br/>(JWT + DEV_AUTH fallback)"]
+    subgraph API ["API Layer FastAPI"]
+        Middleware["Middleware Request ID CORS Logging"]
+        Routers["Routers chat knowledge leads approvals usage evaluation health"]
+        AuthDep["Auth JWT and DEV_AUTH fallback"]
     end
 
     subgraph Business ["Business Logic Layer"]
-        Services["Services<br/>(auth, org, plan, quota,<br/>chat, rag, lead, email,<br/>approval, usage, memory, audit)"]
-        Agents["LangGraph Agent<br/>(router, nodes, tools)"]
+        Services["Services auth rag lead approval usage billing evaluation audit"]
+        Agents["LangGraph Agent two stage routing and tools"]
     end
 
-    subgraph Data ["Data & Integration Layer"]
-        Repos["Repositories<br/>(SQLAlchemy 2.x sync)"]
-        Providers["Provider Adapters<br/>(LLM, Embeddings, Vector,<br/>CRM, Email, Calendar,<br/>Search, Billing)"]
+    subgraph Data ["Data and Integration Layer"]
+        Repos["Repositories SQLAlchemy tenant scoped"]
+        Providers["Provider Adapters LLM embeddings vector speech CRM email billing"]
     end
 
     subgraph Infra ["Infrastructure"]
         Postgres[(PostgreSQL)]
-        Redis[(Redis)]
-        Qdrant[(Qdrant)]
-        External["External APIs<br/>(OpenAI, HubSpot, Gmail, etc.)"]
+        Redis[(Redis cache and rate limit)]
+        Qdrant[(Qdrant vectors)]
+        External["OpenAI LangSmith optional Serper"]
+        Mocks["Mock Gmail HubSpot Calendar Twilio Stripe"]
     end
 
     Browser --> Middleware --> Routers
@@ -161,9 +162,9 @@ flowchart TB
 flowchart TD
     Start([User Message]) --> Safety{Safety<br/>Check}
     Safety -->|blocked| SafetyError[Safety Error]
-    Safety -->|safe| IntentClassifier["Intent Classifier<br/>(LLM or Rules)"]
-    
-    IntentClassifier --> QuotaCheck{"Quota<br/>Available?"}
+    Safety -->|safe| MessageClass["Stage 1 Message Classifier"]
+    MessageClass --> IntentClassifier["Stage 2 Intent Classifier"]
+    IntentClassifier --> QuotaCheck{"Quota Available?"}
     QuotaCheck -->|No| QuotaError[Quota Exceeded]
     QuotaCheck -->|Yes| Route{Route by Intent}
     
@@ -187,7 +188,8 @@ flowchart TD
     CreateApproval --> LogUsage
     
     LogUsage --> UpdateMemory["Update Memory"]
-    UpdateMemory --> Done([Return to User])
+    UpdateMemory --> TraceMeta["Trace metadata LangSmith or local"]
+    TraceMeta --> Done([Return to User])
 ```
 
 ## Multilingual Layer

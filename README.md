@@ -2,7 +2,7 @@
 
 **OnePilot AI** is a production-style AI-powered business workspace for small and medium businesses. It combines a company knowledge base, retrieval-augmented generation (RAG), agentic workflow automation, email drafting, lead management, human approval gates, usage tracking, memory, and security guardrails in a single multi-tenant SaaS platform.
 
-> **Capstone project status:** All 8 phases complete. 494 backend tests passing. Full Docker stack validated. Frontend TypeScript build passing.
+> **Capstone project status:** All 8 phases complete. **506** backend tests passing. Full Docker stack validated. Frontend typecheck, lint, build, and tests passing.
 
 ---
 
@@ -43,7 +43,44 @@ Small businesses use many disconnected AI tools and lose time managing scattered
 | Audit logs | Every sensitive action is logged with actor, org, and metadata |
 | Usage tracking | Per-org quota enforcement and usage event history |
 | Security | JWT auth, RBAC, prompt injection detection, sensitive data redaction, rate limiting |
-| Provider adapters | Every external dependency (LLM, embeddings, vector DB, CRM, email) has a mock fallback |
+| Provider adapters | Every external dependency has mock, fallback, or live modes; diagnostics in Settings |
+
+---
+
+## Human-in-the-Loop (HITL)
+
+External actions never run autonomously. When the agent proposes `send_email`, `update_crm`, `schedule_meeting`, or other gated actions:
+
+1. An **ApprovalRequest** is created with the proposed payload and risk level.
+2. The user sees a pending banner in AI Workspace and in the **Approvals** queue.
+3. An Owner/Admin **approves** or **rejects** — rejected actions are not retried automatically.
+4. Every decision is written to the **audit log**.
+
+Email **drafting** does not require approval; **sending** does. See [docs/agent_workflow.md](docs/agent_workflow.md).
+
+---
+
+## Usage and Billing
+
+- **Usage events** record tokens, latency, provider, feature, and estimated cost per org.
+- **Quotas** enforce plan limits (chat, RAG, uploads, etc.) with progress shown on Dashboard and Usage pages.
+- **Billing preview** uses mock Stripe adapters — estimated invoice lines, no real charges.
+- Settings and `/providers` show honest live vs mock provider status.
+
+See [docs/usage_billing.md](docs/usage_billing.md).
+
+---
+
+## Security and Guardrails
+
+- JWT authentication with RBAC (Owner, Admin, Member, Viewer)
+- Multi-tenant isolation on every query (`organization_id`)
+- Prompt injection detection and sensitive-data redaction
+- Rate limiting (in-memory; Redis-backed planned)
+- No API keys in the frontend; model names only via `/runtime/config`
+- Audit trail for sensitive actions
+
+See [docs/security.md](docs/security.md).
 
 ---
 
@@ -57,7 +94,7 @@ Small businesses use many disconnected AI tools and lose time managing scattered
 | Cache | Redis |
 | Vector DB | Qdrant |
 | Frontend | Next.js 16, TypeScript, Tailwind CSS, TanStack Query |
-| Testing | pytest (494 tests), Ruff, Vitest |
+| Testing | pytest (**506** tests), Ruff, Vitest (**48** tests) |
 | Infra | Docker Compose |
 
 ---
@@ -89,7 +126,53 @@ Small businesses use many disconnected AI tools and lose time managing scattered
   └────────┘ └────────┘ └────────┘
 ```
 
-See [docs/architecture.md](docs/architecture.md) for Mermaid diagrams.
+See [docs/architecture.md](docs/architecture.md) for full Mermaid diagrams.
+
+### High-level architecture
+
+```mermaid
+flowchart TB
+    subgraph Frontend ["Next.js Frontend"]
+        Dashboard[Dashboard]
+        Workspace[AI Workspace]
+        Knowledge[Knowledge Base]
+        Leads[Leads]
+        Approvals[Approvals]
+        Usage[Usage and Billing]
+        Evaluation[Evaluation]
+        Settings[Settings]
+    end
+
+    subgraph Backend ["FastAPI Backend"]
+        Routers[Routers]
+        Services[Services]
+        Agent[LangGraph Agent]
+        RAG[RAG Service]
+        EvalSvc[Evaluation Service]
+        Security[Security Layer]
+    end
+
+    subgraph Providers ["Provider Adapters"]
+        OpenAI[OpenAI LLM Embeddings Speech]
+        Qdrant[Qdrant]
+        Redis[Redis]
+        Postgres[(Postgres)]
+        LangSmith[LangSmith local or live]
+        Mocks[Mock Gmail HubSpot Calendar Twilio Stripe]
+        Serper[Serper optional or mock]
+    end
+
+    Frontend -->|REST JSON| Routers
+    Routers --> Services
+    Services --> Agent
+    Agent --> RAG
+    Services --> EvalSvc
+    Services --> Security
+    Services --> Providers
+    Providers --> Postgres
+    Providers --> Qdrant
+    Providers --> Redis
+```
 
 ---
 
@@ -150,13 +233,16 @@ cd backend
 python scripts/seed_demo.py
 ```
 
-This creates a demo user (`admin@novaedge.io` / `Demo1234!`), ingests 19 NovaEdge knowledge documents, and seeds leads, approvals, audit logs, and usage events.
+This creates the demo user **`admin@onepilot.ai` / `Demo1234!`**, ingests **19 NovaEdge** knowledge documents, and seeds **12 leads**, **8 approvals** (with pending items), **40 usage events**, and **25 audit log** entries when the org is empty.
 
 ### 6. Open the app
 
 - Frontend: [http://localhost:3000](http://localhost:3000)
+- **Demo login:** `admin@onepilot.ai` / `Demo1234!`
 - Backend API docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 - Health check: [http://localhost:8000/health](http://localhost:8000/health)
+- Provider diagnostics: [http://localhost:8000/providers](http://localhost:8000/providers)
+- Safe model config: [http://localhost:8000/runtime/config](http://localhost:8000/runtime/config)
 
 ---
 
@@ -217,6 +303,7 @@ Copy `.env.example` to `.env` (root) and `frontend/.env.example` to `frontend/.e
 | `OPENAI_API_KEY` | No | — | OpenAI key (optional, deterministic fallback without it) |
 | `OPENAI_MODEL` | No | `gpt-4o-mini` | Chat completion model |
 | `OPENAI_EMBEDDING_MODEL` | No | `text-embedding-3-small` | Embedding model |
+| `OPENAI_SPEECH_MODEL` | No | `whisper-1` | Speech transcription model |
 | `LANGSMITH_API_KEY` | No | — | LangSmith tracing (optional) |
 | `LANGSMITH_TRACING` | No | `false` | Enable LangSmith trace export |
 | `SERPER_API_KEY` | No | — | Web search (optional, returns mock results without it) |
@@ -226,17 +313,31 @@ Copy `.env.example` to `.env` (root) and `frontend/.env.example` to `frontend/.e
 | `DEV_BYPASS_QUOTAS` | No | `false` | Skip quota checks in dev |
 | `NEXT_PUBLIC_API_URL` | **Yes** (frontend) | `http://localhost:8000` | Backend URL (baked into frontend build) |
 
+### Mock vs live providers
+
+| Provider | With credentials | Without credentials |
+|----------|------------------|---------------------|
+| OpenAI LLM / embeddings / speech | **Live** | **Missing** → deterministic fallback |
+| Qdrant | **Live** | **Missing** → in-memory vectors |
+| Redis | **Live** | **Missing** → process-local cache |
+| Postgres | **Required** | — |
+| LangSmith | **Live** tracing | **Missing** or **Local** trace steps |
+| Serper | Optional (mock in capstone) | **Optional** — not required |
+| Gmail, HubSpot, Calendar, Twilio, Stripe | Always **Mock** in this version | Safe demo adapters |
+
+Provider keys are set via environment variables only. **No API keys are stored in the frontend.** See Settings → Provider Diagnostics in the app.
+
 ---
 
 ## Running Tests
 
-### Backend (494 tests)
+### Backend (506 tests)
 
 ```bash
 cd backend
-pytest -v                         # all tests
-pytest -v tests/test_chat.py      # single file
-pytest -v --cov=onepilot          # with coverage
+uv run python -m pytest          # all tests
+uv run python -m pytest -v tests/test_chat.py   # single file
+uv run python -m pytest -v --cov=onepilot       # with coverage
 ```
 
 ### Linting
@@ -268,15 +369,14 @@ make lint     # backend + frontend linters
 
 ## Evaluation
 
-The evaluation harness lives in `backend/src/onepilot/evaluation/`:
+Deterministic offline evaluation (routing, RAG golden set, safety/HITL) with reports and a UI page:
 
 ```bash
 cd backend
-# Run intent classification evaluation
-python -m onepilot.evaluation.runner
+uv run python -m onepilot.evaluation.run_all_evals
 ```
 
-See [docs/evaluation.md](docs/evaluation.md) for the evaluation approach, datasets, and results.
+Then open **Evaluation** in the app or `GET /evaluation/summary`. See [docs/evaluation.md](docs/evaluation.md) for metrics, datasets, limitations, and the RAGAS/LangSmith roadmap.
 
 ---
 
@@ -286,15 +386,21 @@ See [docs/evaluation.md](docs/evaluation.md) for the evaluation approach, datase
 |------|------|-------------|
 | Login / Register | `/login`, `/register` | Auth with JWT, dev bypass available |
 | Dashboard | `/` | Usage summary, recent activity, quick actions |
-| AI Workspace | `/workspace` | Chat with the LangGraph agent, citations, approvals |
+| AI Workspace | `/workspace` | Chat with the LangGraph agent, citations, speech-to-text, email drafting |
 | Knowledge Base | `/knowledge` | Upload documents, semantic search, grounded answers |
-| Leads | `/leads` | Lead table with qualification status |
+| Leads | `/leads` | Lead table with qualification status (12 seeded) |
+| Email Assistant | `/workspace` | Email drafting via AI Workspace (`email_drafting` intent) |
 | Approvals | `/approvals` | Review and approve/reject pending agent actions |
 | Memory | `/memory` | Conversation memory and long-term facts |
-| Usage | `/usage` | Usage events, quota status, audit logs |
-| Settings | `/settings` | Organization and user settings |
+| Usage & Admin | `/usage` | Usage events, quota status, billing preview, audit logs |
+| Evaluation | `/evaluation` | Quality metrics, RAG/routing/safety tables, HITL policy |
+| Settings | `/settings` | Model config, provider diagnostics, organization settings |
 
-> **Screenshots:** See `docs/screenshots/` (placeholder — add your own during demo).
+> **Screenshots:** Add captures under [docs/screenshots/](docs/screenshots/) — see placeholder README there.
+
+### Manual testing
+
+Full pre-push checklist: [docs/manual_test_checklist.md](docs/manual_test_checklist.md)
 
 ---
 
@@ -307,7 +413,8 @@ See [docs/evaluation.md](docs/evaluation.md) for the evaluation approach, datase
 | [RAG System](docs/rag_system.md) | Ingestion, chunking, embeddings, retrieval, citations |
 | [Security](docs/security.md) | Auth, RBAC, tenant isolation, guardrails, production gaps |
 | [Evaluation](docs/evaluation.md) | Intent eval harness, test coverage, RAG evaluation approach |
-| [Demo Script](docs/demo_script.md) | 5–7 minute demo walkthrough |
+| [Demo Script](docs/demo_script.md) | 5–7 minute SCR demo walkthrough (10 steps) |
+| [Manual Test Checklist](docs/manual_test_checklist.md) | Pre-push validation checklist |
 | [Limitations & Roadmap](docs/limitations_roadmap.md) | Honest assessment of mock components and future work |
 | [Data Model](docs/data_model.md) | Database schema and entity relationships |
 
@@ -326,7 +433,7 @@ See [docs/evaluation.md](docs/evaluation.md) for the evaluation approach, datase
 | 7 | Frontend pages & integration | ✅ Complete |
 | 8 | Docker, docs, finalization | ✅ Complete |
 
-**494 backend tests passing.** Frontend typecheck, lint, build, and tests all pass.
+**506 backend tests passing.** Frontend: 48 Vitest tests; typecheck, lint, and build pass.
 
 ---
 
@@ -377,12 +484,14 @@ Transcription returns a detected `language` code. When preference is Auto, that 
 
 ## Known Limitations
 
-1. **Mock providers** — HubSpot, Gmail, Google Calendar, Stripe, and Serper all use in-memory mocks. No real external API calls are made.
+1. **Mock providers** — HubSpot, Gmail, Google Calendar, Stripe, Twilio, and Serper use in-memory or optional mocks. No real external API calls in the capstone demo.
 2. **JWT in localStorage** — Tokens are stored in `localStorage` for simplicity. In production, use HTTP-only cookies.
 3. **No streaming** — Chat responses are synchronous (no Server-Sent Events or WebSocket yet).
 4. **Rate limiting** — In-memory token bucket resets on restart. Redis-backed rate limiting is planned.
 5. **No OAuth/SSO** — Username/password only.
 6. **No production deployment** — This is a local and Docker Compose setup. Kubernetes/cloud deployment is not included.
+7. **Email Assistant** — No standalone page; email drafting runs inside AI Workspace.
+8. **Editable model selection** — Models are environment-driven; UI selection is planned for a future version.
 
 See [docs/limitations_roadmap.md](docs/limitations_roadmap.md) for the full list.
 

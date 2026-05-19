@@ -21,6 +21,22 @@ vi.mock("@/lib/auth", () => ({
 }));
 
 vi.mock("@/lib/queries", () => ({
+  useRuntimeModelConfig: () => ({
+    isLoading: false,
+    data: {
+      chat_model: "gpt-4o-mini",
+      embedding_model: "text-embedding-3-small",
+      speech_model: "whisper-1",
+      llm_status: "live",
+      embeddings_status: "live",
+      speech_status: "live",
+      fallback_active: false,
+      provider_mode: "mixed",
+      cost_note:
+        "OpenAI chat and embedding usage is metered per token; speech transcription is metered per audio minute.",
+      configuration_source: "environment",
+    },
+  }),
   useCurrentPlan: () => ({
     isLoading: false,
     data: {
@@ -81,7 +97,7 @@ vi.mock("@/lib/queries", () => ({
           healthy: false,
           active: false,
           fallback_used: true,
-          mode: "fallback",
+          mode: "missing",
           model: null,
           reason: "QDRANT_URL not set",
           last_checked_at: "2024-01-01T00:00:00Z",
@@ -94,7 +110,7 @@ vi.mock("@/lib/queries", () => ({
           healthy: false,
           active: false,
           fallback_used: true,
-          mode: "fallback",
+          mode: "missing",
           model: null,
           reason: "REDIS_URL not set",
           last_checked_at: "2024-01-01T00:00:00Z",
@@ -120,7 +136,7 @@ vi.mock("@/lib/queries", () => ({
           healthy: true,
           active: false,
           fallback_used: true,
-          mode: "local",
+          mode: "missing",
           model: null,
           reason: "LANGSMITH_API_KEY not set",
           last_checked_at: "2024-01-01T00:00:00Z",
@@ -159,6 +175,58 @@ vi.mock("@/lib/queries", () => ({
 }));
 
 describe("SettingsPage", () => {
+  it("renders AI model configuration section", async () => {
+    renderWithProviders(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("AI Model Configuration")).toBeInTheDocument();
+      expect(screen.getByText("OPENAI_MODEL")).toBeInTheDocument();
+      expect(screen.getByText("OPENAI_EMBEDDING_MODEL")).toBeInTheDocument();
+      expect(screen.getByText("OPENAI_SPEECH_MODEL")).toBeInTheDocument();
+      expect(screen.getByText(/metered per token/i)).toBeInTheDocument();
+    });
+  });
+
+  it("explains environment-driven model configuration", async () => {
+    renderWithProviders(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Model configuration is environment driven/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/Editable model selection is planned/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows mocked provider and env-var copy", async () => {
+    renderWithProviders(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByText(/Provider keys are configured through environment variables/i)
+          .length,
+      ).toBeGreaterThan(0);
+      expect(
+        screen.getAllByText(/Mock providers are used for capstone safe demos/i).length,
+      ).toBeGreaterThan(0);
+    });
+  });
+
+  it("describes LangSmith local and live tracing", async () => {
+    renderWithProviders(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/LangSmith supports live cloud tracing or local trace steps/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/LangSmith local trace steps when API key is set/i),
+      ).toBeInTheDocument();
+    });
+  });
+
   it("renders provider diagnostics section", async () => {
     renderWithProviders(<SettingsPage />);
 
@@ -180,8 +248,8 @@ describe("SettingsPage", () => {
     const liveBadges = screen.getAllByText("Live");
     expect(liveBadges.length).toBeGreaterThan(0);
 
-    const fallbackBadges = screen.getAllByText("Fallback");
-    expect(fallbackBadges.length).toBeGreaterThan(0);
+    const missingBadges = screen.getAllByText("Missing");
+    expect(missingBadges.length).toBeGreaterThan(0);
 
     const mockBadges = screen.getAllByText("Mock");
     expect(mockBadges.length).toBeGreaterThan(0);
@@ -191,9 +259,11 @@ describe("SettingsPage", () => {
     renderWithProviders(<SettingsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Real provider is configured and operational/i)).toBeInTheDocument();
-      expect(screen.getByText(/Mock provider for development/i)).toBeInTheDocument();
-      expect(screen.getByText(/Using deterministic fallback provider/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Real provider configured and operational/i),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/Capstone-safe demo adapters/i)).toBeInTheDocument();
+      expect(screen.getByText(/Deterministic in-process substitute/i)).toBeInTheDocument();
     });
   });
 

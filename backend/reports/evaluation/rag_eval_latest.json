@@ -1,100 +1,206 @@
 {
-  "test_name": "rag_retrieval",
-  "timestamp": "2026-05-18T17:01:31.993101+00:00",
-  "total_queries": 5,
-  "total_hits": 0,
-  "precision_at_3": 0.0,
-  "recall_at_3": 0.0,
-  "avg_relevance_score": 0.0,
-  "queries_with_results": 0,
-  "queries_without_results": 0,
-  "category_performance": {
-    "policy": {
-      "count": 1,
-      "hits": 0,
-      "precision": 0.0
-    },
-    "billing": {
-      "count": 1,
-      "hits": 0,
-      "precision": 0.0
-    },
-    "security": {
-      "count": 1,
-      "hits": 0,
-      "precision": 0.0
-    },
-    "integrations": {
-      "count": 1,
-      "hits": 0,
-      "precision": 0.0
-    },
-    "data": {
-      "count": 1,
-      "hits": 0,
-      "precision": 0.0
-    }
-  },
-  "query_results": [
+  "test_name": "rag_golden",
+  "timestamp": "2026-05-19T11:15:28.529016+00:00",
+  "total": 10,
+  "rag_golden_pass_rate": 1.0,
+  "source_hit_rate": 0.9,
+  "citation_presence_rate": 1.0,
+  "weak_evidence_correctness": 1.0,
+  "failures": [],
+  "case_results": [
     {
-      "query": "What is the refund policy?",
-      "expected_documents": [
-        "refund_policy.md",
-        "terms_of_service.md"
+      "query": "What services does NovaEdge offer and what integrations are supported?",
+      "category": "services_integrations",
+      "language": null,
+      "expected_sources": [
+        "services_overview",
+        "integration_guide",
+        "customer_faq"
       ],
-      "retrieved_count": 0,
-      "retrieved_titles": [],
-      "hit": false,
-      "relevance_score": 0.0,
-      "category": "policy"
+      "top_sources": [
+        "services_overview.md",
+        "customer_faq.md",
+        "integration_guide_hubspot_gmail_calendar.md"
+      ],
+      "source_hit": true,
+      "expect_citations": true,
+      "has_citation": true,
+      "expect_weak_evidence": false,
+      "weak_evidence": false,
+      "passed": true
     },
     {
-      "query": "How do I upgrade my plan?",
-      "expected_documents": [
+      "query": "What are the pricing plans and what is included in each tier?",
+      "category": "pricing",
+      "language": null,
+      "expected_sources": [
+        "pricing_plans"
+      ],
+      "top_sources": [
         "pricing_plans.md",
-        "billing_faq.md"
+        "company_profile.md",
+        "customer_faq.md"
       ],
-      "retrieved_count": 0,
-      "retrieved_titles": [],
-      "hit": false,
-      "relevance_score": 0.0,
-      "category": "billing"
+      "source_hit": true,
+      "expect_citations": true,
+      "has_citation": true,
+      "expect_weak_evidence": false,
+      "weak_evidence": false,
+      "passed": true
     },
     {
-      "query": "What security measures are in place?",
-      "expected_documents": [
-        "security_overview.md",
-        "data_privacy.md"
+      "query": "What is NovaEdge's refund policy for pilots and retainers?",
+      "category": "refund_policy",
+      "language": null,
+      "expected_sources": [
+        "refund_policy"
       ],
-      "retrieved_count": 0,
-      "retrieved_titles": [],
-      "hit": false,
-      "relevance_score": 0.0,
-      "category": "security"
+      "top_sources": [
+        "refund_policy.md",
+        "ai_usage_policy.md",
+        "company_profile.md"
+      ],
+      "source_hit": true,
+      "expect_citations": true,
+      "has_citation": true,
+      "expect_weak_evidence": false,
+      "weak_evidence": false,
+      "passed": true
     },
     {
-      "query": "Can I integrate with Slack?",
-      "expected_documents": [
-        "integrations.md",
-        "slack_guide.md"
+      "query": "How does the onboarding process work for new customers?",
+      "category": "onboarding",
+      "language": null,
+      "expected_sources": [
+        "onboarding_guide",
+        "customer_faq"
       ],
-      "retrieved_count": 0,
-      "retrieved_titles": [],
-      "hit": false,
-      "relevance_score": 0.0,
-      "category": "integrations"
+      "top_sources": [
+        "onboarding_guide.md",
+        "customer_faq.md",
+        "sample_meeting_notes.md"
+      ],
+      "source_hit": true,
+      "expect_citations": true,
+      "has_citation": true,
+      "expect_weak_evidence": false,
+      "weak_evidence": false,
+      "passed": true
     },
     {
-      "query": "How do I export my data?",
-      "expected_documents": [
-        "data_export.md",
-        "api_docs.md"
+      "query": "What is the escalation policy for urgent customer issues?",
+      "category": "escalation",
+      "language": null,
+      "expected_sources": [
+        "escalation_policy"
       ],
-      "retrieved_count": 0,
-      "retrieved_titles": [],
-      "hit": false,
-      "relevance_score": 0.0,
-      "category": "data"
+      "top_sources": [
+        "escalation_policy.md",
+        "integration_guide_hubspot_gmail_calendar.md",
+        "support_troubleshooting.md"
+      ],
+      "source_hit": true,
+      "expect_citations": true,
+      "has_citation": true,
+      "expect_weak_evidence": false,
+      "weak_evidence": false,
+      "passed": true
+    },
+    {
+      "query": "How is customer data protected and what is your privacy policy?",
+      "category": "security_privacy",
+      "language": null,
+      "expected_sources": [
+        "data_privacy",
+        "security_policy"
+      ],
+      "top_sources": [
+        "data_privacy_policy.md",
+        "security_policy.md",
+        "objection_handling.md"
+      ],
+      "source_hit": true,
+      "expect_citations": true,
+      "has_citation": true,
+      "expect_weak_evidence": false,
+      "weak_evidence": false,
+      "passed": true
+    },
+    {
+      "query": "Welche Integrationen unterst\u00fctzt NovaEdge mit HubSpot und Gmail?",
+      "category": "multilingual_de",
+      "language": "de",
+      "expected_sources": [
+        "integration_guide"
+      ],
+      "top_sources": [
+        "integration_guide_hubspot_gmail_calendar.md",
+        "company_profile.md",
+        "email_templates.md"
+      ],
+      "source_hit": true,
+      "expect_citations": true,
+      "has_citation": true,
+      "expect_weak_evidence": false,
+      "weak_evidence": false,
+      "passed": true
+    },
+    {
+      "query": "Quels services NovaEdge propose-t-il pour l'automatisation client?",
+      "category": "multilingual_fr",
+      "language": "fr",
+      "expected_sources": [
+        "services_overview",
+        "company_profile",
+        "customer_faq"
+      ],
+      "top_sources": [
+        "company_profile.md",
+        "customer_faq.md",
+        "services_overview.md"
+      ],
+      "source_hit": true,
+      "expect_citations": true,
+      "has_citation": true,
+      "expect_weak_evidence": false,
+      "weak_evidence": false,
+      "passed": true
+    },
+    {
+      "query": "\u00bfC\u00f3mo se integra NovaEdge con HubSpot y el calendario de Google?",
+      "category": "multilingual_es",
+      "language": "es",
+      "expected_sources": [
+        "integration_guide"
+      ],
+      "top_sources": [
+        "integration_guide_hubspot_gmail_calendar.md",
+        "company_profile.md",
+        "data_privacy_policy.md"
+      ],
+      "source_hit": true,
+      "expect_citations": true,
+      "has_citation": true,
+      "expect_weak_evidence": false,
+      "weak_evidence": false,
+      "passed": true
+    },
+    {
+      "query": "What is the weather in Paris tomorrow?",
+      "category": "out_of_kb",
+      "language": null,
+      "expected_sources": [],
+      "top_sources": [
+        "discovery_call_script.md",
+        "objection_handling.md",
+        "ai_usage_policy.md"
+      ],
+      "source_hit": false,
+      "expect_citations": false,
+      "has_citation": false,
+      "expect_weak_evidence": true,
+      "weak_evidence": true,
+      "passed": true
     }
   ]
 }

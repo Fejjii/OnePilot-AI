@@ -81,7 +81,7 @@ async def transcribe_speech(
     # Initialize OpenAI speech provider
     provider = OpenAISpeechProvider(
         api_key=settings.OPENAI_API_KEY,
-        model="whisper-1",
+        model=settings.OPENAI_SPEECH_MODEL,
     )
     
     # Transcribe audio
@@ -97,7 +97,7 @@ async def transcribe_speech(
             user_id=principal.user_id,
             feature="speech_transcription",
             provider="openai",
-            model=result.model or "whisper-1",
+            model=result.model or settings.OPENAI_SPEECH_MODEL,
             audio_seconds=audio_seconds,
             fallback_used=False,
             latency_ms=latency_ms,
@@ -114,7 +114,7 @@ async def transcribe_speech(
             language=result.language,
             duration=result.duration,
             provider="openai",
-            model=result.model or "whisper-1",
+            model=result.model or settings.OPENAI_SPEECH_MODEL,
             fallback_used=False,
             usage={
                 "latency_ms": latency_ms,

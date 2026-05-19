@@ -267,7 +267,7 @@ erDiagram
 The demo dataset is based on **NovaEdge Solutions**, a fictional company with:
 
 - **1 Organization:** `org_demo_onepilot`
-- **1 User:** `admin@novaedge.io` (Owner role)
+- **1 User:** `admin@onepilot.ai` (Owner role)
 - **19 Documents:** Company docs, sales playbooks, FAQs, policies, templates
 - **~150 DocumentChunks:** Chunked from the 19 documents
 - **10 Leads:** Various qualification statuses (new, contacted, qualified, etc.)

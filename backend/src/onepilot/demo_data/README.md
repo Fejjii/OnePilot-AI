@@ -48,4 +48,10 @@ the above. Use a smaller `scale` (e.g. `0.1`) in tests for speed.
 organization via `services.document_service.upload_document`. It is **idempotent**:
 re-running the seeder skips documents that are already present (matched by filename).
 
+`seed_operational_data(...)` seeds **12 curated leads**, **8 approvals** (including
+pending items), **40 usage events**, and **25 audit logs** when the org has no leads
+yet. Also idempotent.
+
 The same flow is exposed via the API at `POST /demo/seed` (admin-only).
+
+**Demo login:** `admin@onepilot.ai` / `Demo1234!`

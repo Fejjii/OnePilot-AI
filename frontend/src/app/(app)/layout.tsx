@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Database,
   BarChart3,
+  ClipboardCheck,
   Settings,
   LogOut,
   Menu,
@@ -40,6 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Approvals", href: "/approvals", icon: ShieldCheck, badge: "pending" },
   { label: "Memory", href: "/memory", icon: Database },
   { label: "Usage & Admin", href: "/usage", icon: BarChart3 },
+  { label: "Evaluation", href: "/evaluation", icon: ClipboardCheck },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 

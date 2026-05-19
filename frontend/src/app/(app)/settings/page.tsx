@@ -25,7 +25,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PlanBadge } from "@/components/domain/plan-badge";
 import { useAuth, isAdminRole } from "@/lib/auth";
-import { useCurrentPlan, useProviderDiagnostics } from "@/lib/queries";
+import {
+  useCurrentPlan,
+  useProviderDiagnostics,
+  useRuntimeModelConfig,
+} from "@/lib/queries";
 import { api } from "@/lib/api-client";
 import { toast } from "sonner";
 import type { ProviderDiagnostic, ProviderMode } from "@/types/api";
@@ -40,6 +44,7 @@ export default function SettingsPage() {
   const { user, refresh } = useAuth();
   const plan = useCurrentPlan();
   const diagnostics = useProviderDiagnostics();
+  const modelConfig = useRuntimeModelConfig();
 
   if (!user) return null;
 
@@ -145,12 +150,84 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle>AI Model Configuration</CardTitle>
+          <span className="text-[11px] text-slate-500">
+            Read-only · from environment variables via /runtime/config
+          </span>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-slate-600">
+            Model configuration is environment driven in this version. Editable
+            model selection is planned for a future version.
+          </p>
+          {modelConfig.isLoading ? (
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <CircleDashed className="h-3.5 w-3.5 animate-spin" />
+              Loading model configuration…
+            </div>
+          ) : !modelConfig.data ? (
+            <p className="text-xs text-slate-500">Model configuration unavailable.</p>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <ModelConfigRow
+                  label="Chat model"
+                  envVar="OPENAI_MODEL"
+                  value={modelConfig.data.chat_model}
+                  status={modelConfig.data.llm_status}
+                />
+                <ModelConfigRow
+                  label="Embedding model"
+                  envVar="OPENAI_EMBEDDING_MODEL"
+                  value={modelConfig.data.embedding_model}
+                  status={modelConfig.data.embeddings_status}
+                />
+                <ModelConfigRow
+                  label="Speech model"
+                  envVar="OPENAI_SPEECH_MODEL"
+                  value={modelConfig.data.speech_model}
+                  status={modelConfig.data.speech_status}
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-md border border-slate-200 bg-slate-50/40 p-3">
+                  <p className="text-[10px] uppercase tracking-wide text-slate-400">
+                    Fallback status
+                  </p>
+                  <p className="mt-1 text-xs font-medium text-slate-900">
+                    {modelConfig.data.fallback_active
+                      ? "Active — one or more core providers use fallbacks"
+                      : "Inactive — live providers in use"}
+                  </p>
+                </div>
+                <div className="rounded-md border border-slate-200 bg-slate-50/40 p-3">
+                  <p className="text-[10px] uppercase tracking-wide text-slate-400">
+                    Provider mode
+                  </p>
+                  <p className="mt-1 text-xs font-medium text-slate-900">
+                    {titleize(modelConfig.data.provider_mode)}
+                  </p>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-600">{modelConfig.data.cost_note}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Runtime & Provider Diagnostics</CardTitle>
           <span className="text-[11px] text-slate-500">
             Detailed provider status from /providers
           </span>
         </CardHeader>
         <CardContent>
+          <p className="mb-4 text-xs text-slate-600">
+            Provider keys are configured through environment variables. No API
+            keys are stored in the frontend. Mock providers are used for
+            capstone safe demos.
+          </p>
           {diagnostics.isLoading ? (
             <div className="flex items-center gap-1.5 text-xs text-slate-500">
               <CircleDashed className="h-3.5 w-3.5 animate-spin" />
@@ -171,26 +248,44 @@ export default function SettingsPage() {
                 </p>
                 <ul className="space-y-1 text-[11px] text-slate-600">
                   <li>
-                    <span className="font-semibold text-emerald-600">Live:</span> Real
-                    provider is configured and operational
+                    <span className="font-semibold text-emerald-600">Live:</span>{" "}
+                    Real provider configured and operational (OpenAI LLM/embeddings,
+                    Qdrant, Redis, Postgres, LangSmith cloud tracing)
                   </li>
                   <li>
-                    <span className="font-semibold text-blue-600">Local:</span> Using
-                    local implementation (e.g., LangSmith local trace steps)
+                    <span className="font-semibold text-blue-600">Local:</span>{" "}
+                    LangSmith local trace steps when API key is set but cloud tracing
+                    is disabled
                   </li>
                   <li>
-                    <span className="font-semibold text-amber-600">Mock:</span> Mock
-                    provider for development (credentials not configured)
+                    <span className="font-semibold text-slate-600">Missing:</span>{" "}
+                    Required credentials or URL not set (OpenAI, Qdrant, Redis,
+                    LangSmith key)
                   </li>
                   <li>
                     <span className="font-semibold text-amber-600">Fallback:</span>{" "}
-                    Using deterministic fallback provider
+                    Deterministic in-process substitute (e.g. hash embeddings)
+                  </li>
+                  <li>
+                    <span className="font-semibold text-amber-600">Mock:</span>{" "}
+                    Capstone-safe demo adapters (Gmail, HubSpot, Calendar, Twilio,
+                    Stripe)
+                  </li>
+                  <li>
+                    <span className="font-semibold text-slate-500">Optional:</span>{" "}
+                    Serper web search — not required for core workflows
                   </li>
                   <li>
                     <span className="font-semibold text-red-600">Unhealthy:</span>{" "}
-                    Provider configured but connection failed
+                    Configured but connection or health check failed
                   </li>
                 </ul>
+                <p className="mt-2 text-[10px] text-slate-500">
+                  Expected states: OpenAI LLM/embeddings (live · fallback · missing) ·
+                  OpenAI speech (live · missing) · LangSmith (live · local · missing) ·
+                  Serper (optional · mock · live) · SaaS integrations (mock) · Qdrant ·
+                  Redis · Postgres (live · missing)
+                </p>
               </div>
               <p className="text-[11px] text-slate-500">
                 Last checked: {formatDateTime(diagnostics.data.checked_at)}
@@ -244,9 +339,11 @@ export default function SettingsPage() {
             </li>
             <li className="flex items-start gap-2">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 text-amber-500" />
-              SaaS providers (Gmail, HubSpot, Calendar, Twilio, Stripe, Serper)
-              are provider-ready but use mock adapters unless real credentials
-              are configured.
+              Provider keys are configured through environment variables. No API
+              keys are stored in the frontend. Mock providers are used for
+              capstone safe demos (Gmail, HubSpot, Calendar, Twilio, Stripe).
+              Serper is optional; LangSmith supports live cloud tracing or local
+              trace steps when the API key is absent.
             </li>
           </ul>
         </CardContent>
@@ -288,6 +385,31 @@ function Row({
   );
 }
 
+function ModelConfigRow({
+  label,
+  envVar,
+  value,
+  status,
+}: {
+  label: string;
+  envVar: string;
+  value: string;
+  status: string;
+}) {
+  return (
+    <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+      <p className="text-[10px] uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mt-0.5 font-mono text-xs font-medium text-slate-900">{value}</p>
+      <p className="mt-1 text-[10px] text-slate-500">{envVar}</p>
+      <div className="mt-2">
+        <Badge tone={status === "live" ? "success" : "warning"}>
+          {titleize(status)}
+        </Badge>
+      </div>
+    </div>
+  );
+}
+
 function getModeBadge(mode: ProviderMode) {
   const toneMap: Record<ProviderMode, "success" | "info" | "warning" | "danger"> = {
     live: "success",
@@ -295,6 +417,7 @@ function getModeBadge(mode: ProviderMode) {
     mock: "warning",
     fallback: "warning",
     missing: "warning",
+    optional: "info",
     unhealthy: "danger",
   };
   const labelMap: Record<ProviderMode, string> = {
@@ -303,6 +426,7 @@ function getModeBadge(mode: ProviderMode) {
     mock: "Mock",
     fallback: "Fallback",
     missing: "Missing",
+    optional: "Optional",
     unhealthy: "Unhealthy",
   };
   return <Badge tone={toneMap[mode]}>{labelMap[mode]}</Badge>;
@@ -324,6 +448,8 @@ function ProviderCard({ provider }: { provider: ProviderDiagnostic }) {
       "Google Calendar": <Calendar className={iconClassName} />,
       Twilio: <MessageSquare className={iconClassName} />,
       Stripe: <DollarSign className={iconClassName} />,
+      "OpenAI Speech": <MessageSquare className={iconClassName} />,
+      "Multilingual Support": <Sparkles className={iconClassName} />,
     };
     return iconMap[provider.name] || <Activity className={iconClassName} />;
   };

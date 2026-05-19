@@ -23,7 +23,8 @@ OnePilot AI centralizes business knowledge, AI agents, RAG, approvals, memory, u
 - Docker stack running: `docker compose up -d && docker compose run --rm migrate`
 - Demo data seeded: `docker compose run --rm seed`  
   (or locally: `cd backend && python scripts/seed_demo.py`)
-- Both backend (`:8000`) and frontend (`:3000`) healthy
+- Evaluation report (optional): `cd backend && uv run python -m onepilot.evaluation.run_all_evals`
+- Login: **`admin@onepilot.ai`** / **`Demo1234!`**
 
 Verify:
 ```bash
@@ -32,143 +33,140 @@ cd backend && python scripts/check_stack.py
 
 ---
 
-## Demo Flow
+## Demo Flow (10 steps)
 
-### Step 1 — Login (30 seconds)
+### 1 — Dashboard (30 s)
 
-1. Open [http://localhost:3000](http://localhost:3000)
-2. Click **Login** — use `admin@novaedge.io` / `Demo1234!`
+1. Open [http://localhost:3000/login](http://localhost:3000/login) and sign in
+2. Land on **Dashboard** — point to conversations, documents (19), leads (12), pending approvals
+3. Note header: **Live providers** vs **Deterministic fallback** (honest about env)
 
-> **Talking point:** Multi-tenant SaaS. Every org is isolated. No data leaks across tenants.
-
----
-
-### Step 2 — Dashboard (30 seconds)
-
-1. Land on the **Dashboard** page
-2. Point to the usage summary cards: chat messages, RAG queries, document uploads
-3. Point to recent activity feed
-
-> **Talking point:** Operators see real-time usage and quota status. Quotas prevent runaway AI costs.
+> **Talking point:** Single operational view — usage, knowledge, pipeline, and approval backlog.
 
 ---
 
-### Step 3 — Knowledge Base (60 seconds)
+### 2 — Provider & model diagnostics (45 s)
 
-1. Navigate to **Knowledge Base**
-2. Show the list of **19 NovaEdge documents** (pricing plans, sales playbook, AI usage policy, support guides, etc.)
-3. Click **Search** and enter: `How much does the Growth retainer cost per month?`
-4. Show the results: top citation is `Pricing Plans`, with section, score, and chunk preview
+1. Open **Settings**
+2. Show **AI Model Configuration** — `OPENAI_MODEL`, embeddings, speech (read-only, env-driven)
+3. Scroll to **Runtime & Provider Diagnostics** — live vs mock vs missing
+4. Emphasize: keys in environment only; Gmail/HubSpot/Stripe are **mock** for safe demos
 
-> **Talking point:** RAG retrieval with citations. The AI retrieves the most relevant chunk from your company's documents — not the internet. Every answer is grounded in your own knowledge base.
-
-5. Run a **grounded answer** query: `Can NovaEdge handle refunds autonomously?`
-6. Show the answer that references the AI Usage Policy forbidding autonomous refunds
-7. Run an **out-of-scope** query: `What is the population of Tokyo?`
-8. Show the `weak_evidence: true` response — the AI refuses to answer from its training data
-
-> **Talking point:** Weak-evidence guardrail. The AI does not hallucinate. It says "I don't know" when the company knowledge base doesn't support an answer.
+> **Talking point:** Reviewers can verify configuration without exposing secrets.
 
 ---
 
-### Step 4 — AI Workspace (90 seconds)
+### 3 — Knowledge Base golden query (60 s)
 
-1. Navigate to **AI Workspace**
-2. Type: `Can you help us automate customer support and integrate with HubSpot and Gmail?`
-3. Show the **intent classification** banner: `workflow_action`
-4. Show the **tool trace** panel: tools selected (`lead_lookup`, `crm_update`, `email_draft`)
-5. Show the **response** with the proposed action draft
-6. Show the **approval banner**: "This action requires human approval before execution"
+1. Navigate to **Knowledge Base** — confirm **19 NovaEdge** documents
+2. Search: `How much does the Growth retainer cost per month?`
+3. Show citation from **pricing_plans.md**
+4. Grounded answer: `Can NovaEdge handle refunds autonomously?` → **AI Usage Policy**
+5. Optional weak-evidence: `What is the population of Tokyo?`
 
-> **Talking point:** The agent classifies intent, selects the right tools, and creates a draft — but it never executes external actions without approval. This is the most important safety property of the system.
-
----
-
-### Step 5 — Approvals (60 seconds)
-
-1. Navigate to **Approvals**
-2. Show the **pending approval** created by the previous chat
-3. Show the **action payload**: what the agent proposes to do, which tool, which data
-4. Click **Approve** — show the status change to `approved`
-
-OR
-
-4. Click **Reject** — show the status change to `rejected` and that no action was taken
-
-> **Talking point:** Human-in-the-loop is not optional here. Approvals are mandatory. Rejected actions are never retried automatically.
+> **Talking point:** Answers grounded in company docs, not the open internet.
 
 ---
 
-### Step 6 — Leads (30 seconds)
+### 4 — AI Workspace: general capability (30 s)
 
-1. Navigate to **Leads**
-2. Show the lead table with seeded NovaEdge leads (name, email, status, score)
-3. Click on a lead to show its detail: activity history, qualification score
+1. Open **AI Workspace**
+2. Ask: `What can OnePilot help our team with?`
+3. Show intent routing and helpful capability overview
 
-> **Talking point:** Lead management is integrated with the AI agent. When you ask the agent to qualify a lead, it looks up the record here.
-
----
-
-### Step 7 — Usage / Admin (30 seconds)
-
-1. Navigate to **Usage**
-2. Show the usage events table: each AI action is recorded with tokens, latency, and provider
-3. Show the audit log: `document.uploaded`, `approval.created`, `chat.message` entries
-
-> **Talking point:** Every action is audited with actor, timestamp, and metadata. You can trace exactly what the AI did, when, and why.
+> **Talking point:** Intent classification routes to the right behavior before tools run.
 
 ---
 
-### Step 8 — Architecture Summary (30 seconds)
+### 5 — AI Workspace: RAG question (45 s)
 
-Close with a brief architecture explanation:
+1. Ask: `What is our escalation policy for P1 support tickets?`
+2. Show citations from **escalation_policy.md**
+3. Optional: switch language to **French** and ask the same — answer in FR, citations in English
 
-> "The backend is FastAPI with a LangGraph agent, Postgres for structured data, Qdrant for vector search, and Redis for rate limiting. Every external provider — OpenAI, HubSpot, Gmail — has a mock fallback so the system works without any third-party keys for demos. The multi-tenant model isolates all data by organization. And the approval gate ensures no autonomous external action ever fires without a human saying yes."
-
----
-
-## Offline Demo Notes
-
-- Without an OpenAI API key, the system uses a **deterministic fallback LLM** — responses are canned but the entire workflow still demonstrates correctly.
-- Without Qdrant, the system uses an **in-memory vector store** — retrieval works within the same process.
-- The `fallback_used: true` flag appears in API responses when providers are in mock mode.
-- The demo seed data is **deterministic** (seeded with `seed=42`) and idempotent — safe to re-run.
+> **Talking point:** Multilingual replies with original-language citations.
 
 ---
 
-## CLI Demo Alternative
+### 6 — Speech to text (30 s)
 
-If the frontend is unavailable, the same demo can be driven via curl:
+1. Use microphone control in Workspace (requires `OPENAI_API_KEY`)
+2. Record a short phrase; show transcript + detected language
+3. If no key: explain graceful unavailability in Settings diagnostics
+
+> **Talking point:** Voice input feeds the same agent pipeline as typed chat.
+
+---
+
+### 7 — Email Assistant & Approvals / HITL (90 s)
+
+1. In Workspace, ask: `Draft a follow-up email to Olivia Grant at FinPulse about our Growth plan`
+2. Show **email_drafting** intent and draft output
+3. Or trigger workflow: `Automate HubSpot lead update and send a welcome email`
+4. Open **Approvals** — show pending item, payload, risk level
+5. **Approve** or **Reject** and show status change
+
+> **Talking point:** AI can draft and propose — it cannot send email or update CRM without human approval.
+
+---
+
+### 8 — Usage & Billing (30 s)
+
+1. Open **Usage & Admin**
+2. Show usage events, token counts, estimated cost
+3. Show invoice preview (mock Stripe — no real charges)
+4. Glance at audit log entries
+
+> **Talking point:** Full observability for cost control and compliance.
+
+---
+
+### 9 — Evaluation page (30 s)
+
+1. Open **Evaluation**
+2. Show routing / RAG / safety metrics from latest report
+3. If empty: show run command on screen
 
 ```bash
-# Register and get token
-TOKEN=$(curl -s -X POST http://localhost:8000/auth/register \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"demo@novaedge.io","password":"Demo1234!","full_name":"Demo","organization_name":"NovaEdge"}' \
-  | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+cd backend && uv run python -m onepilot.evaluation.run_all_evals
+```
 
-# Seed knowledge base
-curl -s -X POST http://localhost:8000/demo/seed \
-  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+> **Talking point:** Deterministic offline quality gates for capstone review.
 
-# Ask a grounded question
+---
+
+### 10 — Architecture & safety close (45 s)
+
+> "FastAPI backend, LangGraph agent, Postgres for tenancy and audit, Qdrant for vectors, Redis for cache. Every external integration uses a provider adapter — live when configured, mock or fallback otherwise. Multi-tenant isolation on every query. Prompt injection checks, audit logs, quotas, and mandatory HITL before send_email, schedule_meeting, or update_crm. This is demo-ready locally and in Docker — production deployment and live Stripe/Gmail are roadmap items."
+
+Optional: show [docs/architecture.md](architecture.md) diagram.
+
+---
+
+## Email Assistant note
+
+There is no separate Email Assistant page — email drafting lives in **AI Workspace** (intent: `email_drafting`). Dashboard **Quick actions** includes an Email Assistant shortcut to Workspace.
+
+---
+
+## Offline / no-OpenAI demo
+
+- Without `OPENAI_API_KEY`: deterministic LLM fallback — workflows still demonstrate
+- Without `QDRANT_URL`: in-memory vectors (same process)
+- Mock CRM/email/calendar never call real APIs
+- Re-run seed safely: `python scripts/seed_demo.py` (idempotent)
+
+---
+
+## CLI alternative
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8000/demo/setup -H 'Content-Type: application/json' -d '{}' | python -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+
+curl -s -X POST http://localhost:8000/demo/seed -H "Authorization: Bearer $TOKEN" | python -m json.tool
+
 curl -s -X POST http://localhost:8000/knowledge/answer \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
-  -d '{"query":"Can NovaEdge handle refunds autonomously?"}' | python3 -m json.tool
-
-# Chat with the agent
-curl -s -X POST http://localhost:8000/chat \
-  -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"message":"Draft an email to our top lead about our Growth plan","conversation_id":"demo-001"}' \
-  | python3 -m json.tool
-
-# Check pending approvals
-curl -s http://localhost:8000/approvals?status=pending \
-  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
-
-# Check usage
-curl -s http://localhost:8000/usage/summary \
-  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+  -d '{"query":"How much does the Growth retainer cost per month?"}' | python -m json.tool
 ```

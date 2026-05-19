@@ -1,41 +1,40 @@
-# OnePilot AI Evaluation Summary
+# OnePilot AI — Evaluation & Quality Summary
 
-**Generated:** 2026-05-18T17:01:31.998531+00:00
+**Generated:** 2026-05-19T11:15:28.549084+00:00
 
-## Overall Results
+These are deterministic evaluation checks for capstone/demo quality. They are not a replacement for full production RAGAS or human evaluation.
 
-- **Tests passed:** 1/2
-- **Overall status:** ❌ FAIL
+## Quality metrics
 
-## Test Results
+| Metric | Value |
+|--------|-------|
+| Intent accuracy | 100.0% |
+| Routing accuracy | 100.0% |
+| RAG golden pass rate | 100.0% |
+| Citation presence rate | 100.0% |
+| Source hit rate | 90.0% |
+| Weak-evidence correctness | 100.0% |
+| Safety guardrail pass rate | 100.0% |
+| Total cases | 52 |
+| Failed cases | 0 |
 
-### Intent Classification
+## How to regenerate
 
-- **Accuracy:** 100.00%
-- **Total cases:** 30
-- **Correct:** 30
-- **Status:** ✅ PASS (≥85%)
+```bash
+cd backend && uv run python -m onepilot.evaluation.run_all_evals
+```
 
-[View detailed intent eval report](intent_eval_latest.md)
+## Limitations
 
-### RAG Retrieval
+- Small labeled datasets (demo/capstone scope, not statistically significant).
+- RAG eval uses deterministic keyword scoring over demo docs, not live vector search.
+- No automated RAGAS faithfulness or LangSmith dataset runs in this harness.
+- Multilingual RAG cases use offline heuristics; production quality needs human review.
 
-- **Precision@3:** 0.00%
-- **Recall@3:** 0.00%
-- **Total queries:** 5
-- **Status:** ❌ FAIL (<70%)
+## Future roadmap (RAGAS / LangSmith)
 
-[View detailed RAG eval report](rag_eval_latest.md)
-
-## Recommendations
-
-The evaluation suite has identified areas for improvement:
-
-- **RAG retrieval:** Precision@3 (0.00%) is below target (70%). Consider improving embeddings or document chunking strategy.
-
-## Next Steps
-
-1. Review individual test reports for detailed breakdowns
-2. Address any failing tests before deployment
-3. Consider running continuous evaluation in CI/CD pipeline
-4. Expand test coverage with additional edge cases
+- RAGAS faithfulness
+- RAGAS context precision
+- RAGAS context recall
+- RAGAS answer relevancy
+- LangSmith evaluation datasets and regression runs on deploy

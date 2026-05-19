@@ -93,6 +93,7 @@ export type ProviderMode =
   | "mock"
   | "local"
   | "missing"
+  | "optional"
   | "unhealthy";
 
 export type ProviderCategory =
@@ -128,6 +129,19 @@ export interface ProviderDiagnostic {
 export interface ProviderDiagnosticResponse {
   providers: ProviderDiagnostic[];
   checked_at: string;
+}
+
+export interface RuntimeModelConfigResponse {
+  chat_model: string;
+  embedding_model: string;
+  speech_model: string;
+  llm_status: "live" | "fallback" | "missing";
+  embeddings_status: "live" | "fallback" | "missing";
+  speech_status: "live" | "missing";
+  fallback_active: boolean;
+  provider_mode: "live" | "mixed" | "demo";
+  cost_note: string;
+  configuration_source: string;
 }
 
 // Chat & conversations
@@ -580,4 +594,40 @@ export interface TranscribeResponse {
   model: string;
   fallback_used: boolean;
   usage: Record<string, unknown>;
+}
+
+// Evaluation summary
+
+export interface EvaluationMetrics {
+  intent_accuracy: number;
+  routing_accuracy: number;
+  rag_golden_pass_rate: number;
+  citation_presence_rate: number;
+  source_hit_rate: number;
+  weak_evidence_correctness: number;
+  safety_guardrail_pass_rate: number;
+  total_cases: number;
+  failed_cases: number;
+}
+
+export interface HitlApprovalSafety {
+  sensitive_actions_require_approval: boolean;
+  ai_can_draft_not_send_without_approval: boolean;
+  approval_decisions_audit_logged: boolean;
+  admin_owner_review_actions: boolean;
+  gated_action_types: string[];
+}
+
+export interface EvaluationSummaryResponse {
+  available: boolean;
+  message?: string | null;
+  generated_at?: string | null;
+  run_command?: string | null;
+  disclaimer?: string | null;
+  metrics?: EvaluationMetrics | null;
+  suites?: Record<string, unknown> | null;
+  failed_cases?: Array<Record<string, unknown>>;
+  limitations?: string[];
+  future_roadmap?: string[];
+  hitl_approval_safety?: HitlApprovalSafety | null;
 }

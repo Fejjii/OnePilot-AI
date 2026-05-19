@@ -23,6 +23,7 @@ import type {
   HealthResponse,
   LanguagePreference,
   ProviderDiagnosticResponse,
+  RuntimeModelConfigResponse,
   LeadCreate,
   LeadListResponse,
   LeadResponse,
@@ -35,11 +36,13 @@ import type {
   InvoicePreviewResponse,
   UsageEventListResponse,
   UsageSummaryResponse,
+  EvaluationSummaryResponse,
 } from "@/types/api";
 
 export const queryKeys = {
   health: ["health"] as const,
   providerDiagnostics: ["providers", "diagnostics"] as const,
+  runtimeModelConfig: ["runtime", "config"] as const,
   usageSummary: ["usage", "summary"] as const,
   billingSummary: ["billing", "summary"] as const,
   billingInvoice: ["billing", "invoice-preview"] as const,
@@ -59,6 +62,7 @@ export const queryKeys = {
   auditLogs: (offset = 0) => ["audit-logs", { offset }] as const,
   usageEvents: (offset = 0) => ["usage-events", { offset }] as const,
   currentPlan: ["plan", "current"] as const,
+  evaluationSummary: ["evaluation", "summary"] as const,
 };
 
 // --- Health -----------------------------------------------------------------
@@ -77,6 +81,16 @@ export function useProviderDiagnostics(opts?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.providerDiagnostics,
     queryFn: () => api.get<ProviderDiagnosticResponse>("/providers"),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+    ...opts,
+  });
+}
+
+export function useRuntimeModelConfig(opts?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: queryKeys.runtimeModelConfig,
+    queryFn: () => api.get<RuntimeModelConfigResponse>("/runtime/config"),
     refetchInterval: 60_000,
     staleTime: 30_000,
     ...opts,
@@ -357,5 +371,15 @@ export function useUsageEvents(offset = 0) {
       api.get<UsageEventListResponse>("/admin/usage-events", {
         query: { offset, limit: 50 },
       }),
+  });
+}
+
+// --- Evaluation -------------------------------------------------------------
+
+export function useEvaluationSummary() {
+  return useQuery({
+    queryKey: queryKeys.evaluationSummary,
+    queryFn: () => api.get<EvaluationSummaryResponse>("/evaluation/summary"),
+    staleTime: 60_000,
   });
 }

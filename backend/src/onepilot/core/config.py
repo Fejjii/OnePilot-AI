@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
+    OPENAI_SPEECH_MODEL: str = "whisper-1"
 
     DATABASE_URL: str = "sqlite:///./onepilot_dev.db"
     REDIS_URL: str = ""

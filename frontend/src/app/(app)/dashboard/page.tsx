@@ -66,7 +66,13 @@ export default function DashboardPage() {
     coreProviders && coreProviders.every((p) => p.mode === "live");
   const hasMixedModes =
     diagnostics.data &&
-    diagnostics.data.providers.some((p) => p.mode === "mock" || p.mode === "fallback");
+    diagnostics.data.providers.some(
+      (p) =>
+        p.mode === "mock" ||
+        p.mode === "fallback" ||
+        p.mode === "missing" ||
+        p.mode === "optional",
+    );
 
   return (
     <div className="space-y-6">
@@ -310,6 +316,12 @@ export default function DashboardPage() {
                 hint="Ask the AI grounded questions"
               />
               <QuickAction
+                href="/workspace"
+                icon={Mail}
+                title="Email Assistant"
+                hint="Draft outreach or follow-up emails"
+              />
+              <QuickAction
                 href="/knowledge"
                 icon={BookOpen}
                 title="Upload a document"
@@ -355,6 +367,7 @@ function getModeBadge(mode: ProviderMode, compact?: boolean) {
     mock: "warning",
     fallback: "warning",
     missing: "warning",
+    optional: "info",
     unhealthy: "danger",
   };
   const labelMap: Record<ProviderMode, string> = {
@@ -363,6 +376,7 @@ function getModeBadge(mode: ProviderMode, compact?: boolean) {
     mock: "Mock",
     fallback: "Fallback",
     missing: "Missing",
+    optional: "Optional",
     unhealthy: "Error",
   };
   

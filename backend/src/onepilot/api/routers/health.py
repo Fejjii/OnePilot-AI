@@ -27,9 +27,99 @@ from onepilot.schemas.runtime import (
     ProviderDiagnostic,
     ProviderDiagnosticResponse,
     ProviderMode,
+    RuntimeModelConfigResponse,
 )
 
 router = APIRouter(tags=["health"])
+
+_COST_NOTE = (
+    "OpenAI chat and embedding usage is metered per token; speech transcription "
+    "(Whisper) is metered per audio minute. Fallback and mock providers incur no "
+    "external API cost. Configure models via environment variables."
+)
+
+
+def _openai_core_mode(*, configured: bool, using_fallback: bool) -> ProviderMode:
+    if not configured:
+        return ProviderMode.MISSING
+    if using_fallback:
+        return ProviderMode.FALLBACK
+    return ProviderMode.LIVE
+
+
+def _openai_core_status(*, configured: bool, using_fallback: bool) -> str:
+    return _openai_core_mode(configured=configured, using_fallback=using_fallback).value
+
+
+def _aggregate_provider_mode(
+    *,
+    llm_mode: ProviderMode,
+    embeddings_mode: ProviderMode,
+    vector_mode: ProviderMode,
+    redis_mode: ProviderMode,
+) -> str:
+    core_modes = {llm_mode, embeddings_mode, vector_mode, redis_mode}
+    if core_modes == {ProviderMode.LIVE}:
+        return "live"
+    if ProviderMode.LIVE in core_modes:
+        return "mixed"
+    return "demo"
+
+
+@router.get("/runtime/config", response_model=RuntimeModelConfigResponse)
+def runtime_model_config(
+    settings: Settings = Depends(get_settings),
+) -> RuntimeModelConfigResponse:
+    """Expose safe, read-only model names and status for reviewers (no secrets)."""
+    llm = get_llm_provider(settings)
+    embeddings = get_embeddings_provider(settings)
+    vector = get_vector_provider(settings)
+
+    llm_fallback = isinstance(llm, FallbackLLMProvider)
+    embeddings_fallback = isinstance(embeddings, FallbackEmbeddingsProvider)
+    vector_fallback = isinstance(vector, MemoryVectorProvider)
+
+    llm_mode = _openai_core_mode(configured=settings.has_openai, using_fallback=llm_fallback)
+    embeddings_mode = _openai_core_mode(
+        configured=settings.has_openai,
+        using_fallback=embeddings_fallback,
+    )
+    vector_mode = (
+        ProviderMode.MISSING if not settings.has_qdrant else ProviderMode.LIVE
+    )
+    if settings.has_qdrant and vector_fallback:
+        vector_mode = ProviderMode.FALLBACK
+
+    redis_mode = ProviderMode.MISSING if not settings.has_redis else ProviderMode.LIVE
+
+    fallback_active = any(
+        mode in {ProviderMode.FALLBACK, ProviderMode.MISSING}
+        for mode in (llm_mode, embeddings_mode, vector_mode, redis_mode)
+    )
+
+    return RuntimeModelConfigResponse(
+        chat_model=settings.OPENAI_MODEL,
+        embedding_model=settings.OPENAI_EMBEDDING_MODEL,
+        speech_model=settings.OPENAI_SPEECH_MODEL,
+        llm_status=_openai_core_status(
+            configured=settings.has_openai,
+            using_fallback=llm_fallback,
+        ),
+        embeddings_status=_openai_core_status(
+            configured=settings.has_openai,
+            using_fallback=embeddings_fallback,
+        ),
+        speech_status="live" if settings.has_openai else "missing",
+        fallback_active=fallback_active,
+        provider_mode=_aggregate_provider_mode(
+            llm_mode=llm_mode,
+            embeddings_mode=embeddings_mode,
+            vector_mode=vector_mode,
+            redis_mode=redis_mode,
+        ),
+        cost_note=_COST_NOTE,
+        configuration_source="environment",
+    )
 
 
 @router.get("/health")
@@ -62,10 +152,15 @@ def provider_diagnostics(
     # OpenAI LLM
     llm = get_llm_provider(settings)
     llm_fallback = isinstance(llm, FallbackLLMProvider)
-    llm_mode = ProviderMode.FALLBACK if llm_fallback else ProviderMode.LIVE
+    llm_mode = _openai_core_mode(
+        configured=settings.has_openai,
+        using_fallback=llm_fallback,
+    )
     llm_reason = None
-    if llm_fallback:
-        llm_reason = "OPENAI_API_KEY not set" if not settings.has_openai else "OpenAI LLM not implemented"
+    if llm_mode == ProviderMode.MISSING:
+        llm_reason = "OPENAI_API_KEY not set; deterministic fallback responses in use"
+    elif llm_mode == ProviderMode.FALLBACK:
+        llm_reason = "OpenAI LLM unavailable; deterministic fallback responses in use"
     
     diagnostics.append(
         ProviderDiagnostic(
@@ -86,10 +181,15 @@ def provider_diagnostics(
     # OpenAI Embeddings
     embeddings = get_embeddings_provider(settings)
     embeddings_fallback = isinstance(embeddings, FallbackEmbeddingsProvider)
-    embeddings_mode = ProviderMode.FALLBACK if embeddings_fallback else ProviderMode.LIVE
+    embeddings_mode = _openai_core_mode(
+        configured=settings.has_openai,
+        using_fallback=embeddings_fallback,
+    )
     embeddings_reason = None
-    if embeddings_fallback:
-        embeddings_reason = "OPENAI_API_KEY not set" if not settings.has_openai else "OpenAI embeddings not implemented"
+    if embeddings_mode == ProviderMode.MISSING:
+        embeddings_reason = "OPENAI_API_KEY not set; hash-based fallback embeddings in use"
+    elif embeddings_mode == ProviderMode.FALLBACK:
+        embeddings_reason = "OpenAI embeddings unavailable; hash-based fallback embeddings in use"
     
     diagnostics.append(
         ProviderDiagnostic(
@@ -113,10 +213,15 @@ def provider_diagnostics(
     # Qdrant
     vector = get_vector_provider(settings)
     vector_fallback = isinstance(vector, MemoryVectorProvider)
-    vector_mode = ProviderMode.FALLBACK if vector_fallback else ProviderMode.LIVE
-    vector_reason = None
-    if vector_fallback:
-        vector_reason = "QDRANT_URL not set"
+    if not settings.has_qdrant:
+        vector_mode = ProviderMode.MISSING
+        vector_reason = "QDRANT_URL not set; in-memory vector store in use"
+    elif vector_fallback:
+        vector_mode = ProviderMode.FALLBACK
+        vector_reason = "Qdrant unavailable; in-memory vector store in use"
+    else:
+        vector_mode = ProviderMode.LIVE
+        vector_reason = None
     
     diagnostics.append(
         ProviderDiagnostic(
@@ -137,8 +242,8 @@ def provider_diagnostics(
     # Redis
     redis_configured = settings.has_redis
     redis_healthy = redis_configured
-    redis_mode = ProviderMode.LIVE if redis_configured else ProviderMode.FALLBACK
-    redis_reason = None if redis_configured else "REDIS_URL not set"
+    redis_mode = ProviderMode.LIVE if redis_configured else ProviderMode.MISSING
+    redis_reason = None if redis_configured else "REDIS_URL not set; process-local cache in use"
     
     if redis_configured:
         try:
@@ -201,13 +306,15 @@ def provider_diagnostics(
     langsmith_healthy = True
     langsmith_mode = ProviderMode.LIVE if langsmith_active else ProviderMode.LOCAL
     langsmith_reason = None
-    langsmith_details = {}
+    langsmith_details: dict[str, str | int | bool] = {}
 
     if not langsmith_configured:
-        langsmith_reason = "LANGSMITH_API_KEY not set, using local trace steps"
+        langsmith_mode = ProviderMode.MISSING
+        langsmith_reason = "LANGSMITH_API_KEY not set; local trace steps only"
         langsmith_details = {"fallback": "Local trace steps"}
     elif not settings.LANGSMITH_TRACING:
-        langsmith_reason = "LANGSMITH_TRACING is false, using local trace steps"
+        langsmith_mode = ProviderMode.LOCAL
+        langsmith_reason = "LANGSMITH_TRACING is false; local trace steps only"
         langsmith_details = {"fallback": "Local trace steps"}
     else:
         # LangSmith is configured and enabled
@@ -252,12 +359,19 @@ def provider_diagnostics(
         )
     )
     
-    # Serper
+    # Serper (optional integration; never calls live search without credentials)
     serper_provider = get_search_provider(settings)
     serper_configured = bool(settings.SERPER_API_KEY)
     serper_is_mock = "Mock" in serper_provider.__class__.__name__
-    serper_mode = ProviderMode.LIVE if serper_configured else ProviderMode.MOCK
-    serper_reason = None if serper_configured else "SERPER_API_KEY not set, using mock provider"
+    if serper_configured and not serper_is_mock:
+        serper_mode = ProviderMode.LIVE
+        serper_reason = None
+    elif serper_configured and serper_is_mock:
+        serper_mode = ProviderMode.MOCK
+        serper_reason = "SERPER_API_KEY set but mock adapter active (capstone demo)"
+    else:
+        serper_mode = ProviderMode.OPTIONAL
+        serper_reason = "SERPER_API_KEY not set; web search is optional, mock results in demos"
     
     diagnostics.append(
         ProviderDiagnostic(
@@ -275,12 +389,16 @@ def provider_diagnostics(
         )
     )
     
-    # Gmail
+    # Gmail (capstone-safe mock)
     gmail_provider = get_email_provider()
     gmail_configured = bool(os.environ.get("GMAIL_CREDENTIALS_JSON", ""))
     gmail_is_mock = "Mock" in gmail_provider.__class__.__name__
-    gmail_mode = ProviderMode.LIVE if gmail_configured else ProviderMode.MOCK
-    gmail_reason = None if gmail_configured else "GMAIL_CREDENTIALS_JSON not set, using mock provider"
+    gmail_mode = ProviderMode.MOCK
+    gmail_reason = (
+        "Mock Gmail adapter for capstone-safe demos"
+        if gmail_is_mock
+        else "Gmail credentials configured; mock adapter still used in this version"
+    )
     
     diagnostics.append(
         ProviderDiagnostic(
@@ -298,12 +416,16 @@ def provider_diagnostics(
         )
     )
     
-    # HubSpot
+    # HubSpot (capstone-safe mock)
     hubspot_provider = get_crm_provider()
     hubspot_configured = bool(os.environ.get("HUBSPOT_API_KEY", ""))
     hubspot_is_mock = "Mock" in hubspot_provider.__class__.__name__
-    hubspot_mode = ProviderMode.LIVE if hubspot_configured else ProviderMode.MOCK
-    hubspot_reason = None if hubspot_configured else "HUBSPOT_API_KEY not set, using mock provider"
+    hubspot_mode = ProviderMode.MOCK
+    hubspot_reason = (
+        "Mock HubSpot adapter for capstone-safe demos"
+        if hubspot_is_mock
+        else "HubSpot API key configured; mock adapter still used in this version"
+    )
     
     diagnostics.append(
         ProviderDiagnostic(
@@ -321,12 +443,16 @@ def provider_diagnostics(
         )
     )
     
-    # Google Calendar
+    # Google Calendar (capstone-safe mock)
     calendar_provider = get_calendar_provider()
     calendar_configured = bool(os.environ.get("GOOGLE_CALENDAR_CREDENTIALS_JSON", ""))
     calendar_is_mock = "Mock" in calendar_provider.__class__.__name__
-    calendar_mode = ProviderMode.LIVE if calendar_configured else ProviderMode.MOCK
-    calendar_reason = None if calendar_configured else "GOOGLE_CALENDAR_CREDENTIALS_JSON not set, using mock provider"
+    calendar_mode = ProviderMode.MOCK
+    calendar_reason = (
+        "Mock Google Calendar adapter for capstone-safe demos"
+        if calendar_is_mock
+        else "Calendar credentials configured; mock adapter still used in this version"
+    )
     
     diagnostics.append(
         ProviderDiagnostic(
@@ -344,10 +470,10 @@ def provider_diagnostics(
         )
     )
     
-    # Twilio (not implemented yet, but show as missing)
+    # Twilio (capstone-safe mock)
     twilio_configured = bool(os.environ.get("TWILIO_API_KEY", ""))
     twilio_mode = ProviderMode.MOCK
-    twilio_reason = "Provider adapter not implemented, mock only"
+    twilio_reason = "Mock Twilio adapter for capstone-safe demos (SMS not wired live)"
     
     diagnostics.append(
         ProviderDiagnostic(
@@ -365,12 +491,16 @@ def provider_diagnostics(
         )
     )
     
-    # Stripe
+    # Stripe (capstone-safe mock)
     stripe_provider = get_billing_provider()
     stripe_configured = bool(os.environ.get("STRIPE_SECRET_KEY", ""))
     stripe_is_mock = "Mock" in stripe_provider.__class__.__name__
-    stripe_mode = ProviderMode.LIVE if stripe_configured else ProviderMode.MOCK
-    stripe_reason = None if stripe_configured else "STRIPE_SECRET_KEY not set, using mock provider"
+    stripe_mode = ProviderMode.MOCK
+    stripe_reason = (
+        "Mock Stripe adapter for capstone-safe demos"
+        if stripe_is_mock
+        else "Stripe secret configured; mock adapter still used in this version"
+    )
     
     diagnostics.append(
         ProviderDiagnostic(
@@ -412,8 +542,12 @@ def provider_diagnostics(
     # OpenAI Speech (Whisper)
     speech_configured = settings.has_openai
     speech_mode = ProviderMode.LIVE if speech_configured else ProviderMode.MISSING
-    speech_reason = None if speech_configured else "OPENAI_API_KEY not set, speech transcription unavailable"
-    
+    speech_reason = (
+        None
+        if speech_configured
+        else "OPENAI_API_KEY not set; speech transcription unavailable"
+    )
+
     diagnostics.append(
         ProviderDiagnostic(
             name="OpenAI Speech",
@@ -423,7 +557,7 @@ def provider_diagnostics(
             active=speech_configured,
             fallback_used=False,
             mode=speech_mode,
-            model="whisper-1" if speech_configured else None,
+            model=settings.OPENAI_SPEECH_MODEL if speech_configured else None,
             reason=speech_reason,
             last_checked_at=now,
             details={"provider": "openai"} if speech_configured else {},

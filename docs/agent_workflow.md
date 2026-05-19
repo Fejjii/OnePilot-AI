@@ -4,7 +4,16 @@
 
 ## Overview
 
-The AI agent uses **LangGraph** for orchestration. It supports multi-step workflows with intent classification, tool calling, human approval gates, and memory. Every chat request flows through the same graph; the path taken depends on the classified intent.
+The AI agent uses **LangGraph** for orchestration. It supports multi-step workflows with **two-stage routing** (message classification, then intent classification), tool calling, human approval gates, and memory. Every chat request flows through the same graph; the path taken depends on the classified message class and intent.
+
+### Two-stage routing
+
+| Stage | Purpose | Output |
+|-------|---------|--------|
+| **1 — Message class** | Broad bucket (business knowledge, workflow, conversational, etc.) | `MessageClass` |
+| **2 — Intent** | Specific tool routing intent | `Intent` |
+
+Stage 1 reduces misroutes for meta questions, corrections, and out-of-scope requests before Stage 2 selects tools.
 
 ---
 
@@ -51,9 +60,10 @@ class AgentState(TypedDict):
 ```mermaid
 flowchart TD
     Start([User Message]) --> Safety{Safety Check}
-    Safety -->|blocked| Blocked[Return Safety Error\n+ audit log]
-    Safety -->|safe| Classify[Classify Intent\nvia LLM or keyword]
-    Classify --> QuotaCheck{Quota Check\n chat_messages}
+    Safety -->|blocked| Blocked[Return Safety Error and audit log]
+    Safety -->|safe| Stage1[Stage 1 Message Class]
+    Stage1 --> Stage2[Stage 2 Intent Classify]
+    Stage2 --> QuotaCheck{Quota Check chat_messages}
     QuotaCheck -->|exceeded| QuotaError[Return Quota Error]
     QuotaCheck -->|ok| Route{Route by Intent}
 

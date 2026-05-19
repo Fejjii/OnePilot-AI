@@ -14,6 +14,7 @@ class ProviderMode(str, Enum):
     MOCK = "mock"
     LOCAL = "local"
     MISSING = "missing"
+    OPTIONAL = "optional"
     UNHEALTHY = "unhealthy"
 
 
@@ -51,3 +52,28 @@ class ProviderDiagnostic(BaseModel):
 class ProviderDiagnosticResponse(BaseModel):
     providers: list[ProviderDiagnostic] = Field(..., description="All provider diagnostics")
     checked_at: datetime = Field(..., description="When these diagnostics were generated")
+
+
+class RuntimeModelConfigResponse(BaseModel):
+    """Safe, read-only model configuration for reviewers (no secrets)."""
+
+    chat_model: str = Field(..., description="Chat model from OPENAI_MODEL")
+    embedding_model: str = Field(..., description="Embedding model from OPENAI_EMBEDDING_MODEL")
+    speech_model: str = Field(..., description="Speech model from OPENAI_SPEECH_MODEL")
+    llm_status: str = Field(..., description="OpenAI LLM status: live, fallback, or missing")
+    embeddings_status: str = Field(
+        ..., description="OpenAI embeddings status: live, fallback, or missing"
+    )
+    speech_status: str = Field(..., description="OpenAI speech status: live or missing")
+    fallback_active: bool = Field(
+        ..., description="Whether any core AI provider is using a fallback"
+    )
+    provider_mode: str = Field(
+        ...,
+        description="Aggregate runtime mode: live, mixed, or demo",
+    )
+    cost_note: str = Field(..., description="High-level cost guidance for reviewers")
+    configuration_source: str = Field(
+        default="environment",
+        description="How models are configured (environment-driven in this version)",
+    )
