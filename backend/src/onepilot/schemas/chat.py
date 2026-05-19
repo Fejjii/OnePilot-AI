@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from onepilot.core.constants import Intent
+from onepilot.core.constants import Intent, LanguagePreference
 
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
     conversation_id: str | None = None
     context: dict | None = None
+    language_preference: LanguagePreference = LanguagePreference.AUTO
 
 
 class Citation(BaseModel):
@@ -52,6 +53,10 @@ class ChatResponse(BaseModel):
     trace_id: str | None = None
     trace_url: str | None = None
 
+    detected_language: str = "en"
+    response_language: str = "en"
+    language_preference: LanguagePreference = LanguagePreference.AUTO
+
 
 class MessageResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -70,6 +75,10 @@ class MessageResponse(BaseModel):
     trace_id: str | None = None
     trace_url: str | None = None
     span_count: int | None = None
+
+    detected_language: str | None = None
+    response_language: str | None = None
+    language_preference: str | None = None
 
 
 class ConversationSummary(BaseModel):

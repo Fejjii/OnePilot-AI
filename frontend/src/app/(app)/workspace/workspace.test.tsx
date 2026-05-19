@@ -39,6 +39,9 @@ const CHAT_RESPONSE = {
   trace_id: "local_trace_123",
   trace_url: null,
   span_count: 3,
+  detected_language: "en",
+  response_language: "en",
+  language_preference: "auto",
 };
 
 const CONVERSATION_KNOWLEDGE = {
@@ -689,6 +692,139 @@ describe("WorkspacePage", () => {
       expect(
         screen.getByText(/NovaEdge Escalation Policy/i),
       ).toBeInTheDocument();
+    });
+  });
+
+  it("renders language selector defaulting to Auto", async () => {
+    renderWithProviders(<WorkspacePage />);
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId("language-selector").length).toBeGreaterThan(
+        0,
+      );
+    });
+
+    const select = screen.getAllByLabelText(
+      /response language/i,
+    )[0] as HTMLSelectElement;
+    expect(select.value).toBe("auto");
+  });
+
+  it("sends selected language_preference in chat request", async () => {
+    const user = userEvent.setup();
+    let capturedBody: Record<string, unknown> | null = null;
+
+    restoreFetch();
+    restoreFetch = installFetchMock([
+      {
+        method: "GET",
+        url: "/conversations",
+        response: { body: { items: [], total: 0 } },
+      },
+      {
+        method: "POST",
+        url: "/chat",
+        response: ({ body }) => {
+          capturedBody = body as Record<string, unknown>;
+          return { body: { ...CHAT_RESPONSE, language_preference: "de" } };
+        },
+      },
+    ]);
+
+    renderWithProviders(<WorkspacePage />);
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId("language-selector").length).toBeGreaterThan(
+        0,
+      );
+    });
+
+    await user.selectOptions(
+      screen.getAllByLabelText(/response language/i)[0],
+      "de",
+    );
+
+    const textarea = screen.getByPlaceholderText(/ask the ai assistant/i);
+    await user.type(textarea, "Hello");
+    await user.click(screen.getByRole("button", { name: /send/i }));
+
+    await waitFor(() => {
+      expect(capturedBody).not.toBeNull();
+      expect(capturedBody?.language_preference).toBe("de");
+    });
+  });
+
+  it("shows detected and response language in response details", async () => {
+    const user = userEvent.setup();
+    const germanResponse = {
+      ...CHAT_RESPONSE,
+      detected_language: "de",
+      response_language: "de",
+      language_preference: "auto",
+    };
+
+    restoreFetch();
+    restoreFetch = installFetchMock([
+      {
+        method: "GET",
+        url: "/conversations",
+        response: { body: { items: [], total: 0 } },
+      },
+      {
+        method: "POST",
+        url: "/chat",
+        response: { body: germanResponse },
+      },
+    ]);
+
+    renderWithProviders(<WorkspacePage />);
+
+    const textarea = screen.getByPlaceholderText(/ask the ai assistant/i);
+    await user.type(textarea, "Welche Integrationen?");
+    await user.click(screen.getByRole("button", { name: /send/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("language-details")).toBeInTheDocument();
+      expect(screen.getByText(/^Detected language:/i)).toBeInTheDocument();
+      expect(screen.getByText(/^Response language:/i)).toBeInTheDocument();
+      expect(screen.getByText(/^Preference:/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/^German$/i).length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  it("does not show high confidence when weak evidence is flagged", async () => {
+    const user = userEvent.setup();
+    const weakResponse = {
+      ...CHAT_RESPONSE,
+      confidence: 0.85,
+      safety_flags: ["weak_evidence"],
+      citations: [],
+      final_response: "I could not find enough information in the knowledge base.",
+    };
+
+    restoreFetch();
+    restoreFetch = installFetchMock([
+      {
+        method: "GET",
+        url: "/conversations",
+        response: { body: { items: [], total: 0 } },
+      },
+      {
+        method: "POST",
+        url: "/chat",
+        response: { body: weakResponse },
+      },
+    ]);
+
+    renderWithProviders(<WorkspacePage />);
+
+    const textarea = screen.getByPlaceholderText(/ask the ai assistant/i);
+    await user.type(textarea, "obscure question");
+    await user.click(screen.getByRole("button", { name: /send/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText(/high confidence/i)).not.toBeInTheDocument();
+      expect(screen.getAllByText(/medium confidence/i).length).toBeGreaterThan(0);
     });
   });
 });

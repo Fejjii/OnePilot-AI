@@ -31,7 +31,7 @@ This document is an honest, professional assessment of the current state of OneP
 5. **Fallback embeddings are low quality** — token-hash embeddings produce correct retrieval only for exact-ish keyword matches. Set `OPENAI_API_KEY` for real semantic similarity.
 6. **No streaming** — chat responses are synchronous; long responses may feel slow.
 7. **No real-time web search** — web search tool uses mock results without `SERPER_API_KEY`.
-8. **Single-language** — English only. No multilingual support.
+8. **Partial multilingual support** — Workspace replies in EN/DE/FR/ES with auto or fixed preference; KB documents and UI chrome remain English. Cross-lingual retrieval uses heuristics, not multilingual embeddings.
 
 ### Infrastructure
 9. **In-memory rate limiting** — resets on backend restart. Not suitable for horizontally scaled deployments.
@@ -58,7 +58,7 @@ Despite the limitations above, the following components are designed and impleme
 - **Usage event tracking** — per-org quota enforcement with real token counting
 - **Provider adapter pattern** — every external dependency can be swapped without code changes
 - **Approval gates** — no autonomous external actions without human approval
-- **221 passing tests** — covering auth, tenancy, RAG, agent workflow, approvals, memory, and security
+- **494 passing tests** — covering auth, tenancy, RAG, agent workflow, approvals, memory, multilingual chat/RAG, and security
 - **Ruff + mypy compliance** — clean linting and type checking
 
 ---
@@ -85,7 +85,8 @@ Despite the limitations above, the following components are designed and impleme
 - [ ] WebSocket / SSE streaming chat
 - [ ] Kubernetes deployment manifests
 - [ ] CI/CD pipeline (GitHub Actions)
-- [ ] Multi-language support
+- [x] Workspace multilingual replies (EN/DE/FR/ES) — see README Multilingual Support
+- [ ] Full UI localization and translated KB ingestion
 - [ ] Advanced analytics dashboards (token cost, latency heatmaps)
 - [ ] RAGAS-style automated RAG evaluation
 - [ ] Fine-tuned intent classifier replacing the LLM classifier

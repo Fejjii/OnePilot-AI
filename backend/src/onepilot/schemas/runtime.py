@@ -31,6 +31,7 @@ class ProviderCategory(str, Enum):
     SMS = "sms"
     BILLING = "billing"
     SPEECH = "speech"
+    APPLICATION = "application"
 
 
 class ProviderDiagnostic(BaseModel):

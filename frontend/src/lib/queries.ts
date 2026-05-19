@@ -21,6 +21,7 @@ import type {
   DocumentListResponse,
   DocumentResponse,
   HealthResponse,
+  LanguagePreference,
   ProviderDiagnosticResponse,
   LeadCreate,
   LeadListResponse,
@@ -148,10 +149,11 @@ export function useConversation(
   });
 }
 
-interface ChatInput {
+export interface ChatInput {
   message: string;
   conversation_id?: string | null;
   context?: Record<string, unknown>;
+  language_preference?: LanguagePreference;
 }
 
 export function useChatMutation() {

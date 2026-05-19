@@ -15,7 +15,15 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from onepilot.core.config import Settings
-from onepilot.core.constants import UsageFeature
+from onepilot.core.constants import LanguageCode, UsageFeature
+from onepilot.services import i18n_messages
+from onepilot.services.language_service import (
+    build_english_retrieval_queries,
+    cap_confidence_for_weak_evidence,
+    detect_language_heuristic,
+    language_display_name,
+    response_language_instruction,
+)
 from onepilot.core.errors import ProviderUnavailableError
 from onepilot.core.logging import get_logger
 from onepilot.providers import (
@@ -205,6 +213,7 @@ def search(
     embeddings: EmbeddingsProvider | None = None,
     vector: VectorProvider | None = None,
     enforce_quota: bool = True,
+    supplemental_queries: list[str] | None = None,
 ) -> SearchOutcome:
     if enforce_quota:
         quota_service.check_and_increment(
@@ -221,7 +230,14 @@ def search(
     vector.ensure_collection(collection, embeddings.dimension)
 
     started = time.monotonic()
-    
+
+    if supplemental_queries is None:
+        lang_guess = detect_language_heuristic(query)
+        if lang_guess.language != LanguageCode.EN:
+            supplemental_queries = build_english_retrieval_queries(
+                query, lang_guess.language
+            )
+
     # Detect query facets using generalized facet detection
     facet_result = detect_facets(query)
     facet_queries = generate_facet_queries(query, facet_result, include_general=True)
@@ -240,9 +256,16 @@ def search(
     seen_chunk_ids: set[str] = set()
     candidates_by_facet: dict[str, int] = {}
     
-    for facet_query in facet_queries:
+    all_retrieval_queries: list[tuple[str, str]] = [
+        (facet_query.facet, facet_query.query_text) for facet_query in facet_queries
+    ]
+    for idx, extra_query in enumerate(supplemental_queries or []):
+        if extra_query.strip():
+            all_retrieval_queries.append((f"supplemental_{idx}", extra_query))
+
+    for facet_name, query_text in all_retrieval_queries:
         try:
-            query_vector = embeddings.embed_query(facet_query.query_text)
+            query_vector = embeddings.embed_query(query_text)
         except NotImplementedError as exc:
             logger.warning(
                 "rag_embeddings_fallback",
@@ -251,7 +274,7 @@ def search(
                 error=str(exc),
             )
             embeddings = FallbackEmbeddingsProvider()
-            query_vector = embeddings.embed_query(facet_query.query_text)
+            query_vector = embeddings.embed_query(query_text)
 
         # For compound queries, retrieve more candidates per facet
         facet_top_k = top_k * 2 if facet_result.is_compound else top_k
@@ -293,9 +316,9 @@ def search(
                 )
                 raise ProviderUnavailableError(f"Knowledge search failed: {exc}") from exc
         
-        all_raw_results[facet_query.facet] = raw_results
+        all_raw_results[facet_name] = raw_results
         seen_chunk_ids.update(r.id for r in raw_results)
-        candidates_by_facet[facet_query.facet] = len(raw_results)
+        candidates_by_facet[facet_name] = len(raw_results)
     
     latency_ms = int((time.monotonic() - started) * 1000)
 
@@ -455,6 +478,41 @@ def _build_context(hits: list[SearchHit]) -> str:
     return "\n\n".join(parts)
 
 
+def _hits_to_rerank(hits: list[SearchHit]) -> list:
+    from onepilot.services.reranker import RerankHit
+
+    return [
+        RerankHit(
+            chunk=h.chunk,
+            document_title=h.document_title,
+            vector_score=h.vector_score,
+            rerank_score=h.score,
+            signals=h.signals,
+        )
+        for h in hits
+    ]
+
+
+def _merge_search_hits(primary: SearchOutcome, secondary: SearchOutcome, top_k: int) -> SearchOutcome:
+    """Merge hits from a secondary search into the primary outcome and re-evaluate evidence."""
+    seen: set[str] = {h.chunk.id for h in primary.hits}
+    merged = list(primary.hits)
+    for hit in secondary.hits:
+        if hit.chunk.id in seen:
+            continue
+        seen.add(hit.chunk.id)
+        merged.append(hit)
+    merged.sort(key=lambda h: h.score, reverse=True)
+    merged = merged[:top_k]
+    reranked = _hits_to_rerank(merged)
+    return SearchOutcome(
+        query=primary.query,
+        hits=merged,
+        weak_evidence=is_weak_evidence(reranked),
+        fallback_used=primary.fallback_used or secondary.fallback_used,
+    )
+
+
 def answer(
     session: Session,
     *,
@@ -465,7 +523,19 @@ def answer(
     embeddings: EmbeddingsProvider | None = None,
     vector: VectorProvider | None = None,
     llm: LLMProvider | None = None,
+    response_language: str = "en",
+    detected_language: str | None = None,
 ) -> AnswerOutcome:
+    det = detected_language or response_language
+    try:
+        det_code = LanguageCode(str(det).lower())
+    except ValueError:
+        det_code = LanguageCode.EN
+
+    supplemental: list[str] | None = None
+    if det_code != LanguageCode.EN:
+        supplemental = build_english_retrieval_queries(query, det_code)
+
     outcome = search(
         session,
         principal=principal,
@@ -474,6 +544,7 @@ def answer(
         settings=settings,
         embeddings=embeddings,
         vector=vector,
+        supplemental_queries=supplemental,
     )
 
     if outcome.weak_evidence:
@@ -488,23 +559,21 @@ def answer(
         )
         session.commit()
         
-        # Convert hits to rerank format for confidence calculation
-        from onepilot.services.reranker import RerankHit
-        rerank_hits = [
-            RerankHit(
-                chunk=h.chunk,
-                document_title=h.document_title,
-                vector_score=h.vector_score,
-                rerank_score=h.score,
-                signals=h.signals,
-            )
-            for h in outcome.hits
-        ]
-        
+        rerank_hits = _hits_to_rerank(outcome.hits)
+
+        try:
+            resp_lang = LanguageCode(str(response_language).lower())
+        except ValueError:
+            resp_lang = LanguageCode.EN
+        weak_msg = i18n_messages.get_message(i18n_messages.RAG_WEAK_EVIDENCE, resp_lang)
+
+        raw_confidence = calculate_confidence(rerank_hits, query) if rerank_hits else 0.0
         return AnswerOutcome(
             query=query,
-            answer=WEAK_EVIDENCE_ANSWER,
-            confidence=calculate_confidence(rerank_hits, query) if rerank_hits else 0.0,
+            answer=weak_msg,
+            confidence=cap_confidence_for_weak_evidence(
+                raw_confidence, weak_evidence=True
+            ),
             hits=outcome.hits,
             weak_evidence=True,
             fallback_used=outcome.fallback_used,
@@ -515,20 +584,30 @@ def answer(
     llm_fallback = _llm_fallback(llm)
 
     context = _build_context(outcome.hits)
+    try:
+        resp_lang = LanguageCode(str(response_language).lower())
+    except ValueError:
+        resp_lang = LanguageCode.EN
+    lang_instruction = response_language_instruction(resp_lang)
+    answer_lang = language_display_name(resp_lang)
     messages = [
         {
             "role": "system",
             "content": (
-                "You are the NovaEdge knowledge assistant. Answer the user's question using "
-                "ONLY the provided context. Do not invent information. If the context is "
-                "insufficient, say so. Always cite source document titles in brackets."
+                "You are the NovaEdge knowledge assistant. Answer using ONLY the provided "
+                "context. Do not invent information. If the context is insufficient, say so "
+                "in the requested response language. Cite source document titles in brackets "
+                "exactly as they appear in the context — never translate document or section "
+                f"names. {lang_instruction}"
             ),
         },
         {
             "role": "user",
             "content": (
                 f"Question: {query}\n\nContext:\n{context}\n\n"
-                "Write a concise, factual answer (max 5 sentences) using only the context above."
+                f"Write a concise, factual answer in {answer_lang} (max 5 sentences) using "
+                "only the context above. Include bracketed citations with original document "
+                "titles from the context."
             ),
         },
     ]
@@ -567,7 +646,9 @@ def answer(
             )
             for h in outcome.hits
         ]
-        answer_text = synthesize_answer(query, rerank_hits)
+        answer_text = synthesize_answer(
+            query, rerank_hits, response_language=resp_lang.value
+        )
         
         # If synthesize_answer returned weak evidence message, mark as weak
         if answer_text == WEAK_EVIDENCE_ANSWER:
@@ -582,10 +663,13 @@ def answer(
             )
             session.commit()
             
+            raw_confidence = calculate_confidence(rerank_hits, query) if rerank_hits else 0.0
             return AnswerOutcome(
                 query=query,
                 answer=answer_text,
-                confidence=calculate_confidence(rerank_hits, query) if rerank_hits else 0.0,
+                confidence=cap_confidence_for_weak_evidence(
+                    raw_confidence, weak_evidence=True
+                ),
                 hits=outcome.hits,
                 weak_evidence=True,
                 fallback_used=outcome.fallback_used or llm_fallback,
@@ -605,7 +689,12 @@ def answer(
         output_tokens=response.output_tokens,
         fallback_used=llm_fallback,
         latency_ms=latency_ms,
-        metadata={"rag": True, "hit_count": len(outcome.hits)},
+        metadata={
+            "rag": True,
+            "hit_count": len(outcome.hits),
+            "detected_language": det_code.value,
+            "response_language": resp_lang.value,
+        },
     )
     audit_service.record(
         session,
@@ -623,18 +712,7 @@ def answer(
     )
     session.commit()
 
-    # Calculate improved confidence score
-    from onepilot.services.reranker import RerankHit
-    rerank_hits = [
-        RerankHit(
-            chunk=h.chunk,
-            document_title=h.document_title,
-            vector_score=h.vector_score,
-            rerank_score=h.score,
-            signals=h.signals,
-        )
-        for h in outcome.hits
-    ]
+    rerank_hits = _hits_to_rerank(outcome.hits)
     confidence = calculate_confidence(rerank_hits, query)
     
     return AnswerOutcome(

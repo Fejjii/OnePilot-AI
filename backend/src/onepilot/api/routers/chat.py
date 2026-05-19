@@ -38,6 +38,7 @@ def chat(
         message=body.message,
         conversation_id=body.conversation_id,
         context=body.context,
+        language_preference=body.language_preference,
     )
     state = outcome.state
     return ChatResponse(
@@ -65,6 +66,9 @@ def chat(
         trace_mode=state.trace_mode,
         trace_id=state.trace_id,
         trace_url=state.trace_url,
+        detected_language=state.detected_language,
+        response_language=state.response_language,
+        language_preference=state.language_preference,
     )
 
 
@@ -133,6 +137,15 @@ def get_conversation(
                 trace_id=m.msg_metadata.get("trace_id") if m.msg_metadata else None,
                 trace_url=m.msg_metadata.get("trace_url") if m.msg_metadata else None,
                 span_count=m.msg_metadata.get("span_count") if m.msg_metadata else None,
+                detected_language=(
+                    m.msg_metadata.get("detected_language") if m.msg_metadata else None
+                ),
+                response_language=(
+                    m.msg_metadata.get("response_language") if m.msg_metadata else None
+                ),
+                language_preference=(
+                    m.msg_metadata.get("language_preference") if m.msg_metadata else None
+                ),
             )
             for m in msgs
         ],

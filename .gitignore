@@ -68,3 +68,7 @@ docs/screenshots/*.webp
 
 # Cursor
 .cursor/
+
+# Local scratch (do not commit)
+Untitled
+commit-msg.txt

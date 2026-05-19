@@ -190,6 +190,20 @@ flowchart TD
     UpdateMemory --> Done([Return to User])
 ```
 
+## Multilingual Layer
+
+Response language is resolved before agent execution and passed through chat, RAG, and general-chat paths.
+
+| Component | Role |
+|-----------|------|
+| `LanguageService` | Heuristic detection (EN/DE/FR/ES) with optional OpenAI disambiguation |
+| `language_preference` on chat requests | `auto` or fixed `en` / `de` / `fr` / `es` from the workspace UI |
+| `RAGService` | Retrieves in source language; optional English query expansion; answers in response language |
+| `i18n_messages` | Localized fallback strings when providers are unavailable |
+| Frontend `LanguageSelector` | Sets `language_preference` on `/workspace` chat and speech flows |
+
+Citations and document metadata stay in the knowledge base’s original language.
+
 ## Multi-Tenant Isolation
 
 - Every business entity is scoped by `organization_id`

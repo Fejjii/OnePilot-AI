@@ -17,7 +17,9 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from onepilot.core.constants import MessageClass, UsageFeature
+from onepilot.core.constants import LanguageCode, MessageClass, UsageFeature
+from onepilot.services.language_service import response_language_instruction
+from onepilot.tools import general_chat_i18n
 from onepilot.core.logging import get_logger
 from onepilot.providers import get_llm_provider
 from onepilot.providers.llm.fallback_provider import FallbackLLMProvider
@@ -25,47 +27,6 @@ from onepilot.services import usage_service
 from onepilot.tools.base import Tool, ToolContext, ToolResult
 
 logger = get_logger(__name__)
-
-# Template responses for specific message classes
-CAPABILITY_RESPONSE = """I can help you with:
-
-**Knowledge & Search**
-- Answer questions from your knowledge base with citations
-- Search through documents and guides
-
-**Email & Communication**
-- Draft professional emails and replies
-- Compose follow-up messages for leads
-
-**Lead Management**
-- Qualify and capture new leads
-- Track customer inquiries
-- Recommend next actions for prospects
-
-**Workflows & Actions**
-- Schedule meetings and appointments
-- Update CRM records
-- Summarize documents
-
-**Visibility & Control**
-- All actions are logged for audit
-- Memory of conversation context
-- Usage tracking and diagnostics
-- Speech-to-text input support
-
-You can ask me questions like:
-- "What are our integration options?"
-- "Draft a follow-up email for this lead"
-- "Summarize this document"
-- "What's our refund policy?"
-
-How can I help you today?"""
-
-OUT_OF_SCOPE_RESPONSE = (
-    "I'm built for business productivity (knowledge search, leads, email "
-    "drafts, workflows, etc.) and can't help with that. Try rephrasing as a work task, "
-    "or let me know what business goal you're trying to achieve."
-)
 
 SYSTEM_PROMPT = (
     "You are OnePilot, a helpful business productivity assistant. You can assist with:\n"
@@ -108,8 +69,10 @@ class GeneralChatTool(Tool):
         message: str,
         history: list[dict] | None = None,
         message_class: MessageClass | None = None,
+        response_language: str = "en",
         **_: Any,
     ) -> ToolResult:
+        lang = response_language
         # Handle capability/help questions with template response
         if message_class == MessageClass.CAPABILITY_OR_HELP:
             return ToolResult(
@@ -117,7 +80,7 @@ class GeneralChatTool(Tool):
                 input_summary=f"capability question: {message[:120]}",
                 output_summary="template_capability_response",
                 output={
-                    "reply": CAPABILITY_RESPONSE,
+                    "reply": general_chat_i18n.get_capability(lang),
                     "model": "template",
                     "fallback_used": False,
                 },
@@ -133,7 +96,7 @@ class GeneralChatTool(Tool):
                 input_summary=f"out_of_scope: {message[:120]}",
                 output_summary="template_out_of_scope_response",
                 output={
-                    "reply": OUT_OF_SCOPE_RESPONSE,
+                    "reply": general_chat_i18n.get_out_of_scope(lang),
                     "model": "template",
                     "fallback_used": False,
                 },
@@ -146,12 +109,17 @@ class GeneralChatTool(Tool):
         llm = get_llm_provider(ctx.settings)
         is_fallback = isinstance(llm, FallbackLLMProvider)
 
+        try:
+            lang_code = LanguageCode(str(lang).lower())
+        except ValueError:
+            lang_code = LanguageCode.EN
+
         # Build system prompt based on message class
-        system_prompt = SYSTEM_PROMPT
+        system_prompt = SYSTEM_PROMPT + "\n\n" + response_language_instruction(lang_code)
         if message_class == MessageClass.CORRECTION_OR_META:
-            system_prompt = SYSTEM_PROMPT + "\n\n" + CORRECTION_PROMPT
+            system_prompt = system_prompt + "\n\n" + CORRECTION_PROMPT
         elif message_class == MessageClass.CONVERSATIONAL:
-            system_prompt = SYSTEM_PROMPT + "\n\n" + CONVERSATIONAL_PROMPT
+            system_prompt = system_prompt + "\n\n" + CONVERSATIONAL_PROMPT
 
         messages: list[dict] = [{"role": "system", "content": system_prompt}]
         for entry in (history or [])[-6:]:
@@ -179,6 +147,7 @@ class GeneralChatTool(Tool):
             metadata={
                 "intent": "general_assistant",
                 "message_class": str(message_class) if message_class else None,
+                "response_language": lang_code.value,
             },
         )
 

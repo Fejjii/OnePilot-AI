@@ -147,7 +147,10 @@ export default function KnowledgePage() {
           {answer.data && (
             <div className="mt-4 space-y-3">
               <div className="flex flex-wrap items-center gap-2">
-                <ConfidenceBadge value={answer.data.confidence} />
+                <ConfidenceBadge
+                  value={answer.data.confidence}
+                  weakEvidence={answer.data.weak_evidence}
+                />
                 {answer.data.fallback_used && (
                   <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
                     Fallback model

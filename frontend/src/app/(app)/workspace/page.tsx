@@ -30,6 +30,10 @@ import { ConfidenceBadge } from "@/components/domain/confidence-badge";
 import { IntentBadge } from "@/components/domain/intent-badge";
 import { MicrophoneInput } from "@/components/domain/microphone-input";
 import {
+  LanguageSelector,
+  LANGUAGE_LABELS,
+} from "@/components/domain/language-selector";
+import {
   useChatMutation,
   useConversation,
   useConversations,
@@ -43,6 +47,7 @@ import type {
   ChatResponse,
   Citation,
   ConversationDetailResponse,
+  LanguagePreference,
   MessageResponse,
   ToolCallTrace,
   TraceStep,
@@ -90,6 +95,11 @@ function WorkspaceInner() {
 
   const [inFlight, setInFlight] = useState<InFlightSend | null>(null);
   const [viewEpoch, setViewEpoch] = useState(0);
+  const [languagePreference, setLanguagePreference] =
+    useState<LanguagePreference>("auto");
+  const [speechDetectedLanguage, setSpeechDetectedLanguage] = useState<
+    string | null
+  >(null);
 
   const activeConversation = useMemo<ConversationDetailResponse | null>(() => {
     if (!activeConversationId) return null;
@@ -139,12 +149,13 @@ function WorkspaceInner() {
       response?.final_response &&
       !base.find((m) => m.id === response.message_id)
     ) {
+      const weak = detectWeakEvidence(response);
       additions.push({
         id: response.message_id,
         role: "assistant",
         content: response.final_response,
         intent: response.intent,
-        confidence: response.confidence,
+        confidence: displayConfidence(response.confidence, weak),
         citations: response.citations,
         tool_calls: response.tool_calls,
         created_at: new Date().toISOString(),
@@ -276,10 +287,18 @@ function WorkspaceInner() {
     });
 
     try {
+      const context =
+        speechDetectedLanguage && languagePreference === "auto"
+          ? { detected_language: speechDetectedLanguage }
+          : undefined;
+
       const response = await chat.mutateAsync({
         message: trimmed,
         conversation_id: sendTargetId ?? undefined,
+        language_preference: languagePreference,
+        context,
       });
+      setSpeechDetectedLanguage(null);
       setInFlight((prev) => {
         if (!prev || prev.conversationId !== sendTargetId) return null;
         return { ...prev, response };
@@ -310,13 +329,21 @@ function WorkspaceInner() {
         title="AI Workspace"
         description="Grounded chat with intent routing, citations, tool traces, and human approval gates."
         actions={
-          <Button
-            variant="outline"
-            leftIcon={<Plus className="h-4 w-4" />}
-            onClick={() => navigateToConversation(null)}
-          >
-            New conversation
-          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <LanguageSelector
+              id="language-preference-header"
+              value={languagePreference}
+              onChange={setLanguagePreference}
+              disabled={chat.isPending}
+            />
+            <Button
+              variant="outline"
+              leftIcon={<Plus className="h-4 w-4" />}
+              onClick={() => navigateToConversation(null)}
+            >
+              New conversation
+            </Button>
+          </div>
         }
       />
 
@@ -341,6 +368,9 @@ function WorkspaceInner() {
           onSend={handleSend}
           approvalRequired={approvalRequired}
           approvalId={approvalId}
+          languagePreference={languagePreference}
+          onLanguagePreferenceChange={setLanguagePreference}
+          onSpeechLanguage={setSpeechDetectedLanguage}
         />
         <DetailsPanel
           key={`details-${viewKey}-${viewEpoch}`}
@@ -396,6 +426,7 @@ function useWorkspaceDevDiagnostics(
 }
 
 function panelDataFromChatResponse(resp: ChatResponse): PanelData {
+  const weakEvidence = detectWeakEvidence(resp);
   return {
     citations: resp.citations,
     toolCalls: resp.tool_calls,
@@ -404,11 +435,14 @@ function panelDataFromChatResponse(resp: ChatResponse): PanelData {
     approvalId: resp.approval_id ?? null,
     safetyFlags: resp.safety_flags,
     usage: resp.usage,
-    confidence: resp.confidence,
+    confidence: displayConfidence(resp.confidence, weakEvidence),
     intent: resp.intent,
-    weakEvidence: detectWeakEvidence(resp),
+    weakEvidence,
     traceMode: resp.trace_mode,
     traceUrl: resp.trace_url ?? null,
+    detectedLanguage: resp.detected_language,
+    responseLanguage: resp.response_language,
+    languagePreference: resp.language_preference,
   };
 }
 
@@ -427,8 +461,13 @@ function panelDataFromMessage(msg: MessageResponse): PanelData {
       msg.intent === "knowledge_search" && msg.citations.length === 0,
     traceMode: msg.trace_mode ?? "local",
     traceUrl: msg.trace_url ?? null,
+    detectedLanguage: msg.detected_language ?? undefined,
+    responseLanguage: msg.response_language ?? undefined,
+    languagePreference: msg.language_preference ?? undefined,
   };
 }
+
+const WEAK_EVIDENCE_MAX_CONFIDENCE = 0.6;
 
 function detectWeakEvidence(resp: ChatResponse): boolean {
   if (resp.safety_flags?.includes("weak_evidence")) return true;
@@ -436,6 +475,12 @@ function detectWeakEvidence(resp: ChatResponse): boolean {
   if (resp.intent === "knowledge_search" && resp.citations.length === 0)
     return true;
   return false;
+}
+
+function displayConfidence(confidence: number, weakEvidence: boolean): number {
+  return weakEvidence
+    ? Math.min(confidence, WEAK_EVIDENCE_MAX_CONFIDENCE)
+    : confidence;
 }
 
 interface ConversationsSidebarProps {
@@ -518,6 +563,9 @@ interface ChatColumnProps {
   onSend: (msg: string) => void;
   approvalRequired: boolean;
   approvalId: string | null;
+  languagePreference: LanguagePreference;
+  onLanguagePreferenceChange: (pref: LanguagePreference) => void;
+  onSpeechLanguage: (lang: string | null) => void;
 }
 
 function ChatColumn({
@@ -530,6 +578,9 @@ function ChatColumn({
   onSend,
   approvalRequired,
   approvalId,
+  languagePreference,
+  onLanguagePreferenceChange,
+  onSpeechLanguage,
 }: ChatColumnProps) {
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -589,7 +640,13 @@ function ChatColumn({
         {isSending && <AssistantTypingBubble />}
         {approvalRequired && <ApprovalBanner approvalId={approvalId} />}
       </div>
-      <div className="border-t border-slate-100 bg-white px-4 py-3">
+      <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3">
+        <LanguageSelector
+          value={languagePreference}
+          onChange={onLanguagePreferenceChange}
+          disabled={isSending}
+          className="mb-2"
+        />
         <div className="flex items-end gap-2">
           <textarea
             ref={textareaRef}
@@ -606,7 +663,10 @@ function ChatColumn({
             className="block w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
           />
           <MicrophoneInput
-            onTranscript={(transcript) => {
+            onTranscript={(transcript, language) => {
+              if (language) {
+                onSpeechLanguage(language);
+              }
               setDraft((prev) => {
                 const combined = prev ? `${prev} ${transcript}` : transcript;
                 return combined;
@@ -658,6 +718,9 @@ interface PanelData {
   weakEvidence: boolean;
   traceMode?: string;
   traceUrl?: string | null;
+  detectedLanguage?: string;
+  responseLanguage?: string;
+  languagePreference?: string;
 }
 
 interface DetailsPanelProps {
@@ -693,10 +756,37 @@ function DetailsPanel({ data, sending }: DetailsPanelProps) {
               <div className="flex flex-wrap items-center gap-2">
                 {data.intent && <IntentBadge intent={data.intent} />}
                 {data.confidence > 0 && (
-                  <ConfidenceBadge value={data.confidence} />
+                  <ConfidenceBadge
+                    value={data.confidence}
+                    weakEvidence={data.weakEvidence}
+                  />
                 )}
               </div>
             )}
+
+            <section
+              className="rounded-md border border-slate-200 bg-slate-50/60 px-3 py-2 text-xs text-slate-700"
+              data-testid="language-details"
+            >
+              <p>
+                <span className="text-slate-500">Detected language:</span>{" "}
+                {LANGUAGE_LABELS[data.detectedLanguage ?? ""] ??
+                  data.detectedLanguage ??
+                  "—"}
+              </p>
+              <p>
+                <span className="text-slate-500">Response language:</span>{" "}
+                {LANGUAGE_LABELS[data.responseLanguage ?? ""] ??
+                  data.responseLanguage ??
+                  "—"}
+              </p>
+              <p>
+                <span className="text-slate-500">Preference:</span>{" "}
+                {LANGUAGE_LABELS[data.languagePreference ?? ""] ??
+                  data.languagePreference ??
+                  "—"}
+              </p>
+            </section>
 
             {data.approvalRequired && (
               <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">

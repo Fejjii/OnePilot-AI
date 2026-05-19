@@ -159,7 +159,7 @@ python -m onepilot.evaluation.run_rag_eval
 
 ### 5. Backend Test Coverage
 
-**Total:** 221+ tests passing across all phases.
+**Total:** 494 tests passing (3 skipped in default CI/local runs).
 
 | Area | Test Count (approx.) |
 |------|----------------------|
@@ -322,5 +322,5 @@ When an OpenAI API key is available:
 1. **Small sample sizes** — 20–30 samples are not statistically significant
 2. **Manual labeling** — no inter-annotator agreement calculation
 3. **Fallback providers** — evaluation with fallback embeddings and LLM will understate production quality
-4. **Single language** — English-only evaluation
+4. **Limited multilingual eval** — multilingual chat/RAG covered by pytest; no separate RAGAS suite per language yet
 5. **No adversarial evaluation** — beyond the prompt injection patterns already tested

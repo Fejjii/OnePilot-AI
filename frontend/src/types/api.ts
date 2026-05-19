@@ -12,6 +12,10 @@ export type ApprovalStatus =
   | "rejected"
   | "needs_more_info";
 
+export type LanguageCode = "en" | "de" | "fr" | "es";
+
+export type LanguagePreference = "auto" | LanguageCode;
+
 export type Intent =
   | "general_assistant"
   | "knowledge_search"
@@ -104,7 +108,8 @@ export type ProviderCategory =
   | "calendar"
   | "sms"
   | "billing"
-  | "speech";
+  | "speech"
+  | "application";
 
 export interface ProviderDiagnostic {
   name: string;
@@ -166,6 +171,9 @@ export interface ChatResponse {
   trace_id?: string | null;
   trace_url?: string | null;
   span_count?: number | null;
+  detected_language: LanguageCode;
+  response_language: LanguageCode;
+  language_preference: LanguagePreference;
 }
 
 export interface MessageResponse {
@@ -181,6 +189,9 @@ export interface MessageResponse {
   trace_id?: string | null;
   trace_url?: string | null;
   span_count?: number | null;
+  detected_language?: LanguageCode | null;
+  response_language?: LanguageCode | null;
+  language_preference?: LanguagePreference | null;
 }
 
 export interface ConversationSummary {

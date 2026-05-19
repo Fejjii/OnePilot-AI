@@ -13,10 +13,13 @@ def test_provider_diagnostics_no_keys(client: TestClient) -> None:
     data = response.json()
     assert "providers" in data
     assert "checked_at" in data
-    assert len(data["providers"]) == 13  # Updated to include speech provider
+    assert len(data["providers"]) == 14  # includes speech + multilingual application capability
     
     provider_map = {p["name"]: p for p in data["providers"]}
-    
+
+    assert provider_map["Multilingual Support"]["category"] == "application"
+    assert provider_map["Multilingual Support"]["active"] is True
+
     # In test mode (conftest.py sets OPENAI_API_KEY=""), these should be fallback
     assert provider_map["OpenAI LLM"]["mode"] == "fallback"
     assert provider_map["OpenAI LLM"]["configured"] is False

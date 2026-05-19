@@ -10,7 +10,7 @@ import type { TranscribeResponse } from "@/types/api";
 const MAX_RECORDING_DURATION_SECONDS = 60;
 
 interface MicrophoneInputProps {
-  onTranscript: (transcript: string) => void;
+  onTranscript: (transcript: string, language?: string | null) => void;
   disabled?: boolean;
 }
 
@@ -170,7 +170,7 @@ export function MicrophoneInput({
       );
       
       if (response.transcript) {
-        onTranscript(response.transcript);
+        onTranscript(response.transcript, response.language ?? null);
         toast.success("Transcribed successfully", {
           description: `${response.transcript.slice(0, 50)}${response.transcript.length > 50 ? "..." : ""}`,
         });

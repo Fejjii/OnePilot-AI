@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from onepilot.agents.workflow import run_agent
 from onepilot.core.config import Settings
-from onepilot.core.constants import UsageFeature
+from onepilot.core.constants import LanguagePreference, UsageFeature
 from onepilot.core.logging import get_logger
 from onepilot.observability.tracing import (
     get_tracing_provider,
@@ -53,6 +53,7 @@ def handle_chat(
     message: str,
     conversation_id: str | None = None,
     context: dict | None = None,
+    language_preference: LanguagePreference | str = LanguagePreference.AUTO,
     history_turns: int = 10,
 ) -> ChatOutcome:
     started = time.monotonic()
@@ -66,6 +67,7 @@ def handle_chat(
             "conversation_id": conversation_id or "new",
             "message_length": len(message),
             "has_context": bool(context),
+            "language_preference": str(language_preference),
         }
     )
     trace_context = tracing_provider.start_trace("chat.handle", trace_metadata)
@@ -112,6 +114,7 @@ def handle_chat(
         message=message,
         history=history,
         context=context,
+        language_preference=language_preference,
         trace_context=trace_context,
     )
 
@@ -138,6 +141,9 @@ def handle_chat(
             "trace_mode": state.trace_mode,
             "trace_id": state.trace_id,
             "trace_url": state.trace_url,
+            "detected_language": state.detected_language,
+            "response_language": state.response_language,
+            "language_preference": state.language_preference.value,
         },
     )
 
@@ -160,6 +166,9 @@ def handle_chat(
             "approval_required": state.approval_required,
             "safety_flags": state.safety_flags,
             "trace_mode": state.trace_mode,
+            "detected_language": state.detected_language,
+            "response_language": state.response_language,
+            "language_preference": state.language_preference.value,
         },
     )
     audit_service.record(
@@ -175,6 +184,9 @@ def handle_chat(
             "approval_required": state.approval_required,
             "safety_flags": state.safety_flags,
             "trace_mode": state.trace_mode,
+            "detected_language": state.detected_language,
+            "response_language": state.response_language,
+            "language_preference": state.language_preference.value,
         },
     )
     session.commit()

@@ -1,17 +1,29 @@
 import { Activity } from "lucide-react";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 
-export function ConfidenceBadge({ value }: { value: number }) {
-  const pct = Math.round(value * 100);
+const WEAK_EVIDENCE_MAX = 0.6;
+
+export function ConfidenceBadge({
+  value,
+  weakEvidence = false,
+}: {
+  value: number;
+  weakEvidence?: boolean;
+}) {
+  const effective = weakEvidence ? Math.min(value, WEAK_EVIDENCE_MAX) : value;
+  const pct = Math.round(effective * 100);
   let tone: BadgeTone = "muted";
   let label = "Low confidence";
-  if (value >= 0.75) {
+  if (weakEvidence) {
+    tone = effective >= 0.5 ? "warning" : "warning";
+    label = effective >= 0.5 ? "Medium confidence" : "Low confidence";
+  } else if (effective >= 0.75) {
     tone = "success";
     label = "High confidence";
-  } else if (value >= 0.5) {
+  } else if (effective >= 0.5) {
     tone = "info";
     label = "Medium confidence";
-  } else if (value > 0) {
+  } else if (effective > 0) {
     tone = "warning";
     label = "Low confidence";
   }

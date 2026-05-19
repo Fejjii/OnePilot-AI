@@ -35,7 +35,12 @@ from sqlalchemy.orm import Session
 from onepilot.agents.intent_classifier import classify as classify_intent_fn
 from onepilot.agents.message_classifier import classify_message as classify_message_fn
 from onepilot.core.config import Settings
-from onepilot.core.constants import Intent
+from onepilot.core.constants import Intent, LanguageCode, LanguagePreference
+from onepilot.services import i18n_messages
+from onepilot.services.language_service import (
+    detect_language,
+    resolve_response_language,
+)
 from onepilot.core.logging import get_logger
 from onepilot.observability.tracing import TraceContext, sanitize_metadata
 from onepilot.schemas.agents import AgentState
@@ -169,6 +174,39 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
         }
         return update
 
+    def resolve_language_node(state: AgentState) -> dict:
+        """Detect user language and resolve assistant response language."""
+        started = time.monotonic()
+        context_lang = state.context.get("detected_language")
+        detection = detect_language(
+            state.message,
+            settings=deps.settings,
+            context_language=str(context_lang) if context_lang else None,
+        )
+        response_lang = resolve_response_language(
+            state.language_preference,
+            detection.language,
+            detection.confidence,
+        )
+        duration_ms = int((time.monotonic() - started) * 1000)
+        return {
+            "detected_language": detection.language.value,
+            "response_language": response_lang.value,
+            "trace_steps": list(state.trace_steps)
+            + [
+                TraceStep(
+                    step="resolve_language",
+                    detail=(
+                        f"detected={detection.language.value} "
+                        f"confidence={detection.confidence:.2f} "
+                        f"response={response_lang.value} "
+                        f"preference={state.language_preference.value}"
+                    ),
+                    duration_ms=duration_ms,
+                ).model_dump()
+            ],
+        }
+
     def classify_intent_node(state: AgentState) -> dict:
         """Stage 2: Map message class to specific intent."""
         started = time.monotonic()
@@ -213,10 +251,19 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             "safety_flags": list(state.safety_flags),
             "usage_metadata": dict(state.usage_metadata),
         }
-        result = registry.get("rag.answer").run(_ctx(deps), query=state.message)
+        result = registry.get("rag.answer").run(
+            _ctx(deps),
+            query=state.message,
+            response_language=state.response_language,
+            detected_language=state.detected_language,
+        )
         _record_tool_call(update, result)
         update["draft_output"] = result.output.get("answer", "")
-        update["confidence"] = max(state.confidence, float(result.output.get("confidence", 0.0)))
+        rag_confidence = float(result.output.get("confidence", 0.0))
+        if "weak_evidence" in result.safety_flags:
+            update["confidence"] = rag_confidence
+        else:
+            update["confidence"] = max(state.confidence, rag_confidence)
         _append_trace(update, "execute_tool:rag.answer", duration_ms=result.duration_ms)
         return update
 
@@ -289,6 +336,7 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             message=state.message,
             history=state.history,
             message_class=state.message_class,
+            response_language=state.response_language,
         )
         _record_tool_call(update, result)
         update["draft_output"] = result.output.get("reply", "")
@@ -299,8 +347,9 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
         flags = list(state.safety_flags)
         if "clarification_requested" not in flags:
             flags.append("clarification_requested")
+        lang = LanguageCode(state.response_language)
         return {
-            "draft_output": CLARIFICATION_RESPONSE,
+            "draft_output": i18n_messages.get_message(i18n_messages.CLARIFICATION, lang),
             "safety_flags": flags,
             "trace_steps": list(state.trace_steps)
             + [TraceStep(step="execute_tool:clarification").model_dump()],
@@ -310,8 +359,9 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
         flags = list(state.safety_flags)
         if "out_of_scope" not in flags:
             flags.append("out_of_scope")
+        lang = LanguageCode(state.response_language)
         return {
-            "draft_output": OUT_OF_SCOPE_RESPONSE,
+            "draft_output": i18n_messages.get_message(i18n_messages.OUT_OF_SCOPE, lang),
             "safety_flags": flags,
             "trace_steps": list(state.trace_steps)
             + [TraceStep(step="execute_tool:out_of_scope").model_dump()],
@@ -327,7 +377,8 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             Intent.KNOWLEDGE_SEARCH,
             Intent.DOCUMENT_SUMMARY,
         }:
-            draft = WEAK_EVIDENCE_RESPONSE
+            lang = LanguageCode(state.response_language)
+            draft = i18n_messages.get_message(i18n_messages.WEAK_EVIDENCE, lang)
 
         # Low-confidence intents that propose an external action get gated.
         approval_required = state.approval_required
@@ -361,9 +412,9 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
     def finalize_node(state: AgentState) -> dict:
         final = state.draft_output or "I don't have a response for that yet."
         if state.approval_required:
-            final = (
-                final.rstrip()
-                + "\n\n*Pending approval before any external action is taken.*"
+            lang = LanguageCode(state.response_language)
+            final = final.rstrip() + i18n_messages.get_message(
+                i18n_messages.APPROVAL_FOOTNOTE, lang
             )
         return {
             "final_response": final,
@@ -373,6 +424,7 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
 
     graph: StateGraph = StateGraph(AgentState)
     graph.add_node("classify_message", classify_message_node)
+    graph.add_node("resolve_language", resolve_language_node)
     graph.add_node("classify_intent", classify_intent_node)
     graph.add_node("route", route_node)
     graph.add_node("knowledge_search", knowledge_search_node)
@@ -385,7 +437,8 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
     graph.add_node("finalize_response", finalize_node)
 
     graph.set_entry_point("classify_message")
-    graph.add_edge("classify_message", "classify_intent")
+    graph.add_edge("classify_message", "resolve_language")
+    graph.add_edge("resolve_language", "classify_intent")
     graph.add_edge("classify_intent", "route")
     graph.add_conditional_edges(
         "route",
@@ -469,6 +522,7 @@ def run_agent(
     message: str,
     history: list[dict] | None = None,
     context: dict | None = None,
+    language_preference: LanguagePreference | str = LanguagePreference.AUTO,
     trace_context: TraceContext | None = None,
 ) -> AgentState:
     """Run the full workflow once and return the final :class:`AgentState`."""
@@ -479,6 +533,11 @@ def run_agent(
         trace_context=trace_context,
     )
     workflow = make_workflow(deps)
+    pref = (
+        language_preference
+        if isinstance(language_preference, LanguagePreference)
+        else LanguagePreference(str(language_preference).lower())
+    )
     initial = AgentState(
         organization_id=principal.organization_id,
         user_id=principal.user_id,
@@ -486,6 +545,7 @@ def run_agent(
         message=message,
         history=list(history or []),
         context=dict(context or {}),
+        language_preference=pref,
         trace_mode=trace_context.mode if trace_context else "local",
         trace_id=trace_context.trace_id if trace_context else None,
         trace_url=trace_context.trace_url if trace_context else None,

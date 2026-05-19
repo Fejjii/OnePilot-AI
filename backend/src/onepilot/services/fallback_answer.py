@@ -13,11 +13,27 @@ from onepilot.services.reranker import RerankHit
 MIN_RELEVANCE_THRESHOLD: float = 0.35
 
 
+_CITATION_PREFIX: dict[str, str] = {
+    "en": "Based on {title}: ",
+    "de": "Laut {title}: ",
+    "fr": "Selon {title} : ",
+    "es": "Según {title}: ",
+}
+
+_CITATION_PREFIX_MULTI: dict[str, str] = {
+    "en": "Based on the knowledge base ({titles}): ",
+    "de": "Laut der Wissensdatenbank ({titles}): ",
+    "fr": "D'après la base de connaissances ({titles}) : ",
+    "es": "Según la base de conocimiento ({titles}): ",
+}
+
+
 def synthesize_answer(
     query: str,
     hits: list[RerankHit],
     max_length: int = 500,
     min_relevance: float = MIN_RELEVANCE_THRESHOLD,
+    response_language: str = "en",
 ) -> str:
     """Synthesize a deterministic answer from retrieved chunks.
     
@@ -89,11 +105,11 @@ def synthesize_answer(
     # Combine into answer with citation
     answer_text = " ".join(answer_parts)
     
-    # Add citation prefix
+    lang = response_language if response_language in _CITATION_PREFIX else "en"
     if len(unique_titles) == 1:
-        citation_prefix = f"Based on {unique_titles[0]}: "
+        citation_prefix = _CITATION_PREFIX[lang].format(title=unique_titles[0])
     else:
-        citation_prefix = f"Based on the knowledge base ({citation_text}): "
+        citation_prefix = _CITATION_PREFIX_MULTI[lang].format(titles=citation_text)
     
     # Ensure answer doesn't exceed max length
     max_answer_len = max_length - len(citation_prefix)

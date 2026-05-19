@@ -388,6 +388,27 @@ def provider_diagnostics(
         )
     )
     
+    # Multilingual support (application capability)
+    diagnostics.append(
+        ProviderDiagnostic(
+            name="Multilingual Support",
+            category=ProviderCategory.APPLICATION,
+            configured=True,
+            healthy=True,
+            active=True,
+            fallback_used=False,
+            mode=ProviderMode.LIVE,
+            model=None,
+            reason=None,
+            last_checked_at=now,
+            details={
+                "supported_languages": "en,de,fr,es",
+                "preference_modes": "auto,en,de,fr,es",
+                "kb_translation": False,
+            },
+        )
+    )
+
     # OpenAI Speech (Whisper)
     speech_configured = settings.has_openai
     speech_mode = ProviderMode.LIVE if speech_configured else ProviderMode.MISSING

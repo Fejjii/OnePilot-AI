@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from onepilot.core.constants import Intent, MessageClass
+from onepilot.core.constants import Intent, LanguagePreference, MessageClass
 from onepilot.schemas.chat import Citation, ToolCallTrace, TraceStep
 
 
@@ -49,3 +49,7 @@ class AgentState(BaseModel):
 
     history: list[dict] = Field(default_factory=list)
     context: dict = Field(default_factory=dict)
+
+    language_preference: LanguagePreference = LanguagePreference.AUTO
+    detected_language: str = "en"
+    response_language: str = "en"

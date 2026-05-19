@@ -16,7 +16,16 @@ class RAGTool(Tool):
         "Returns citations and weak-evidence flag."
     )
 
-    def run(self, ctx: ToolContext, *, query: str, top_k: int = 5, **_: Any) -> ToolResult:
+    def run(
+        self,
+        ctx: ToolContext,
+        *,
+        query: str,
+        top_k: int = 5,
+        response_language: str = "en",
+        detected_language: str | None = None,
+        **_: Any,
+    ) -> ToolResult:
         started = time.monotonic()
         outcome = rag_service.answer(
             ctx.session,
@@ -24,6 +33,8 @@ class RAGTool(Tool):
             query=query,
             top_k=top_k,
             settings=ctx.settings,
+            response_language=response_language,
+            detected_language=detected_language,
         )
         duration_ms = int((time.monotonic() - started) * 1000)
 

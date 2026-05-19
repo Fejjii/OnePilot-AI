@@ -503,6 +503,25 @@ onepilot/schemas/
 
 ---
 
+## 11. Multilingual Interaction
+
+### Design
+- **Detect or honor preference:** `LanguageService` uses weighted heuristics first; OpenAI disambiguation only when confidence is low and a key is configured.
+- **Separate retrieval from generation:** RAG searches with the user’s source-language query (plus optional English expansion for non-English questions when OpenAI is available). Answers are generated in the resolved response language.
+- **Stable citations:** Document titles and section labels in citations are never translated.
+- **Localized fallbacks:** `i18n_messages` supplies deterministic strings when LLM providers are unavailable.
+
+### Testing
+- `test_language_service.py` — detection and preference resolution
+- `test_multilingual_chat.py` — chat API response language
+- `test_multilingual_rag.py` — RAG answers and citation language
+
+### Trade-offs
+- UI chrome remains English; only workspace replies and speech hints are multilingual.
+- Cross-lingual recall is heuristic, not full multilingual embedding search.
+
+---
+
 ## Summary
 
 OnePilot AI follows **production-grade AI engineering practices**:
@@ -517,5 +536,6 @@ OnePilot AI follows **production-grade AI engineering practices**:
 ✅ **Layered architecture** for separation of concerns  
 ✅ **Typed schemas** for runtime validation  
 ✅ **Tenant isolation** enforced at multiple layers  
+✅ **Multilingual workspace** with explicit language preference and tested RAG/chat paths  
 
 These practices make OnePilot AI **maintainable, testable, secure, and scalable**.

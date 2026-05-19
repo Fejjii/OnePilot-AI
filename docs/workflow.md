@@ -58,7 +58,8 @@ flowchart TD
 flowchart TD
     Start([User Message<br/>Received]) --> ExtractContext[Extract Context:<br/>org_id, user_id,<br/>conversation_id]
     
-    ExtractContext --> SafetyCheck{Safety<br/>Guardrails}
+    ExtractContext --> LangResolve[Resolve Response Language<br/>auto or fixed EN/DE/FR/ES]
+    LangResolve --> SafetyCheck{Safety<br/>Guardrails}
     SafetyCheck -->|Blocked| SafetyReject[Return Safety Error<br/>+ Log Audit Event]
     SafetyCheck -->|Pass| IntentClassify[Intent Classification<br/>via LLM]
     

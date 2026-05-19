@@ -2,7 +2,7 @@
 
 **OnePilot AI** is a production-style AI-powered business workspace for small and medium businesses. It combines a company knowledge base, retrieval-augmented generation (RAG), agentic workflow automation, email drafting, lead management, human approval gates, usage tracking, memory, and security guardrails in a single multi-tenant SaaS platform.
 
-> **Capstone project status:** All 8 phases complete. 221 backend tests passing. Full Docker stack validated. Frontend TypeScript build passing.
+> **Capstone project status:** All 8 phases complete. 494 backend tests passing. Full Docker stack validated. Frontend TypeScript build passing.
 
 ---
 
@@ -57,7 +57,7 @@ Small businesses use many disconnected AI tools and lose time managing scattered
 | Cache | Redis |
 | Vector DB | Qdrant |
 | Frontend | Next.js 16, TypeScript, Tailwind CSS, TanStack Query |
-| Testing | pytest (221 tests), Ruff, Vitest |
+| Testing | pytest (494 tests), Ruff, Vitest |
 | Infra | Docker Compose |
 
 ---
@@ -230,7 +230,7 @@ Copy `.env.example` to `.env` (root) and `frontend/.env.example` to `frontend/.e
 
 ## Running Tests
 
-### Backend (221 tests)
+### Backend (494 tests)
 
 ```bash
 cd backend
@@ -326,7 +326,52 @@ See [docs/evaluation.md](docs/evaluation.md) for the evaluation approach, datase
 | 7 | Frontend pages & integration | ✅ Complete |
 | 8 | Docker, docs, finalization | ✅ Complete |
 
-**221 backend tests passing.** Frontend typecheck, lint, build, and tests all pass.
+**494 backend tests passing.** Frontend typecheck, lint, build, and tests all pass.
+
+---
+
+## Multilingual Support
+
+OnePilot supports multilingual **user interaction** in the AI Workspace and speech-to-text flow while keeping the knowledge base in its original language for grounded RAG.
+
+### Supported languages
+
+| Language | Code |
+|----------|------|
+| English | `en` |
+| German | `de` |
+| French | `fr` |
+| Spanish | `es` |
+
+### Language preference
+
+- **Auto (default):** Detect language from the user message (or speech transcript) and reply in that language.
+- **Fixed (`en` / `de` / `fr` / `es`):** Always reply in the selected language, even if the user writes in another language.
+
+The workspace language selector controls response language only. Navigation and sidebar labels remain in English.
+
+### RAG behavior
+
+- Retrieval uses the **original user query** (source language).
+- Optional **English query expansion** may run for non-English questions when OpenAI is configured, to improve recall against English KB documents.
+- Answers are generated in the **response language**.
+- **Citations keep original document titles and sections** (not translated).
+
+### Speech-to-text
+
+Transcription returns a detected `language` code. When preference is Auto, that hint is passed to the agent for more reliable detection.
+
+### Current limitations
+
+- Knowledge base documents are **not translated** at ingest time.
+- UI chrome (nav, settings labels) is **English only**.
+- Cross-lingual retrieval is heuristic (original query + optional English expansion), not full multilingual embeddings.
+
+### Future work
+
+- Translated knowledge base ingestion
+- Multilingual document ingestion pipelines
+- Stronger cross-lingual retrieval (multilingual embeddings, query routing)
 
 ---
 

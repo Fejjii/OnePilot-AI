@@ -259,6 +259,50 @@ FACET_DOCUMENT_MAPPING: dict[str, list[str]] = {
     ],
 }
 
+# Non-English query terms mapped to facets (phrase match, does not dilute English scoring)
+MULTILINGUAL_FACET_ALIASES: dict[str, tuple[str, ...]] = {
+    "services": (
+        "dienste",
+        "dienst",
+        "bietet",
+        "servicios",
+        "servicio",
+        "ofrece",
+        "propose",
+        "services",
+    ),
+    "integrations": (
+        "integrationen",
+        "unterstützt",
+        "unterstutzt",
+        "intégrations",
+        "integraciones",
+        "integración",
+        "admite",
+        "prises en charge",
+        "prises",
+    ),
+    "refunds": (
+        "rückerstattung",
+        "ruckerstattung",
+        "richtlinie",
+        "remboursement",
+        "politique de remboursement",
+        "reembolso",
+        "política de reembolso",
+    ),
+    "onboarding": (
+        "onboarding",
+        "funktioniert",
+        "mise en place",
+    ),
+    "pricing": (
+        "tarif",
+        "preis",
+        "precio",
+    ),
+}
+
 # Facet expansion templates for retrieval query generation
 FACET_EXPANSION_TEMPLATES: dict[str, str] = {
     "services": "services offerings features capabilities automation customer support lead qualification",
@@ -340,19 +384,28 @@ def detect_facets(query: str, threshold: float = 0.15) -> FacetDetectionResult:
     for facet_name, facet_keywords in FACET_KEYWORDS.items():
         # Count matching keywords
         matches = query_keywords & facet_keywords
-        
+
         # Also check for phrase matches (more weight)
         phrase_matches = sum(
             1 for keyword in facet_keywords if keyword in query_lower
         )
-        
+
         # Calculate score based on matches and phrase matches
         if matches or phrase_matches > 0:
-            keyword_score = len(matches) / min(len(query_keywords), len(facet_keywords)) if query_keywords else 0
+            keyword_score = (
+                len(matches) / min(len(query_keywords), len(facet_keywords))
+                if query_keywords
+                else 0
+            )
             phrase_score = phrase_matches / len(facet_keywords)
-            
+
             # Weighted combination: phrase matches count more
             facet_scores[facet_name] = (keyword_score * 0.4) + (phrase_score * 0.6)
+
+    # Boost facets matched by multilingual aliases (German, French, Spanish)
+    for facet_name, aliases in MULTILINGUAL_FACET_ALIASES.items():
+        if any(alias in query_lower for alias in aliases):
+            facet_scores[facet_name] = max(facet_scores.get(facet_name, 0.0), 0.35)
 
     # Filter facets above threshold
     detected_facets = [
@@ -397,7 +450,7 @@ def generate_facet_queries(
         for facet in facet_result.detected_facets:
             expansion = FACET_EXPANSION_TEMPLATES.get(facet, "")
             if expansion:
-                facet_query = f"{expansion} {query}"
+                facet_query = f"{expansion} NovaEdge Solutions"
                 weight = facet_result.facet_scores.get(facet, 0.5)
                 queries.append(
                     FacetRetrievalQuery(

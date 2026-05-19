@@ -47,6 +47,10 @@ docker compose ps
 docker compose logs -f backend
 ```
 
+### Multilingual workspace (optional)
+
+No extra deployment steps are required. Users set **Response language** in the AI Workspace (`auto`, `en`, `de`, `fr`, `es`). The backend reads `language_preference` on `POST /chat` requests. Speech transcription may pass a detected language hint when preference is `auto`.
+
 ### Access the Application
 
 - **Frontend:** http://localhost:3000

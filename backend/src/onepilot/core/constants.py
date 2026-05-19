@@ -45,6 +45,21 @@ class Intent(StrEnum):
     CLARIFICATION = "clarification"
 
 
+class LanguageCode(StrEnum):
+    EN = "en"
+    DE = "de"
+    FR = "fr"
+    ES = "es"
+
+
+class LanguagePreference(StrEnum):
+    AUTO = "auto"
+    EN = "en"
+    DE = "de"
+    FR = "fr"
+    ES = "es"
+
+
 class UsageFeature(StrEnum):
     CHAT_MESSAGES = "chat_messages"
     RAG_QUERIES = "rag_queries"
