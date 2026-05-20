@@ -446,6 +446,7 @@ Full pre-push checklist: [docs/manual_test_checklist.md](docs/manual_test_checkl
 | [Limitations & Roadmap](docs/limitations_roadmap.md) | Honest assessment of mock components and future work |
 | [Data Model](docs/data_model.md) | Database schema and entity relationships |
 | [Deployment](docs/deployment.md) | Docker and local run guide |
+| [Azure Deployment](docs/deployment-azure.md) | Short-term ACA demo runbook (branch `deployment/azure`) |
 | [Usage & Billing](docs/usage_billing.md) | Usage events and mock billing |
 | [Google Workspace OAuth](docs/google_workspace_oauth_setup.md) | Gmail + Calendar OAuth refresh token setup |
 | [Gmail OAuth](docs/gmail_oauth_setup.md) | Legacy Gmail-only OAuth helper (Calendar scopes not included) |

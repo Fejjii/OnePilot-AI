@@ -249,7 +249,7 @@ make frontend-dev
 ## Known Deployment Limitations
 
 1. **No Kubernetes manifests** — Docker Compose only
-2. **No cloud-native deployment** — no AWS ECS, GCP Cloud Run, Azure Container Instances examples
+2. **Azure short-term demo** — see [deployment-azure.md](deployment-azure.md) for Container Apps runbook (branch `deployment/azure`)
 3. **No autoscaling** — fixed resource limits
 4. **No multi-region** — single-region deployment
 5. **No CDN** — frontend static assets served directly by Next.js

@@ -11,7 +11,9 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 
-# Build-time env: the backend URL is baked in at build time via NEXT_PUBLIC_*
+# Build-time env: the backend URL is baked in at build time via NEXT_PUBLIC_*.
+# Azure: docker build --build-arg NEXT_PUBLIC_API_URL=https://<backend-fqdn> ...
+# Changing the backend URL requires a frontend image rebuild. See docs/deployment-azure.md.
 ARG NEXT_PUBLIC_API_URL=http://localhost:8000
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 

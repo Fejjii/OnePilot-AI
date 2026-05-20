@@ -9,6 +9,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _BACKEND_ROOT = Path(__file__).resolve().parents[3]
 _PROJECT_ROOT = _BACKEND_ROOT.parent
 
+# Default CORS origins for local frontend (Docker Compose and pnpm dev).
+DEFAULT_CORS_ALLOWED_ORIGINS = "http://localhost:3000,http://127.0.0.1:3000"
+
+
+def parse_comma_separated_list(value: str) -> list[str]:
+    """Parse a comma-separated env string into a trimmed list (empty entries dropped)."""
+    return [item.strip() for item in value.split(",") if item.strip()]
+
 
 def resolve_env_files() -> tuple[str, ...]:
     """Load dotenv files from repo root and backend/ (root wins on conflicts).
@@ -84,6 +92,11 @@ class Settings(BaseSettings):
     DEV_USER_ID: str = "usr_demo_admin"
     DEV_BYPASS_QUOTAS: bool = False
 
+    CORS_ALLOWED_ORIGINS: str = DEFAULT_CORS_ALLOWED_ORIGINS
+    CORS_ALLOW_CREDENTIALS: bool = True
+    CORS_ALLOW_METHODS: str = "*"
+    CORS_ALLOW_HEADERS: str = "*"
+
     model_config = SettingsConfigDict(
         env_file=resolve_env_files(),
         env_file_encoding="utf-8",
@@ -96,6 +109,21 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return value.strip()
         return value
+
+    @property
+    def cors_allowed_origins_list(self) -> list[str]:
+        origins = parse_comma_separated_list(self.CORS_ALLOWED_ORIGINS)
+        return origins if origins else parse_comma_separated_list(DEFAULT_CORS_ALLOWED_ORIGINS)
+
+    @property
+    def cors_allow_methods_list(self) -> list[str]:
+        methods = parse_comma_separated_list(self.CORS_ALLOW_METHODS)
+        return methods if methods else ["*"]
+
+    @property
+    def cors_allow_headers_list(self) -> list[str]:
+        headers = parse_comma_separated_list(self.CORS_ALLOW_HEADERS)
+        return headers if headers else ["*"]
 
     @property
     def is_dev(self) -> bool:
