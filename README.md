@@ -2,7 +2,7 @@
 
 **OnePilot AI** is a production-style AI-powered business workspace for small and medium businesses. It combines a company knowledge base, retrieval-augmented generation (RAG), agentic workflow automation, email drafting, lead management, human approval gates, usage tracking, memory, and security guardrails in a single multi-tenant SaaS platform.
 
-> **Capstone project status:** All 8 phases complete. **506** backend tests passing. Full Docker stack validated. Frontend typecheck, lint, build, and tests passing.
+> **Capstone project status:** All 8 phases complete. **599** backend tests passing. Full Docker stack validated. Frontend typecheck, lint, build, and tests passing.
 
 ---
 
@@ -36,7 +36,7 @@ Small businesses use many disconnected AI tools and lose time managing scattered
 | Multi-tenant SaaS | Organizations, users, roles (Owner/Admin/Member/Viewer), plans, quotas |
 | RAG knowledge base | Upload, chunk, embed, search, grounded answers, citations, weak-evidence guardrail |
 | LangGraph agent | Intent routing, tool registry, multi-step reasoning |
-| Email drafting | Draft generation with HubSpot/Gmail mock adapters |
+| Email drafting | LLM drafts in-app; Gmail draft/send after human approval when OAuth configured |
 | Lead management | Lead tracking, qualification, CRM mock |
 | Human approval gates | All external actions require explicit approval |
 | Memory | Session, conversation, and long-term memory per org |
@@ -44,6 +44,20 @@ Small businesses use many disconnected AI tools and lose time managing scattered
 | Usage tracking | Per-org quota enforcement and usage event history |
 | Security | JWT auth, RBAC, prompt injection detection, sensitive data redaction, rate limiting |
 | Provider adapters | Every external dependency has mock, fallback, or live modes; diagnostics in Settings |
+| External web search | Serper-backed `external.web_search` tool; separated from internal RAG citations |
+
+---
+
+## External web search (Serper)
+
+Set `SERPER_API_KEY` in `backend/.env` (see `.env.example`). Optional tuning: `SERPER_BASE_URL`, `SERPER_TIMEOUT_SECONDS`, `SERPER_MAX_RESULTS`.
+
+- **Internal KB evidence** comes from `rag.answer` — citations show document titles from your uploaded knowledge base.
+- **External web evidence** comes from `external.web_search` — citations show page titles and URLs from the public web.
+- Combined questions (e.g. market trends vs NovaEdge services) route to `web_and_knowledge` and label **Internal company knowledge**, **External web evidence**, and **Recommendation** in the answer.
+- Without a Serper key, the app keeps running in optional/mock mode and states that external search is not configured.
+
+**Demo prompt:** `Find recent SMB automation trends and compare them with NovaEdge Solutions services.`
 
 ---
 
@@ -94,7 +108,7 @@ See [docs/security.md](docs/security.md).
 | Cache | Redis |
 | Vector DB | Qdrant |
 | Frontend | Next.js 16, TypeScript, Tailwind CSS, TanStack Query |
-| Testing | pytest (**506** tests), Ruff, Vitest (**48** tests) |
+| Testing | pytest (**599** tests), Ruff, Vitest |
 | Infra | Docker Compose |
 
 ---
@@ -158,8 +172,10 @@ flowchart TB
         Redis[Redis]
         Postgres[(Postgres)]
         LangSmith[LangSmith local or live]
-        Mocks[Mock Gmail HubSpot Calendar Twilio Stripe]
-        Serper[Serper optional or mock]
+        Mocks[Mock HubSpot Twilio Stripe]
+        Serper[Serper optional or live]
+        Gmail[Gmail optional or live]
+        GCal[Google Calendar optional or live]
     end
 
     Frontend -->|REST JSON| Routers
@@ -169,7 +185,9 @@ flowchart TB
     Services --> EvalSvc
     Services --> Security
     Services --> Providers
-    Providers --> Postgres
+    Providers --> Serper
+    Providers --> Gmail
+    Providers --> GCal
     Providers --> Qdrant
     Providers --> Redis
 ```
@@ -306,7 +324,15 @@ Copy `.env.example` to `.env` (root) and `frontend/.env.example` to `frontend/.e
 | `OPENAI_SPEECH_MODEL` | No | `whisper-1` | Speech transcription model |
 | `LANGSMITH_API_KEY` | No | — | LangSmith tracing (optional) |
 | `LANGSMITH_TRACING` | No | `false` | Enable LangSmith trace export |
-| `SERPER_API_KEY` | No | — | Web search (optional, returns mock results without it) |
+| `SERPER_API_KEY` | No | — | Serper web search (optional; mock results without it) |
+| `SERPER_BASE_URL` | No | `https://google.serper.dev/search` | Serper search endpoint |
+| `SERPER_TIMEOUT_SECONDS` | No | `10` | HTTP timeout for Serper |
+| `SERPER_MAX_RESULTS` | No | `5` | Default max web results per query |
+| `GOOGLE_CLIENT_ID` | No | — | Google OAuth client ID (Gmail + Calendar) |
+| `GOOGLE_CLIENT_SECRET` | No | — | Google OAuth client secret (server env only) |
+| `GOOGLE_REFRESH_TOKEN` | No | — | Google OAuth refresh token (server env only) |
+| `GMAIL_SEND_ENABLED` | No | `false` | Allow Gmail send after approval (off by default) |
+| `GOOGLE_CALENDAR_CREATE_ENABLED` | No | `true` | Allow Calendar event creation after approval |
 | `JWT_SECRET` | **Yes** | `change-me-...` | Secret for signing JWTs — **change in production** |
 | `JWT_EXPIRE_MINUTES` | No | `60` | JWT expiry in minutes |
 | `DEV_AUTH_ENABLED` | No | `true` | Bypass JWT in dev mode (disable in production) |
@@ -322,8 +348,10 @@ Copy `.env.example` to `.env` (root) and `frontend/.env.example` to `frontend/.e
 | Redis | **Live** | **Missing** → process-local cache |
 | Postgres | **Required** | — |
 | LangSmith | **Live** tracing | **Missing** or **Local** trace steps |
-| Serper | Optional (mock in capstone) | **Optional** — not required |
-| Gmail, HubSpot, Calendar, Twilio, Stripe | Always **Mock** in this version | Safe demo adapters |
+| Serper Web Search | **Live** with `SERPER_API_KEY` | **Optional** — mock canned results; app stays up without key |
+| Gmail | **Live** when `GOOGLE_*` OAuth env is set; **mock** otherwise | Draft after approval; send optional (`GMAIL_SEND_ENABLED`) |
+| Google Calendar | **Live** when `GOOGLE_*` OAuth includes Calendar scopes; **mock** otherwise | Availability/slots without approval; event creation after approval |
+| HubSpot, Twilio, Stripe | **Mock** in this version | Safe demo adapters |
 
 Provider keys are set via environment variables only. **No API keys are stored in the frontend.** See Settings → Provider Diagnostics in the app.
 
@@ -331,7 +359,7 @@ Provider keys are set via environment variables only. **No API keys are stored i
 
 ## Running Tests
 
-### Backend (506 tests)
+### Backend (599 tests)
 
 ```bash
 cd backend
@@ -413,10 +441,14 @@ Full pre-push checklist: [docs/manual_test_checklist.md](docs/manual_test_checkl
 | [RAG System](docs/rag_system.md) | Ingestion, chunking, embeddings, retrieval, citations |
 | [Security](docs/security.md) | Auth, RBAC, tenant isolation, guardrails, production gaps |
 | [Evaluation](docs/evaluation.md) | Intent eval harness, test coverage, RAG evaluation approach |
-| [Demo Script](docs/demo_script.md) | 5–7 minute SCR demo walkthrough (10 steps) |
+| [Demo Script](docs/demo_script.md) | 8–10 minute reviewer demo walkthrough (12 steps) |
 | [Manual Test Checklist](docs/manual_test_checklist.md) | Pre-push validation checklist |
 | [Limitations & Roadmap](docs/limitations_roadmap.md) | Honest assessment of mock components and future work |
 | [Data Model](docs/data_model.md) | Database schema and entity relationships |
+| [Deployment](docs/deployment.md) | Docker and local run guide |
+| [Usage & Billing](docs/usage_billing.md) | Usage events and mock billing |
+| [Google Workspace OAuth](docs/google_workspace_oauth_setup.md) | Gmail + Calendar OAuth refresh token setup |
+| [Gmail OAuth](docs/gmail_oauth_setup.md) | Legacy Gmail-only OAuth helper (Calendar scopes not included) |
 
 ---
 
@@ -433,7 +465,7 @@ Full pre-push checklist: [docs/manual_test_checklist.md](docs/manual_test_checkl
 | 7 | Frontend pages & integration | ✅ Complete |
 | 8 | Docker, docs, finalization | ✅ Complete |
 
-**506 backend tests passing.** Frontend: 48 Vitest tests; typecheck, lint, and build pass.
+**599 backend tests passing.** Frontend: typecheck, lint, build, and Vitest pass.
 
 ---
 
@@ -484,7 +516,7 @@ Transcription returns a detected `language` code. When preference is Auto, that 
 
 ## Known Limitations
 
-1. **Mock providers** — HubSpot, Gmail, Google Calendar, Stripe, Twilio, and Serper use in-memory or optional mocks. No real external API calls in the capstone demo.
+1. **Provider modes** — Gmail and Google Calendar are **live** when Google OAuth env vars include the required scopes (approval-gated draft/send and calendar event creation). See [docs/google_workspace_oauth_setup.md](docs/google_workspace_oauth_setup.md). HubSpot, Stripe, and Twilio use in-memory mocks. Serper is **live when `SERPER_API_KEY` is set**; otherwise mock/optional mode.
 2. **JWT in localStorage** — Tokens are stored in `localStorage` for simplicity. In production, use HTTP-only cookies.
 3. **No streaming** — Chat responses are synchronous (no Server-Sent Events or WebSocket yet).
 4. **Rate limiting** — In-memory token bucket resets on restart. Redis-backed rate limiting is planned.

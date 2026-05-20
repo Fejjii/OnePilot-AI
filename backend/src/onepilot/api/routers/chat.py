@@ -150,3 +150,18 @@ def get_conversation(
             for m in msgs
         ],
     )
+
+
+@conversations_router.delete("/{conversation_id}", status_code=204)
+def delete_conversation(
+    conversation_id: str,
+    principal: CurrentPrincipal,
+    session: DBSession,
+) -> None:
+    require_member(principal)
+    conversation_service.delete_conversation(
+        session,
+        organization_id=principal.organization_id,
+        user_id=principal.user_id,
+        conversation_id=conversation_id,
+    )

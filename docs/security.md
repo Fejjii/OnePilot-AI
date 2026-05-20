@@ -155,7 +155,8 @@ When an external provider is unavailable or not configured:
 | OpenAI Embeddings | `FallbackEmbeddingsProvider` | Token-hash embeddings (not for production) |
 | Qdrant | `MemoryVectorProvider` | In-process singleton (not for production) |
 | HubSpot CRM | `MockCRMProvider` | In-memory, deterministic |
-| Gmail | `MockEmailProvider` | In-memory draft store |
+| Gmail | `MockEmailProvider` or `GmailProvider` | OAuth refresh token in server env only; drafts/sends **after** approval; `/health` and `/providers` never return tokens. Setup: `docs/gmail_oauth_setup.md` |
+| Google Calendar | `MockCalendarProvider` or `GoogleCalendarProvider` | Reuses same OAuth refresh token when Calendar scopes granted; availability/slots without approval; event creation **after** approval only. Setup: `docs/google_workspace_oauth_setup.md` |
 | Stripe | `MockBillingProvider` | In-memory subscription store |
 
 All fallback usage is logged with `fallback_used=True` in responses and audit logs.

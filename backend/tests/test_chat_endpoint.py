@@ -249,3 +249,63 @@ class TestChatTracing:
             assert "trace_mode" in assistant_msg
             assert "trace_id" in assistant_msg
             assert "trace_url" in assistant_msg
+
+
+class TestConversationDelete:
+    def test_delete_own_conversation(self, client: TestClient) -> None:
+        token = _register(client, suffix="_del")
+        chat_resp = client.post(
+            "/chat",
+            json={"message": "Hello for delete test"},
+            headers=_h(token),
+        )
+        assert chat_resp.status_code == 200, chat_resp.text
+        conv_id = chat_resp.json()["conversation_id"]
+
+        delete_resp = client.delete(
+            f"/conversations/{conv_id}",
+            headers=_h(token),
+        )
+        assert delete_resp.status_code == 204, delete_resp.text
+
+        get_resp = client.get(f"/conversations/{conv_id}", headers=_h(token))
+        assert get_resp.status_code == 404
+
+        list_resp = client.get("/conversations", headers=_h(token))
+        assert list_resp.status_code == 200
+        ids = [item["id"] for item in list_resp.json()["items"]]
+        assert conv_id not in ids
+
+    def test_delete_removes_messages(self, client: TestClient) -> None:
+        token = _register(client, suffix="_del_msgs")
+        conv_id = client.post(
+            "/chat",
+            json={"message": "Persist then delete"},
+            headers=_h(token),
+        ).json()["conversation_id"]
+        detail_before = client.get(f"/conversations/{conv_id}", headers=_h(token))
+        assert len(detail_before.json()["messages"]) >= 2
+
+        delete_resp = client.delete(f"/conversations/{conv_id}", headers=_h(token))
+        assert delete_resp.status_code == 204
+
+        detail_after = client.get(f"/conversations/{conv_id}", headers=_h(token))
+        assert detail_after.status_code == 404
+
+    def test_cannot_delete_other_org_conversation(
+        self, client: TestClient
+    ) -> None:
+        token_a = _register(client, suffix="_del_a")
+        chat_resp = client.post(
+            "/chat",
+            json={"message": "Org A conversation"},
+            headers=_h(token_a),
+        )
+        conv_id = chat_resp.json()["conversation_id"]
+
+        token_b = _register(client, suffix="_del_b")
+        delete_resp = client.delete(
+            f"/conversations/{conv_id}",
+            headers=_h(token_b),
+        )
+        assert delete_resp.status_code == 404

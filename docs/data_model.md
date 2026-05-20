@@ -1,6 +1,6 @@
 # Data Model
 
-## Phase 4 Entity Relationship Diagram
+## Entity Relationship Diagram
 
 ```mermaid
 erDiagram
@@ -8,19 +8,23 @@ erDiagram
     Organization ||--o{ Subscription : has
     Organization ||--o{ UsageQuota : tracks
     Organization ||--o{ Document : owns
+    Organization ||--o{ Conversation : owns
+    Organization ||--o{ Lead : owns
+    Organization ||--o{ ApprovalRequest : owns
     Organization ||--o{ AuditLog : produces
     Organization ||--o{ UsageEvent : emits
+    Organization ||--o{ MemoryItem : stores
     User ||--o{ OrganizationMember : belongs_to
     Plan ||--o{ Subscription : defines
     OrganizationMember }o--|| User : references
     Document ||--o{ DocumentChunk : contains
+    Conversation ||--o{ Message : contains
 
     Organization {
         string id PK
         string name
         string slug UK
         datetime created_at
-        datetime updated_at
     }
 
     User {
@@ -29,102 +33,97 @@ erDiagram
         string hashed_password
         string full_name
         boolean is_active
-        datetime created_at
-        datetime updated_at
     }
 
-    OrganizationMember {
+    Conversation {
         string id PK
         string organization_id FK
         string user_id FK
-        string role
+        string title
         datetime created_at
     }
 
-    Plan {
-        string code PK
-        string name
-        int monthly_price_cents
-        json limits
+    Message {
+        string id PK
+        string conversation_id FK
+        string role
+        text content
+        json metadata
+        datetime created_at
     }
 
-    Subscription {
+    Lead {
         string id PK
         string organization_id FK
-        string plan_code FK
+        string name
+        string email
         string status
-        datetime started_at
-        datetime renews_at
-        datetime created_at
-        datetime updated_at
+        string priority
     }
 
-    UsageQuota {
+    ApprovalRequest {
         string id PK
-        string organization_id
-        string feature
-        int used
-        datetime period_start
-        datetime period_end
+        string organization_id FK
+        string action_type
+        string status
+        json proposed_payload
+        string risk_level
+        datetime created_at
     }
 
     Document {
         string id PK
-        string organization_id
-        string filename
+        string organization_id FK
         string title
-        string content_type
-        int size_bytes
         int chunk_count
         string status
-        string source
-        string uploaded_by
-        json metadata
-        datetime created_at
-        datetime updated_at
     }
 
     DocumentChunk {
         string id PK
-        string organization_id
         string document_id FK
-        int ordinal
         string section
         text content
-        int token_count
-        json metadata
-        datetime created_at
     }
 
     AuditLog {
         string id PK
-        string organization_id
+        string organization_id FK
         string user_id
         string action
-        string resource_type
-        string resource_id
         json detail
-        string ip_address
         datetime created_at
     }
 
     UsageEvent {
         string id PK
-        string organization_id
-        string user_id
+        string organization_id FK
         string feature
         string model
-        string provider
-        int input_tokens
-        int output_tokens
         float estimated_cost
         bool fallback_used
-        int tool_calls
-        int latency_ms
-        json metadata
         datetime created_at
     }
+
+    MemoryItem {
+        string id PK
+        string organization_id FK
+        string key
+        text value
+    }
 ```
+
+## Provider Diagnostics (runtime, not persisted)
+
+Provider health is computed at request time from env configuration and live probes. Exposed via `GET /health` and `GET /providers` — **never stores OAuth tokens or API keys**.
+
+| Field | Source |
+|-------|--------|
+| `mode` | live / mock / missing / optional / unhealthy |
+| `capabilities` | e.g. draft, send, availability, create_event |
+| `requires_approval` | HITL policy flags |
+
+---
 
 ## Plan Limits
 
@@ -148,46 +147,22 @@ erDiagram
 | Member | Use AI tools, read data |
 | Viewer | Read-only access |
 
-## Phase 4 Entities
+## Core Entities
 
-- **Document** — uploaded files with metadata; soft-linked to chunks via `document_id`.
-- **DocumentChunk** — section-aware text segments, embedded into the tenant vector store.
-- **AuditLog** — append-only record of every AI / tool action with `organization_id`,
-  `user_id`, `action`, `resource_type`, and `detail`.
-- **UsageEvent** — granular token / latency / cost record for every LLM, embedding, or
-  tool call.
+- **Document / DocumentChunk** — uploaded files, section-aware chunks, tenant-scoped Qdrant collections
+- **Conversation / Message** — chat sessions and turns with intent/tool metadata
+- **Lead** — sales leads with status, priority, source (seeded demo data)
+- **ApprovalRequest** — human-in-the-loop queue for Gmail, Calendar, CRM actions
+- **AuditLog** — append-only sensitive action log
+- **UsageEvent** — token, latency, cost per LLM/tool call
+- **MemoryItem** — persistent org/conversation facts for the agent
 
-All four are tenant-scoped: every read enforces `organization_id` at the repository layer.
+All entities enforce `organization_id` at the repository layer.
 
-## Future Entities (Phase 5+)
+## Demo Data
 
-These entities will be added in later phases:
+The fictional company **NovaEdge Solutions** provides realistic demo data via `backend/src/onepilot/demo_data/`:
 
-- **Conversation / Message** — chat sessions and individual turns.
-- **Lead** — sales leads with status, urgency, source.
-- **Customer** — converted leads / existing customers.
-- **Contact** — people associated with customers.
-- **Deal** — sales opportunities.
-- **SupportTicket** — customer support requests.
-- **EmailDraft** — AI-generated email drafts.
-- **ApprovalRequest** — human-in-the-loop approval queue.
-- **AgentAction** — individual agent tool calls and results.
-- **WorkflowRun** — full agent workflow execution trace.
-- **MemoryItem** — persistent user/org memory for the agent.
-
-## Demo Data (Phase 3)
-
-The fictional company **NovaEdge Solutions** provides realistic demo data via
-`backend/src/onepilot/demo_data/`:
-
-- 19 knowledge base markdown documents under `novaedge_docs/` (company profile,
-  services, pricing, sales playbook, objection handling, integration guide,
-  customer FAQ, support troubleshooting, escalation policy, refund policy,
-  onboarding guide, customer success SOP, data privacy, AI usage, security,
-  email templates, discovery script, demo checklist, sample meeting notes).
-- Deterministic structured generators (`generators.py`) producing leads,
-  customers, support tickets, conversations, email examples, appointments,
-  usage events, approvals, and audit logs. All generators accept a `seed`
-  parameter; the default seed `42` produces the canonical dataset used by tests.
-- An idempotent `POST /demo/seed` endpoint that ingests all 19 docs into the
-  caller's organization.
+- 19 knowledge base markdown documents
+- 12 leads, 8 approvals (with pending items), 40 usage events, 25 audit log entries
+- Idempotent `POST /demo/seed` and `docker compose run --rm seed`

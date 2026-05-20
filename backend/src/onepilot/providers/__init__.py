@@ -30,14 +30,18 @@ log = structlog.get_logger(__name__)
 _vector_singleton: VectorProvider | None = None
 _embeddings_singleton: EmbeddingsProvider | None = None
 _llm_singleton: LLMProvider | None = None
+_email_singleton: EmailProvider | None = None
+_calendar_singleton: CalendarProvider | None = None
 
 
 def reset_provider_cache() -> None:
     """Drop cached singletons; intended for test fixtures."""
-    global _vector_singleton, _embeddings_singleton, _llm_singleton
+    global _vector_singleton, _embeddings_singleton, _llm_singleton, _email_singleton, _calendar_singleton
     _vector_singleton = None
     _embeddings_singleton = None
     _llm_singleton = None
+    _email_singleton = None
+    _calendar_singleton = None
 
 
 # ---------------------------------------------------------------------------
@@ -182,36 +186,103 @@ def get_crm_provider() -> CRMProvider:
 # Email
 # ---------------------------------------------------------------------------
 
-def get_email_provider() -> EmailProvider:
-    gmail_creds = os.environ.get("GMAIL_CREDENTIALS_JSON", "")
-    if gmail_creds:
-        from onepilot.providers.email.gmail_provider import GmailProvider
+def get_email_provider(settings: Settings | None = None) -> EmailProvider:
+    """Return Gmail (live/mock) or in-memory mock based on settings."""
+    global _email_singleton
+    if _email_singleton is not None:
+        return _email_singleton
 
-        log.info("email_provider.init", provider="gmail")
-        return GmailProvider(credentials_json=gmail_creds)
-
+    from onepilot.core.config import get_settings
+    from onepilot.providers.email.gmail_provider import GmailProvider
     from onepilot.providers.email.mock_email_provider import MockEmailProvider
 
-    log.warning("email_provider.fallback", reason="GMAIL_CREDENTIALS_JSON not set")
-    return MockEmailProvider()
+    cfg = settings or get_settings()
+    mode = (cfg.GMAIL_PROVIDER_MODE or "auto").strip().lower()
+
+    if mode == "mock":
+        log.info("email_provider.init", provider="mock", reason="GMAIL_PROVIDER_MODE=mock")
+        _email_singleton = MockEmailProvider()
+        return _email_singleton
+
+    if mode == "missing":
+        log.warning("email_provider.fallback", reason="GMAIL_PROVIDER_MODE=missing")
+        _email_singleton = MockEmailProvider()
+        return _email_singleton
+
+    if cfg.has_gmail_oauth:
+        try:
+            log.info("email_provider.init", provider="gmail", auth="oauth_refresh")
+            _email_singleton = GmailProvider(
+                client_id=cfg.GOOGLE_CLIENT_ID,
+                client_secret=cfg.GOOGLE_CLIENT_SECRET,
+                refresh_token=cfg.GOOGLE_REFRESH_TOKEN,
+                send_enabled=cfg.GMAIL_SEND_ENABLED,
+            )
+            return _email_singleton
+        except Exception as exc:
+            log.warning("email_provider.fallback", reason=f"Gmail init failed: {exc}")
+
+    if cfg.has_gmail_legacy_credentials:
+        log.warning(
+            "email_provider.fallback",
+            reason="GMAIL_CREDENTIALS_JSON is deprecated; use GOOGLE_* OAuth env vars",
+        )
+
+    log.warning("email_provider.fallback", reason="Gmail OAuth not configured")
+    _email_singleton = MockEmailProvider()
+    return _email_singleton
 
 
 # ---------------------------------------------------------------------------
 # Calendar
 # ---------------------------------------------------------------------------
 
-def get_calendar_provider() -> CalendarProvider:
-    gcal_creds = os.environ.get("GOOGLE_CALENDAR_CREDENTIALS_JSON", "")
-    if gcal_creds:
-        from onepilot.providers.calendar.google_calendar_provider import GoogleCalendarProvider
+def _parse_calendar_ids(raw: str) -> list[str]:
+    return [part.strip() for part in raw.split(",") if part.strip()]
 
-        log.info("calendar_provider.init", provider="google_calendar")
-        return GoogleCalendarProvider(credentials_json=gcal_creds)
 
+def get_calendar_provider(settings: Settings | None = None) -> CalendarProvider:
+    """Return Google Calendar (live/mock) based on settings."""
+    global _calendar_singleton
+    if _calendar_singleton is not None:
+        return _calendar_singleton
+
+    from onepilot.core.config import get_settings
+    from onepilot.providers.calendar.google_calendar_provider import GoogleCalendarProvider
     from onepilot.providers.calendar.mock_calendar_provider import MockCalendarProvider
 
-    log.warning("calendar_provider.fallback", reason="GOOGLE_CALENDAR_CREDENTIALS_JSON not set")
-    return MockCalendarProvider()
+    cfg = settings or get_settings()
+    mode = (cfg.GOOGLE_CALENDAR_PROVIDER_MODE or "auto").strip().lower()
+
+    if mode == "mock":
+        log.info("calendar_provider.init", provider="mock", reason="GOOGLE_CALENDAR_PROVIDER_MODE=mock")
+        _calendar_singleton = MockCalendarProvider(calendar_id=cfg.GOOGLE_CALENDAR_ID or "primary")
+        return _calendar_singleton
+
+    if mode == "missing":
+        log.warning("calendar_provider.fallback", reason="GOOGLE_CALENDAR_PROVIDER_MODE=missing")
+        _calendar_singleton = MockCalendarProvider(calendar_id=cfg.GOOGLE_CALENDAR_ID or "primary")
+        return _calendar_singleton
+
+    if cfg.has_calendar_oauth:
+        try:
+            log.info("calendar_provider.init", provider="google_calendar", auth="oauth_refresh")
+            _calendar_singleton = GoogleCalendarProvider(
+                client_id=cfg.GOOGLE_CLIENT_ID,
+                client_secret=cfg.GOOGLE_CLIENT_SECRET,
+                refresh_token=cfg.GOOGLE_REFRESH_TOKEN,
+                calendar_id=cfg.GOOGLE_CALENDAR_ID or "primary",
+                calendar_ids=_parse_calendar_ids(cfg.GOOGLE_CALENDAR_IDS),
+                aggregate_selected=cfg.GOOGLE_CALENDAR_AGGREGATE_SELECTED,
+                create_enabled=cfg.GOOGLE_CALENDAR_CREATE_ENABLED,
+            )
+            return _calendar_singleton
+        except Exception as exc:
+            log.warning("calendar_provider.fallback", reason=f"Google Calendar init failed: {exc}")
+
+    log.warning("calendar_provider.fallback", reason="Google Calendar OAuth not configured")
+    _calendar_singleton = MockCalendarProvider(calendar_id=cfg.GOOGLE_CALENDAR_ID or "primary")
+    return _calendar_singleton
 
 
 # ---------------------------------------------------------------------------
@@ -219,11 +290,15 @@ def get_calendar_provider() -> CalendarProvider:
 # ---------------------------------------------------------------------------
 
 def get_search_provider(settings: Settings) -> SearchProvider:
-    if settings.SERPER_API_KEY:
+    if settings.has_serper:
         from onepilot.providers.search.serper_provider import SerperSearchProvider
 
         log.info("search_provider.init", provider="serper")
-        return SerperSearchProvider(api_key=settings.SERPER_API_KEY)
+        return SerperSearchProvider(
+            api_key=settings.SERPER_API_KEY,
+            base_url=settings.SERPER_BASE_URL,
+            timeout_seconds=settings.SERPER_TIMEOUT_SECONDS,
+        )
 
     from onepilot.providers.search.mock_search_provider import MockSearchProvider
 

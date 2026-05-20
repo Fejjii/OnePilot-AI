@@ -1,6 +1,6 @@
 # Agent Workflow
 
-> **Status:** Implemented in Phase 5. Memory, approvals, and usage tracking added in Phase 6.
+> **Status:** Implemented. Memory, approvals, usage tracking, Serper web search, Gmail, Google Calendar, and compound workflows added in final capstone phase.
 
 ## Overview
 
@@ -23,35 +23,18 @@ Stage 1 reduces misroutes for meta questions, corrections, and out-of-scope requ
 |--------|-------------|
 | `general_assistant` | General business Q&A — answered directly by the LLM |
 | `knowledge_search` | RAG-powered knowledge base lookup with citations |
+| `web_search` | External web search via Serper with URL citations |
+| `web_and_knowledge` | Hybrid Serper + RAG with separated evidence sections |
 | `lead_support` | Lead qualification and CRM lookup/update |
-| `email_drafting` | Draft professional emails; send requires approval |
+| `email_drafting` | Draft professional emails; Gmail draft after approval |
+| `calendar_availability` | Check free/busy across selected Google Calendars |
+| `calendar_scheduling` | Suggest slots or propose event creation (approval-gated) |
+| `calendar_and_email` | Combined email draft + calendar event proposals |
+| `compound_workflow` | Research → email → calendar in one turn |
 | `document_summary` | Summarize an uploaded document |
-| `workflow_action` | Execute business workflows (calendar, CRM); requires approval |
+| `workflow_action` | Execute business workflows (CRM mock); requires approval |
 | `out_of_scope` | Non-business requests declined gracefully |
 | `clarification` | Agent asks for more context before proceeding |
-
----
-
-## Agent State
-
-```python
-class AgentState(TypedDict):
-    organization_id: str
-    user_id: str
-    conversation_id: str
-    user_message: str
-    intent: str | None
-    selected_tools: list[str]
-    retrieved_context: list[dict]
-    tool_results: list[dict]
-    draft_output: str | None
-    approval_required: bool
-    approval_reason: str | None
-    citations: list[dict]
-    confidence: float
-    usage_metadata: dict
-    safety_flags: list[str]
-```
 
 ---
 
@@ -63,34 +46,34 @@ flowchart TD
     Safety -->|blocked| Blocked[Return Safety Error and audit log]
     Safety -->|safe| Stage1[Stage 1 Message Class]
     Stage1 --> Stage2[Stage 2 Intent Classify]
-    Stage2 --> QuotaCheck{Quota Check chat_messages}
+    Stage2 --> QuotaCheck{Quota Check}
     QuotaCheck -->|exceeded| QuotaError[Return Quota Error]
     QuotaCheck -->|ok| Route{Route by Intent}
 
-    Route -->|knowledge_search| RAG[RAG Retrieval\nrag_search tool]
-    Route -->|lead_support| LeadTool[Lead Tools\nlead_lookup / lead_update]
-    Route -->|email_drafting| EmailTool[Email Tools\nemail_draft / email_send]
-    Route -->|general_assistant| LLM[Direct LLM Call]
-    Route -->|workflow_action| WorkflowTools[Workflow Tools\ncrm_update / calendar_book]
-    Route -->|document_summary| SummaryTool[RAG + Summarize]
-    Route -->|out_of_scope| OutOfScope[Decline politely]
-    Route -->|clarification| Clarify[Ask follow-up question]
+    Route -->|knowledge_search| RAG[RAG rag.answer]
+    Route -->|web_search| Web[external.web_search]
+    Route -->|web_and_knowledge| Hybrid[Web plus RAG]
+    Route -->|email_drafting| Email[email.draft]
+    Route -->|calendar| Cal[calendar check suggest create]
+    Route -->|compound_workflow| Compound[web email calendar]
+    Route -->|general_assistant| LLM[Direct LLM]
+    Route -->|workflow_action| Workflow[CRM and workflow tools]
 
-    RAG --> Synthesize[Synthesize Response\nwith citations]
-    LeadTool --> Synthesize
-    EmailTool --> Synthesize
+    RAG --> Synthesize[Synthesize Response with citations]
+    Web --> Synthesize
+    Hybrid --> Synthesize
+    Email --> Synthesize
+    Cal --> Synthesize
+    Compound --> Synthesize
     LLM --> Synthesize
-    WorkflowTools --> Synthesize
-    SummaryTool --> Synthesize
+    Workflow --> Synthesize
 
-    Synthesize --> ApprovalCheck{Needs Approval?}
-    ApprovalCheck -->|yes| CreateApproval[Create ApprovalRequest\nin Postgres]
+    Synthesize --> ApprovalCheck{Needs Approval}
+    ApprovalCheck -->|yes| CreateApproval[Create ApprovalRequest in Postgres]
     ApprovalCheck -->|no| Finalize
 
-    CreateApproval --> Finalize[Log UsageEvent\n+ AuditLog]
-    OutOfScope --> Finalize
-    Clarify --> Finalize
-    Finalize --> Memory[Update Memory\nsession + long-term]
+    CreateApproval --> Finalize[Log UsageEvent and AuditLog]
+    Finalize --> Memory[Update Memory session and long-term]
     Memory --> Done([Response to User])
 ```
 
@@ -102,15 +85,17 @@ Tools are registered in `tools/registry.py`. The agent calls tools only through 
 
 | Tool | Description | Requires Approval |
 |------|-------------|-------------------|
-| `rag_search` | Semantic search over the knowledge base | No |
+| `rag.answer` | Internal knowledge base with citations | No |
+| `external.web_search` | Serper web search (`web_search` / `web_and_knowledge` / `compound_workflow`) | No |
 | `lead_lookup` | Look up lead by email or ID | No |
 | `lead_update` | Update lead status or score | **Yes** |
-| `email_draft` | Generate a professional email draft | No |
-| `email_send` | Send an approved email draft | **Yes** |
-| `calendar_check` | Check calendar availability | No |
-| `calendar_book` | Book a meeting | **Yes** |
+| `email.draft` | Generate email draft in-app (LLM) | No external Gmail call |
+| `gmail_create_draft` | Create Gmail draft after approval | **Yes** |
+| `gmail_send_email` | Send via Gmail after approval if `GMAIL_SEND_ENABLED` | **Yes** |
+| `calendar.check_availability` | Free/busy across selected calendars | No |
+| `calendar.suggest_slots` | Propose meeting slots | No |
+| `calendar.create_event_request` | Propose calendar event | **Yes** |
 | `crm_update` | Update CRM records (HubSpot mock) | **Yes** |
-| `web_search` | Search the web via Serper (mock fallback) | No |
 
 ---
 
@@ -119,48 +104,55 @@ Tools are registered in `tools/registry.py`. The agent calls tools only through 
 When `approval_required=True` in the agent state, the workflow:
 
 1. Creates an `ApprovalRequest` row in Postgres with the proposed action payload
-2. Returns a response to the user indicating the action is pending approval
-3. The user or an admin reviews the request in the Approvals page
-4. On approval: the action is queued for execution
-5. On rejection: the request is marked rejected and never retried
+2. Returns a response indicating the action is pending approval
+3. The user or admin reviews the request on the **Approvals** page
+4. On approval: `approval_service` executes via `gmail_service` or `calendar_service`; execution metadata stored on payload (`_execution`)
+5. On rejection: marked rejected, never retried automatically
 
-This ensures **no external side effects** happen without human review.
+**No external side effects** happen without human review.
+
+---
+
+## Compound Workflow
+
+Prompt example: *Find recent SMB automation trends, draft an email, and schedule a meeting with a high priority lead next week.*
+
+Sequential execution in `compound_workflow_node`:
+
+1. `external.web_search` — external citations
+2. `email.draft` → Gmail approval if send/draft requested
+3. `calendar.create_event_request` → Calendar approval
+
+Each gated step creates its own approval record.
+
+---
+
+## Calendar Safety
+
+- Availability checks aggregate **selected calendars** (`GOOGLE_CALENDAR_IDS` or primary)
+- Responses show busy/free windows only — **event titles are not exposed** to the agent or UI
+- Timezone handling uses `GOOGLE_CALENDAR_DEFAULT_TIMEZONE`
+- Event creation requires approval; `GOOGLE_CALENDAR_CREATE_ENABLED` can disable creates
 
 ---
 
 ## Intent Classification Trace
 
-The agent logs the classified intent, confidence, and selected tools to:
-- `AuditLog` — for compliance and debugging
-- `UsageEvent` — for quota and cost tracking
-- LangSmith (if `LANGSMITH_TRACING=true`) — for trace visualization
+The agent logs classified intent, confidence, and selected tools to:
 
-### Example Trace
-
-```
-User: "Can you draft an email to our top leads about the new pricing?"
-
-Intent classified: email_drafting (confidence: 0.92)
-Tools selected: lead_lookup, email_draft
-lead_lookup → found 3 leads matching criteria
-email_draft → generated draft (412 tokens)
-approval_required: True (email_send requires approval)
-Response: "I've drafted the email below. Please review and approve it before I send."
-```
+- `AuditLog` — compliance and debugging
+- `UsageEvent` — quota and cost tracking
+- LangSmith (if `LANGSMITH_TRACING=true`) — trace visualization
 
 ---
 
 ## Memory
 
-The agent maintains three tiers of memory, all scoped to `organization_id`:
-
 | Tier | Storage | Description |
 |------|---------|-------------|
 | Session memory | In-process dict | Current conversation turn context |
 | Conversation memory | Postgres | Last N messages per `conversation_id` |
-| Long-term memory | Postgres | Named facts the agent has learned about the org |
-
-Long-term memory is written when the agent detects persistent facts (e.g., "Our pricing changed to X"). These facts are retrieved and injected into the system prompt on subsequent conversations.
+| Long-term memory | Postgres | Named facts learned about the org |
 
 ---
 
@@ -168,8 +160,9 @@ Long-term memory is written when the agent detects persistent facts (e.g., "Our 
 
 | Error | Behavior |
 |-------|----------|
-| Safety flag triggered | Block immediately, log audit event, return safe error message |
-| Quota exceeded | Return structured quota error with limit and reset info |
+| Safety flag triggered | Block immediately, log audit event, return safe error |
+| Quota exceeded | Structured quota error with limit and reset info |
 | Tool call failure | Log error, continue with remaining tools, note in response |
 | LLM API failure | Fall back to `FallbackLLMProvider`, set `fallback_used=True` |
-| Approval creation failure | Return error to user, do not execute the action |
+| Provider unhealthy | Diagnostics surface mode; mock/fallback when configured |
+| Approval creation failure | Return error to user, do not execute action |

@@ -97,8 +97,8 @@ class TestTwoStageRouting:
         intent_result = classify_intent(message, message_class=msg_result.message_class)
         assert intent_result.intent == Intent.DOCUMENT_SUMMARY
 
-    def test_scheduling_workflow_routes_to_workflow_action(self) -> None:
-        """Scheduling workflow -> workflow_request -> workflow_action."""
+    def test_scheduling_workflow_routes_to_calendar_scheduling(self) -> None:
+        """Scheduling workflow -> workflow_request -> calendar_scheduling."""
         message = "Schedule a meeting for tomorrow at 2pm"
         
         # Stage 1
@@ -107,7 +107,7 @@ class TestTwoStageRouting:
         
         # Stage 2
         intent_result = classify_intent(message, message_class=msg_result.message_class)
-        assert intent_result.intent == Intent.WORKFLOW_ACTION
+        assert intent_result.intent == Intent.CALENDAR_SCHEDULING
 
     def test_unclear_routes_to_clarification(self) -> None:
         """Unclear message -> unclear -> clarification."""
@@ -144,7 +144,7 @@ class TestLegacyCompatibility:
             ("Draft an email to Acme", Intent.EMAIL_DRAFTING),
             ("Capture this lead", Intent.LEAD_SUPPORT),
             ("Summarize the Q3 plan", Intent.DOCUMENT_SUMMARY),
-            ("Schedule a meeting", Intent.WORKFLOW_ACTION),
+            ("Schedule a meeting", Intent.CALENDAR_SCHEDULING),
             ("Hello there", Intent.GENERAL_ASSISTANT),
             ("That's not what I meant", Intent.GENERAL_ASSISTANT),
             ("Tell me a joke", Intent.OUT_OF_SCOPE),
@@ -206,10 +206,8 @@ class TestWorkflowDisambiguation:
             }, f"Failed for: {msg}"
 
     def test_workflow_action_indicators_detected(self) -> None:
-        """Generic workflow actions should map to WORKFLOW_ACTION."""
+        """CRM-style workflow actions should map to WORKFLOW_ACTION."""
         messages = [
-            "Schedule a meeting",
-            "Book an appointment",
             "Update the CRM",
             "Approve this request",
         ]
@@ -217,6 +215,16 @@ class TestWorkflowDisambiguation:
             msg_result = classify_message(msg)
             intent_result = classify_intent(msg, message_class=msg_result.message_class)
             assert intent_result.intent == Intent.WORKFLOW_ACTION, f"Failed for: {msg}"
+
+    def test_calendar_scheduling_indicators_detected(self) -> None:
+        messages = [
+            "Schedule a meeting",
+            "Book an appointment",
+        ]
+        for msg in messages:
+            msg_result = classify_message(msg)
+            intent_result = classify_intent(msg, message_class=msg_result.message_class)
+            assert intent_result.intent == Intent.CALENDAR_SCHEDULING, f"Failed for: {msg}"
 
     def test_ambiguous_workflow_routes_to_clarification(self) -> None:
         """Workflow request without clear indicators should ask for clarification."""

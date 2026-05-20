@@ -47,9 +47,13 @@ class SafetyEvalReport:
                 "admin_owner_review_actions": True,
                 "gated_action_types": sorted(
                     {
-                        "send_email",
-                        "schedule_meeting",
-                        "update_crm",
+                "send_email",
+                "gmail_create_draft",
+                "gmail_send_email",
+                "schedule_meeting",
+                "calendar_create_event",
+                "google_calendar_create_event",
+                "update_crm",
                         "external_action",
                         "high_risk_tool_call",
                         "low_confidence_action",

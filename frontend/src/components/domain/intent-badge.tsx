@@ -19,6 +19,8 @@ const INTENT_META: Record<
 > = {
   general_assistant: { tone: "primary", icon: Sparkles, label: "General" },
   knowledge_search: { tone: "info", icon: BookOpen, label: "Knowledge" },
+  web_search: { tone: "info", icon: BookOpen, label: "Web search" },
+  web_and_knowledge: { tone: "info", icon: BookOpen, label: "Web + KB" },
   lead_support: { tone: "primary", icon: Users, label: "Lead" },
   email_drafting: { tone: "info", icon: Mail, label: "Email" },
   document_summary: { tone: "info", icon: FileText, label: "Summary" },

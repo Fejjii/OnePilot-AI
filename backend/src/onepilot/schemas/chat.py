@@ -13,11 +13,14 @@ class ChatRequest(BaseModel):
 
 
 class Citation(BaseModel):
-    document_id: str
+    document_id: str = ""
     document_title: str
     section: str | None = None
     chunk_text: str
     relevance_score: float
+    citation_type: str = "internal"
+    url: str | None = None
+    source: str | None = None
 
 
 class ToolCallTrace(BaseModel):

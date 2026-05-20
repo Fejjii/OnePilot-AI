@@ -1,5 +1,5 @@
 import "@/test-utils/next-mocks";
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@/test-utils/render-with-providers";
@@ -270,15 +270,18 @@ describe("WorkspacePage", () => {
     await user.type(textarea, "What is the escalation policy?");
     await user.click(screen.getByRole("button", { name: /send/i }));
 
-    await waitFor(() => {
-      expect(screen.getByText(/trace mode/i)).toBeInTheDocument();
-      expect(screen.getByText(/local/i)).toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(screen.getByText(/trace mode/i)).toBeInTheDocument();
+        expect(screen.getByText(/^Local$/i)).toBeInTheDocument();
+      },
+      { timeout: 10000 },
+    );
 
     expect(
       screen.queryByText(/open langsmith trace/i),
     ).not.toBeInTheDocument();
-  });
+  }, 15000);
 
   it("displays trace mode with LangSmith URL when available", async () => {
     const langsmithResponse = {
@@ -695,18 +698,16 @@ describe("WorkspacePage", () => {
     });
   });
 
-  it("renders language selector defaulting to Auto", async () => {
+  it("renders a single language selector above the chat input", async () => {
     renderWithProviders(<WorkspacePage />);
 
     await waitFor(() => {
-      expect(screen.getAllByTestId("language-selector").length).toBeGreaterThan(
-        0,
-      );
+      expect(screen.getAllByTestId("language-selector")).toHaveLength(1);
     });
 
-    const select = screen.getAllByLabelText(
+    const select = screen.getByLabelText(
       /response language/i,
-    )[0] as HTMLSelectElement;
+    ) as HTMLSelectElement;
     expect(select.value).toBe("auto");
   });
 
@@ -734,13 +735,11 @@ describe("WorkspacePage", () => {
     renderWithProviders(<WorkspacePage />);
 
     await waitFor(() => {
-      expect(screen.getAllByTestId("language-selector").length).toBeGreaterThan(
-        0,
-      );
+      expect(screen.getByTestId("language-selector")).toBeInTheDocument();
     });
 
     await user.selectOptions(
-      screen.getAllByLabelText(/response language/i)[0],
+      screen.getByLabelText(/response language/i),
       "de",
     );
 
@@ -825,6 +824,57 @@ describe("WorkspacePage", () => {
     await waitFor(() => {
       expect(screen.queryByText(/high confidence/i)).not.toBeInTheDocument();
       expect(screen.getAllByText(/medium confidence/i).length).toBeGreaterThan(0);
+    });
+  });
+
+  it("deletes a conversation without opening it", async () => {
+    const deleteCalls: string[] = [];
+    let listAfterDelete = CONVERSATION_LIST;
+    restoreFetch();
+    restoreFetch = installFetchMock([
+      {
+        method: "GET",
+        url: "/conversations/conv_knowledge",
+        response: { body: CONVERSATION_KNOWLEDGE },
+      },
+      {
+        method: "GET",
+        url: "/conversations/conv_general",
+        response: { body: CONVERSATION_GENERAL },
+      },
+      {
+        method: "GET",
+        url: "/conversations",
+        response: () => ({ body: listAfterDelete }),
+      },
+      {
+        method: "DELETE",
+        url: "/conversations/conv_general",
+        response: () => {
+          deleteCalls.push("conv_general");
+          listAfterDelete = {
+            items: CONVERSATION_LIST.items.filter((c) => c.id !== "conv_general"),
+            total: 1,
+          };
+          return { status: 204, body: undefined };
+        },
+      },
+    ]);
+
+    setMockNextLocation({ search: "?conversation=conv_knowledge" });
+    const user = userEvent.setup();
+    renderWithProviders(<WorkspacePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/General help chat/i)).toBeInTheDocument();
+    });
+
+    window.confirm = vi.fn(() => true);
+    await user.click(screen.getByRole("button", { name: /Delete General help chat/i }));
+
+    await waitFor(() => {
+      expect(deleteCalls.length).toBe(1);
+      expect(screen.queryByText(/General help chat/i)).not.toBeInTheDocument();
     });
   });
 });

@@ -33,7 +33,11 @@ def get_evaluation_summary() -> EvaluationSummaryResponse:
         hitl = HitlApprovalSafety(
             gated_action_types=[
                 "send_email",
+                "gmail_create_draft",
+                "gmail_send_email",
                 "schedule_meeting",
+                "calendar_create_event",
+                "google_calendar_create_event",
                 "update_crm",
                 "external_action",
                 "high_risk_tool_call",

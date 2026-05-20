@@ -14,6 +14,10 @@ class TestHealthEndpoint:
         for key in ("app", "version", "env", "providers"):
             assert key in data, f"Missing key: {key}"
         assert isinstance(data["providers"], dict)
+        providers = data["providers"]
+        assert "gmail_configured" in providers
+        assert "gmail_mode" in providers
+        assert providers["gmail_send_enabled"] is False
 
     def test_health_content_type(self, client: TestClient) -> None:
         resp = client.get("/health")

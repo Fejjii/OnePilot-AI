@@ -31,6 +31,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { UsageProgress } from "@/components/domain/usage-progress";
 import { IntentBadge } from "@/components/domain/intent-badge";
 import { Badge } from "@/components/ui/badge";
+import { normalizeProviderMode } from "@/lib/provider-diagnostics";
 import {
   useApprovals,
   useConversations,
@@ -204,8 +205,12 @@ export default function DashboardPage() {
                     />
                   ))}
                 </div>
-              ) : !diagnostics.data ? (
-                <ErrorState onRetry={() => diagnostics.refetch()} />
+              ) : diagnostics.isError || !diagnostics.data ? (
+                <ErrorState
+                  title="Provider diagnostics unavailable"
+                  description="We couldn't load provider status. Please try again."
+                  onRetry={() => diagnostics.refetch()}
+                />
               ) : (
                 <div className="space-y-3">
                   {hasMixedModes && (
@@ -360,7 +365,8 @@ function getStatusIcon(provider: ProviderDiagnostic) {
   return <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />;
 }
 
-function getModeBadge(mode: ProviderMode, compact?: boolean) {
+function getModeBadge(mode: ProviderMode | string, compact?: boolean) {
+  const safeMode = normalizeProviderMode(mode);
   const toneMap: Record<ProviderMode, "success" | "info" | "warning" | "danger"> = {
     live: "success",
     local: "info",
@@ -383,15 +389,15 @@ function getModeBadge(mode: ProviderMode, compact?: boolean) {
   if (compact) {
     return (
       <div className={`h-2 w-2 rounded-full ${
-        mode === "live" ? "bg-emerald-500" :
-        mode === "local" ? "bg-blue-500" :
-        mode === "unhealthy" ? "bg-red-500" :
+        safeMode === "live" ? "bg-emerald-500" :
+        safeMode === "local" ? "bg-blue-500" :
+        safeMode === "unhealthy" ? "bg-red-500" :
         "bg-amber-500"
       }`} />
     );
   }
   
-  return <Badge tone={toneMap[mode]}>{labelMap[mode]}</Badge>;
+  return <Badge tone={toneMap[safeMode]}>{labelMap[safeMode]}</Badge>;
 }
 
 function ProviderCard({

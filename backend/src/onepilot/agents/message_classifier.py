@@ -92,6 +92,48 @@ _CORRECTION_META_PATTERNS = [
     (re.compile(r"\b(unrelated|different (topic|subject)|change (topic|subject)|back to)\b", re.IGNORECASE), 2.5),
 ]
 
+# Multi-step workflow: external research + email + calendar
+_COMPOUND_WORKFLOW_PATTERN = re.compile(
+    r"(?=.*\b(find|research|search).{0,80}\b(trend|trends|market|news)\b)"
+    r"(?=.*\b(draft|write|compose).{0,60}\b(email|mail|message)\b)"
+    r"(?=.*\b(schedule|book).{0,60}\b(meeting|call|appointment)\b)",
+    re.IGNORECASE | re.DOTALL,
+)
+
+# External / current web research indicators
+_EXTERNAL_RESEARCH_PATTERNS = [
+    (re.compile(r"\b(recent|latest|current|up[- ]?to[- ]?date)\b", re.IGNORECASE), 2.5),
+    (re.compile(r"\b(news|headline|press release)\b", re.IGNORECASE), 2.5),
+    (
+        re.compile(
+            r"\b(market trends?|industry trends?|competitor research|benchmarks?)\b",
+            re.IGNORECASE,
+        ),
+        3.0,
+    ),
+    (
+        re.compile(
+            r"\b(external research|web search|live information|public web)\b",
+            re.IGNORECASE,
+        ),
+        3.0,
+    ),
+    (
+        re.compile(
+            r"\b(find|research|search).{0,40}\b(trends?|news|market|competitors?)\b",
+            re.IGNORECASE,
+        ),
+        2.5,
+    ),
+    (
+        re.compile(
+            r"\bcompare\b.{0,60}\b(market trends?|industry trends?)\b",
+            re.IGNORECASE,
+        ),
+        3.0,
+    ),
+]
+
 # Business knowledge indicators
 _BUSINESS_KNOWLEDGE_PATTERNS = [
     # Business entity/topic terms - even with "you/your"
@@ -175,7 +217,9 @@ _WORKFLOW_PATTERNS = [
             r"|\b(create|update|qualify|capture).*(lead|prospect)"
             r"|\b(schedule|book|set up).*(meeting|appointment|call)"
             r"|\b(approve|reject).*(request|action|proposal)"
-            r"|\b(summarize|key points).*(document|report|this)\b",
+            r"|\b(summarize|key points).*(document|report|this)"
+            r"|\b(am i free|are we free|check (my )?availability|free tomorrow|busy tomorrow)"
+            r"|\b(suggest|propose|offer|recommend).*(slot|time|times|meeting)\b",
             re.IGNORECASE,
         ),
         3.0,
@@ -284,6 +328,7 @@ def classify_message(message: str) -> MessageClassResult:
         MessageClass.CORRECTION_OR_META: _score_patterns(cleaned, _CORRECTION_META_PATTERNS),
         MessageClass.CONVERSATIONAL: _score_patterns(cleaned, _CONVERSATIONAL_PATTERNS),
         MessageClass.CAPABILITY_OR_HELP: _score_patterns(cleaned, _CAPABILITY_PATTERNS),
+        MessageClass.EXTERNAL_RESEARCH: _score_patterns(cleaned, _EXTERNAL_RESEARCH_PATTERNS),
         MessageClass.WORKFLOW_REQUEST: _score_patterns(cleaned, _WORKFLOW_PATTERNS),
         MessageClass.BUSINESS_KNOWLEDGE: _score_patterns(cleaned, _BUSINESS_KNOWLEDGE_PATTERNS),
     }
@@ -316,7 +361,25 @@ def classify_message(message: str) -> MessageClassResult:
             scores=scores,
         )
 
-    # 4. Capability/help questions (before general knowledge search)
+    # 4. Compound multi-tool workflow (before web-only external research)
+    if _COMPOUND_WORKFLOW_PATTERN.search(cleaned):
+        return MessageClassResult(
+            message_class=MessageClass.WORKFLOW_REQUEST,
+            confidence=0.9,
+            reason="compound_workflow_indicators",
+            scores=scores,
+        )
+
+    # 5. External web research (before internal business knowledge)
+    if scores[MessageClass.EXTERNAL_RESEARCH] >= _SCORE_THRESHOLD_MEDIUM:
+        return MessageClassResult(
+            message_class=MessageClass.EXTERNAL_RESEARCH,
+            confidence=_score_to_confidence(scores[MessageClass.EXTERNAL_RESEARCH]),
+            reason="external_research_indicators",
+            scores=scores,
+        )
+
+    # 5. Capability/help questions (before general knowledge search)
     if scores[MessageClass.CAPABILITY_OR_HELP] >= _SCORE_THRESHOLD_MEDIUM:
         # Disambiguate: "What services do you offer?" vs "What can you do for me?"
         # If business knowledge is also medium/strong, prefer business knowledge
@@ -334,7 +397,7 @@ def classify_message(message: str) -> MessageClassResult:
             scores=scores,
         )
 
-    # 5. Workflow request (actions on business objects)
+    # 6. Workflow request (actions on business objects)
     if scores[MessageClass.WORKFLOW_REQUEST] >= _SCORE_THRESHOLD_HIGH:
         return MessageClassResult(
             message_class=MessageClass.WORKFLOW_REQUEST,
@@ -343,7 +406,7 @@ def classify_message(message: str) -> MessageClassResult:
             scores=scores,
         )
 
-    # 6. Business knowledge (lower threshold, but must have some signal)
+    # 7. Business knowledge (lower threshold, but must have some signal)
     if scores[MessageClass.BUSINESS_KNOWLEDGE] >= _SCORE_THRESHOLD_LOW:
         return MessageClassResult(
             message_class=MessageClass.BUSINESS_KNOWLEDGE,
@@ -352,7 +415,7 @@ def classify_message(message: str) -> MessageClassResult:
             scores=scores,
         )
 
-    # 7. Fallback: unclear if no strong signals
+    # 8. Fallback: unclear if no strong signals
     max_score = max(scores.values()) if scores else 0.0
     if max_score < _SCORE_THRESHOLD_LOW:
         return MessageClassResult(

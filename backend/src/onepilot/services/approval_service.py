@@ -21,15 +21,32 @@ from onepilot.core.logging import get_logger
 from onepilot.repositories.approvals import ApprovalRequestRepository
 from onepilot.repositories.models import ApprovalRequest
 from onepilot.security.auth import Principal
-from onepilot.services import audit_service
+from onepilot.core.config import get_settings
+from onepilot.services import audit_service, calendar_service, gmail_service
 
 logger = get_logger(__name__)
+
+GMAIL_EXECUTABLE_ACTIONS: frozenset[str] = frozenset(
+    {"send_email", "gmail_create_draft", "gmail_send_email"}
+)
+
+CALENDAR_EXECUTABLE_ACTIONS: frozenset[str] = frozenset(
+    {
+        "schedule_meeting",
+        "calendar_create_event",
+        "google_calendar_create_event",
+    }
+)
 
 
 GATED_ACTION_TYPES: frozenset[str] = frozenset(
     {
         "send_email",
+        "gmail_create_draft",
+        "gmail_send_email",
         "schedule_meeting",
+        "calendar_create_event",
+        "google_calendar_create_event",
         "update_crm",
         "external_action",
         "high_risk_tool_call",
@@ -156,6 +173,46 @@ def decide(
     approval.reviewed_at = datetime.now(UTC)
     if reason:
         approval.reason = reason
+
+    execution_result: dict | None = None
+    if status == ApprovalStatus.APPROVED and approval.action_type in GMAIL_EXECUTABLE_ACTIONS:
+        execution_result = gmail_service.execute_approval_action(
+            session,
+            principal=principal,
+            approval=approval,
+            settings=get_settings(),
+        )
+        payload = dict(approval.proposed_payload or {})
+        payload["_execution"] = {
+            "status": execution_result.get("status", "unknown"),
+            "action": execution_result.get("action"),
+            "mode": execution_result.get("mode"),
+            "draft_id": execution_result.get("draft_id"),
+            "message_id": execution_result.get("message_id"),
+            "error_code": execution_result.get("error_code"),
+            "safe_error_message": execution_result.get("safe_error_message"),
+            "executed_at": datetime.now(UTC).isoformat(),
+        }
+        approval.proposed_payload = payload
+    elif status == ApprovalStatus.APPROVED and approval.action_type in CALENDAR_EXECUTABLE_ACTIONS:
+        execution_result = calendar_service.execute_approval_action(
+            session,
+            principal=principal,
+            approval=approval,
+            settings=get_settings(),
+        )
+        payload = dict(approval.proposed_payload or {})
+        payload["_execution"] = {
+            "status": execution_result.get("status", "unknown"),
+            "action": execution_result.get("action", "create_event"),
+            "mode": execution_result.get("mode"),
+            "event_id": execution_result.get("event_id"),
+            "error_code": execution_result.get("error_code"),
+            "safe_error_message": execution_result.get("safe_error_message"),
+            "executed_at": datetime.now(UTC).isoformat(),
+        }
+        approval.proposed_payload = payload
+
     session.flush()
 
     audit_service.record(
@@ -165,8 +222,25 @@ def decide(
         action=f"approval.{status.value}",
         resource_type="approval_request",
         resource_id=approval.id,
-        detail={"action_type": approval.action_type, "reason": reason},
+        detail={
+            "action_type": approval.action_type,
+            "reason": reason,
+            "execution_status": (execution_result or {}).get("status"),
+        },
     )
+    if status == ApprovalStatus.APPROVED:
+        audit_service.record(
+            session,
+            organization_id=principal.organization_id,
+            user_id=principal.user_id,
+            action="approval.executed",
+            resource_type="approval_request",
+            resource_id=approval.id,
+            detail={
+                "action_type": approval.action_type,
+                "execution_status": (execution_result or {}).get("status"),
+            },
+        )
     logger.info(
         "approval_decided",
         organization_id=principal.organization_id,

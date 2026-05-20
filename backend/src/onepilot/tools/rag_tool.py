@@ -45,6 +45,7 @@ class RAGTool(Tool):
                 "section": hit.chunk.section,
                 "chunk_text": hit.chunk.content[:600],
                 "relevance_score": hit.score,
+                "citation_type": "internal",
             }
             for hit in outcome.hits
         ]

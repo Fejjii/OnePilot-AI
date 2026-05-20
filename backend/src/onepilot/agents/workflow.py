@@ -46,8 +46,11 @@ from onepilot.observability.tracing import TraceContext, sanitize_metadata
 from onepilot.schemas.agents import AgentState
 from onepilot.schemas.chat import Citation, ToolCallTrace, TraceStep
 from onepilot.security.auth import Principal
-from onepilot.services import approval_service
+from onepilot.services import approval_service, calendar_service, gmail_service
+from onepilot.services.calendar_format import format_availability_response, format_suggestion_response
 from onepilot.tools import registry as _tools_bootstrap  # noqa: F401  ensures tool registration
+from onepilot.schemas.web_search import WebSearchCitation, WebSearchResponse
+from onepilot.services import web_synthesis
 from onepilot.tools.base import ToolContext, ToolResult
 from onepilot.tools.registry import registry
 
@@ -79,9 +82,15 @@ LOW_CONFIDENCE_THRESHOLD = 0.45
 _INTENT_TO_BRANCH: dict[Intent, str] = {
     Intent.KNOWLEDGE_SEARCH: "knowledge_search",
     Intent.DOCUMENT_SUMMARY: "knowledge_search",
+    Intent.WEB_SEARCH: "web_search",
+    Intent.WEB_AND_KNOWLEDGE: "web_and_knowledge",
     Intent.EMAIL_DRAFTING: "email_assistant",
+    Intent.CALENDAR_AVAILABILITY: "calendar_assistant",
+    Intent.CALENDAR_SCHEDULING: "calendar_assistant",
+    Intent.CALENDAR_AND_EMAIL: "calendar_and_email",
     Intent.LEAD_SUPPORT: "lead_assistant",
     Intent.WORKFLOW_ACTION: "lead_assistant",
+    Intent.COMPOUND_WORKFLOW: "compound_workflow",
     Intent.GENERAL_ASSISTANT: "general_chat",
     Intent.OUT_OF_SCOPE: "out_of_scope",
     Intent.CLARIFICATION: "clarification",
@@ -134,6 +143,9 @@ def _record_tool_call(state: dict, result: ToolResult) -> None:
                     section=citation.get("section"),
                     chunk_text=str(citation.get("chunk_text", ""))[:600],
                     relevance_score=float(citation.get("relevance_score", 0.0)),
+                    citation_type=str(citation.get("citation_type", "internal")),
+                    url=citation.get("url"),
+                    source=citation.get("source"),
                 ).model_dump()
             )
     if result.safety_flags:
@@ -275,13 +287,14 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             "safety_flags": list(state.safety_flags),
             "usage_metadata": dict(state.usage_metadata),
         }
+        email_action = gmail_service.infer_email_action(state.message, state.context)
         result = registry.get("email.draft").run(
             _ctx(deps),
             context=state.message,
             tone=state.context.get("tone", "professional"),
             recipient_name=state.context.get("recipient_name"),
             recipient_email=state.context.get("recipient_email"),
-            action=state.context.get("action", "draft_only"),
+            action=email_action,
         )
         _record_tool_call(update, result)
         draft = result.output.get("draft", {})
@@ -300,6 +313,118 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             update["approval_required"] = True
             update["approval_id"] = approval.id
         _append_trace(update, "execute_tool:email.draft", duration_ms=result.duration_ms)
+        return update
+
+    def calendar_assistant_node(state: AgentState) -> dict:
+        update: dict[str, Any] = {
+            "trace_steps": list(state.trace_steps),
+            "tool_calls": list(state.tool_calls),
+            "citations": list(state.citations),
+            "safety_flags": list(state.safety_flags),
+            "usage_metadata": dict(state.usage_metadata),
+        }
+        tool_key = calendar_service.infer_calendar_tool(state.message, state.context)
+        tool_name = f"calendar.{tool_key}"
+        result = registry.get(tool_name).run(
+            _ctx(deps),
+            message=state.message,
+            context=state.context,
+        )
+        _record_tool_call(update, result)
+        update["draft_output"] = _format_calendar_output(result)
+        output = result.output if isinstance(result.output, dict) else {}
+        mode = output.get("mode") or output.get("provider_mode")
+        if mode == "live" and output.get("status") != "error":
+            update["confidence"] = max(state.confidence, 0.88)
+        elif mode in {"unhealthy", "missing"} or output.get("status") == "error":
+            update["confidence"] = min(state.confidence, 0.5)
+        elif mode == "mock" or output.get("fallback_used"):
+            update["confidence"] = min(state.confidence, 0.55)
+        if result.approval_required and result.approval_action_type:
+            approval = approval_service.create(
+                deps.session,
+                principal=deps.principal,
+                action_type=result.approval_action_type,
+                title=result.approval_title or "Calendar approval required",
+                description=update["draft_output"][:1024],
+                proposed_payload=result.approval_payload or {},
+                risk_level=result.approval_risk,
+                reason="Agent proposed a calendar event creation.",
+            )
+            update["approval_required"] = True
+            update["approval_id"] = approval.id
+        _append_trace(update, f"execute_tool:{tool_name}", duration_ms=result.duration_ms)
+        return update
+
+    def calendar_and_email_node(state: AgentState) -> dict:
+        update: dict[str, Any] = {
+            "trace_steps": list(state.trace_steps),
+            "tool_calls": list(state.tool_calls),
+            "citations": list(state.citations),
+            "safety_flags": list(state.safety_flags),
+            "usage_metadata": dict(state.usage_metadata),
+            "approval_required": False,
+        }
+        email_action = gmail_service.infer_email_action(state.message, state.context)
+        email_result = registry.get("email.draft").run(
+            _ctx(deps),
+            context=state.message,
+            tone=state.context.get("tone", "professional"),
+            recipient_name=state.context.get("recipient_name"),
+            recipient_email=state.context.get("recipient_email"),
+            action=email_action,
+        )
+        _record_tool_call(update, email_result)
+        calendar_result = registry.get("calendar.create_event_request").run(
+            _ctx(deps),
+            message=state.message,
+            context=state.context,
+        )
+        _record_tool_call(update, calendar_result)
+
+        sections = [
+            "Email draft",
+            _format_email(email_result.output.get("draft", {})),
+            "",
+            "Calendar proposal",
+            _format_calendar_output(calendar_result),
+        ]
+        update["draft_output"] = "\n".join(sections)
+
+        approval_ids: list[str] = []
+        if email_result.approval_required and email_result.approval_action_type:
+            email_approval = approval_service.create(
+                deps.session,
+                principal=deps.principal,
+                action_type=email_result.approval_action_type,
+                title=email_result.approval_title or "Gmail approval required",
+                description=sections[1][:1024],
+                proposed_payload=email_result.approval_payload or {},
+                risk_level=email_result.approval_risk,
+                reason="Agent proposed an external email action.",
+            )
+            approval_ids.append(email_approval.id)
+        if calendar_result.approval_required and calendar_result.approval_action_type:
+            calendar_approval = approval_service.create(
+                deps.session,
+                principal=deps.principal,
+                action_type=calendar_result.approval_action_type,
+                title=calendar_result.approval_title or "Calendar approval required",
+                description=sections[-1][:1024],
+                proposed_payload=calendar_result.approval_payload or {},
+                risk_level=calendar_result.approval_risk,
+                reason="Agent proposed a calendar event creation.",
+            )
+            approval_ids.append(calendar_approval.id)
+
+        if approval_ids:
+            update["approval_required"] = True
+            update["approval_id"] = approval_ids[0]
+        _append_trace(
+            update,
+            "execute_tool:calendar_and_email",
+            duration_ms=email_result.duration_ms + calendar_result.duration_ms,
+        )
         return update
 
     def lead_assistant_node(state: AgentState) -> dict:
@@ -321,6 +446,180 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
         _record_tool_call(update, result)
         update["draft_output"] = _format_lead(result.output)
         _append_trace(update, "execute_tool:lead.support", duration_ms=result.duration_ms)
+        return update
+
+    def compound_workflow_node(state: AgentState) -> dict:
+        """Sequential multi-tool workflow: research → email draft → calendar proposal."""
+        update: dict[str, Any] = {
+            "trace_steps": list(state.trace_steps),
+            "tool_calls": list(state.tool_calls),
+            "citations": list(state.citations),
+            "safety_flags": list(state.safety_flags),
+            "usage_metadata": dict(state.usage_metadata),
+            "approval_required": False,
+        }
+        web_result = registry.get("external.web_search").run(
+            _ctx(deps),
+            query=state.message,
+            reason="compound_workflow_research",
+        )
+        _record_tool_call(update, web_result)
+        web = _web_response_from_tool(web_result)
+        research_summary = web_synthesis.synthesize_web_only(
+            query=state.message,
+            web=web,
+            configured=deps.settings.has_serper,
+        )
+
+        email_action = gmail_service.infer_email_action(state.message, state.context)
+        email_result = registry.get("email.draft").run(
+            _ctx(deps),
+            context=state.message,
+            tone=state.context.get("tone", "professional"),
+            recipient_name=state.context.get("recipient_name"),
+            recipient_email=state.context.get("recipient_email"),
+            action=email_action,
+        )
+        _record_tool_call(update, email_result)
+
+        calendar_result = registry.get("calendar.create_event_request").run(
+            _ctx(deps),
+            message=state.message,
+            context=state.context,
+        )
+        _record_tool_call(update, calendar_result)
+
+        sections = [
+            "## External market research",
+            research_summary,
+            "",
+            "## Draft email preview",
+            _format_email(email_result.output.get("draft", {})),
+            "",
+            "## Meeting proposal",
+            _format_calendar_output(calendar_result),
+        ]
+        update["draft_output"] = "\n".join(sections)
+
+        approval_ids: list[str] = []
+        if calendar_result.approval_required and calendar_result.approval_action_type:
+            calendar_approval = approval_service.create(
+                deps.session,
+                principal=deps.principal,
+                action_type=calendar_result.approval_action_type,
+                title=calendar_result.approval_title or "Calendar approval required",
+                description=sections[-1][:1024],
+                proposed_payload=calendar_result.approval_payload or {},
+                risk_level=calendar_result.approval_risk,
+                reason="Compound workflow proposed a calendar event.",
+            )
+            approval_ids.append(calendar_approval.id)
+        if email_result.approval_required and email_result.approval_action_type:
+            email_approval = approval_service.create(
+                deps.session,
+                principal=deps.principal,
+                action_type=email_result.approval_action_type,
+                title=email_result.approval_title or "Gmail approval required",
+                description=sections[3][:1024],
+                proposed_payload=email_result.approval_payload or {},
+                risk_level=email_result.approval_risk,
+                reason="Compound workflow proposed an email action.",
+            )
+            approval_ids.append(email_approval.id)
+
+        if approval_ids:
+            update["approval_required"] = True
+            update["approval_id"] = approval_ids[0]
+
+        unhealthy = (calendar_result.output or {}).get("provider_mode") == "unhealthy" or (
+            calendar_result.output or {}
+        ).get("mode") == "unhealthy"
+        if unhealthy:
+            update["confidence"] = min(state.confidence, 0.5)
+
+        _append_trace(
+            update,
+            "execute_tool:compound_workflow",
+            duration_ms=web_result.duration_ms
+            + email_result.duration_ms
+            + calendar_result.duration_ms,
+        )
+        return update
+
+    def web_search_node(state: AgentState) -> dict:
+        update: dict[str, Any] = {
+            "trace_steps": list(state.trace_steps),
+            "tool_calls": list(state.tool_calls),
+            "citations": list(state.citations),
+            "safety_flags": list(state.safety_flags),
+            "usage_metadata": dict(state.usage_metadata),
+        }
+        result = registry.get("external.web_search").run(
+            _ctx(deps),
+            query=state.message,
+            reason="external_research",
+        )
+        _record_tool_call(update, result)
+        web = _web_response_from_tool(result)
+        update["draft_output"] = web_synthesis.synthesize_web_only(
+            query=state.message,
+            web=web,
+            configured=deps.settings.has_serper,
+        )
+        _append_trace(
+            update,
+            "execute_tool:external.web_search",
+            detail=f"results={web.result_count} mode={web.provider_mode}",
+            duration_ms=result.duration_ms,
+        )
+        return update
+
+    def web_and_knowledge_node(state: AgentState) -> dict:
+        update: dict[str, Any] = {
+            "trace_steps": list(state.trace_steps),
+            "tool_calls": list(state.tool_calls),
+            "citations": list(state.citations),
+            "safety_flags": list(state.safety_flags),
+            "usage_metadata": dict(state.usage_metadata),
+        }
+        web_result = registry.get("external.web_search").run(
+            _ctx(deps),
+            query=state.message,
+            reason="external_research_with_internal_comparison",
+        )
+        _record_tool_call(update, web_result)
+        web = _web_response_from_tool(web_result)
+
+        rag_result = registry.get("rag.answer").run(
+            _ctx(deps),
+            query=state.message,
+            response_language=state.response_language,
+            detected_language=state.detected_language,
+        )
+        _record_tool_call(update, rag_result)
+
+        internal_answer = str(rag_result.output.get("answer", ""))
+        internal_weak = "weak_evidence" in rag_result.safety_flags
+        update["draft_output"] = web_synthesis.synthesize_combined(
+            query=state.message,
+            web=web,
+            internal_answer=internal_answer,
+            internal_weak=internal_weak,
+            configured=deps.settings.has_serper,
+        )
+        rag_confidence = float(rag_result.output.get("confidence", 0.0))
+        update["confidence"] = max(state.confidence, rag_confidence)
+        if internal_weak:
+            flags = list(update["safety_flags"])
+            if "weak_evidence" not in flags:
+                flags.append("weak_evidence")
+            update["safety_flags"] = flags
+        _append_trace(
+            update,
+            "execute_tool:web_and_knowledge",
+            detail=f"web_results={web.result_count} rag_weak={internal_weak}",
+            duration_ms=web_result.duration_ms + rag_result.duration_ms,
+        )
         return update
 
     def general_chat_node(state: AgentState) -> dict:
@@ -428,7 +727,12 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
     graph.add_node("classify_intent", classify_intent_node)
     graph.add_node("route", route_node)
     graph.add_node("knowledge_search", knowledge_search_node)
+    graph.add_node("web_search", web_search_node)
+    graph.add_node("web_and_knowledge", web_and_knowledge_node)
     graph.add_node("email_assistant", email_assistant_node)
+    graph.add_node("calendar_assistant", calendar_assistant_node)
+    graph.add_node("calendar_and_email", calendar_and_email_node)
+    graph.add_node("compound_workflow", compound_workflow_node)
     graph.add_node("lead_assistant", lead_assistant_node)
     graph.add_node("general_chat", general_chat_node)
     graph.add_node("clarification", clarification_node)
@@ -445,7 +749,12 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
         lambda s: branch_for(s.intent),
         {
             "knowledge_search": "knowledge_search",
+            "web_search": "web_search",
+            "web_and_knowledge": "web_and_knowledge",
             "email_assistant": "email_assistant",
+            "calendar_assistant": "calendar_assistant",
+            "calendar_and_email": "calendar_and_email",
+            "compound_workflow": "compound_workflow",
             "lead_assistant": "lead_assistant",
             "general_chat": "general_chat",
             "clarification": "clarification",
@@ -454,7 +763,12 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
     )
     for branch in (
         "knowledge_search",
+        "web_search",
+        "web_and_knowledge",
         "email_assistant",
+        "calendar_assistant",
+        "calendar_and_email",
+        "compound_workflow",
         "lead_assistant",
         "general_chat",
         "clarification",
@@ -475,16 +789,59 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
 def _branch_to_tool_name(branch: str) -> str:
     return {
         "knowledge_search": "rag.answer",
+        "web_search": "external.web_search",
+        "web_and_knowledge": "external.web_search",
         "email_assistant": "email.draft",
+        "calendar_assistant": "calendar.check_availability",
+        "calendar_and_email": "calendar.create_event_request",
+        "compound_workflow": "external.web_search",
         "lead_assistant": "lead.support",
         "general_chat": "chat.general",
     }.get(branch, branch)
+
+
+def _web_response_from_tool(result: ToolResult) -> WebSearchResponse:
+    payload = result.output if isinstance(result.output, dict) else {}
+    citations_raw = payload.get("citations") or []
+    citations: list[WebSearchCitation] = []
+    for row in citations_raw:
+        if isinstance(row, dict):
+            citations.append(WebSearchCitation.model_validate(row))
+        else:
+            citations.append(row)
+    return WebSearchResponse(
+        query=str(payload.get("query", "")),
+        citations=citations,
+        provider_mode=str(payload.get("provider_mode", "unknown")),
+        fallback_used=bool(payload.get("fallback_used", True)),
+        latency_ms=int(payload.get("latency_ms", result.duration_ms)),
+        result_count=int(payload.get("result_count", len(citations))),
+    )
 
 
 def _format_email(draft: dict) -> str:
     subject = draft.get("subject", "(no subject)")
     body = draft.get("body", "")
     return f"Subject: {subject}\n\n{body}"
+
+
+def _format_calendar_output(result: ToolResult) -> str:
+    output = result.output if isinstance(result.output, dict) else {}
+    if result.tool_name == "calendar.check_availability":
+        return format_availability_response(output)
+
+    if result.tool_name == "calendar.suggest_slots":
+        return format_suggestion_response(output)
+
+    payload = output.get("approval_payload") or {}
+    slot = output.get("selected_slot") or {}
+    lines = [
+        f"Meeting proposal: {payload.get('summary', 'Meeting')}",
+        f"Proposed: {slot.get('start_time')} – {slot.get('end_time')} ({payload.get('timezone')})",
+        f"Provider mode: {output.get('provider_mode', output.get('mode'))}",
+        "Awaiting approval before creating the calendar event.",
+    ]
+    return "\n".join(lines)
 
 
 def _format_lead(lead: dict) -> str:
@@ -505,6 +862,9 @@ def _is_external(intent: Intent | None) -> bool:
     return intent in {
         Intent.EMAIL_DRAFTING,
         Intent.WORKFLOW_ACTION,
+        Intent.CALENDAR_SCHEDULING,
+        Intent.CALENDAR_AND_EMAIL,
+        Intent.COMPOUND_WORKFLOW,
     }
 
 

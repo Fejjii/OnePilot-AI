@@ -9,23 +9,52 @@ vector index, and produces grounded answers with explicit citations. When the re
 evidence is weak, the agent **does not guess** — it returns a configurable safe message
 and asks the user to escalate to a human.
 
-## Pipeline
+## Ingestion Pipeline
+
 ```mermaid
 flowchart LR
-    Upload["Document Upload"] --> Validate["File Validation\n(extension, MIME, size)"]
-    Validate --> Extract["Text Extraction\n(md, txt, csv,\noptional pdf, docx)"]
-    Extract --> Chunk["Chunking\n(section-aware, overlap)"]
-    Chunk --> Embed["Embed\n(OpenAI or fallback)"]
-    Embed --> Store["Persist\nPostgres + vector index"]
-    Audit["Audit Log\n+ Usage Event"] -.-> Store
-
-    Query["User Query"] --> QEmbed["Embed Query"]
-    QEmbed --> Search["Vector Search\n(tenant-filtered)"]
-    Search --> Confidence["Confidence Check\n(top score >= 0.30)"]
-    Confidence -->|weak| Escalate["Return safe message\n(no LLM call)"]
-    Confidence -->|strong| Generate["LLM with Context\n(or deterministic fallback)"]
-    Generate --> Cite["Citations\n(doc title, chunk, section)"]
+    Upload[Document Upload] --> Validate[File Validation]
+    Validate --> Extract[Text Extraction]
+    Extract --> Chunk[Chunking section aware]
+    Chunk --> Embed[Embed OpenAI or fallback]
+    Embed --> Store[Postgres plus Qdrant]
+    Audit[Audit Log and Usage Event] -.-> Store
 ```
+
+## Query and Hybrid Retrieval
+
+Internal RAG and external Serper search are **never merged at retrieval time**. Hybrid questions run both tools and synthesize with separated citations.
+
+```mermaid
+flowchart TB
+    Query[User Query]
+
+    subgraph Internal [Internal RAG]
+        QEmbed[Embed Query]
+        Search[Vector Search tenant filtered]
+        Confidence[Confidence Check threshold 0.30]
+        Generate[LLM with Context]
+        InternalCite[Internal citations doc title section]
+    end
+
+    subgraph External [External Web Serper]
+        Serper[external.web_search]
+        ExternalCite[External citations page title URL]
+    end
+
+    subgraph Hybrid [web_and_knowledge intent]
+        Synthesis[Combined answer separated sections]
+    end
+
+    Query --> QEmbed --> Search
+    Search -->|weak| Escalate[Safe message no LLM]
+    Search -->|strong| Generate --> InternalCite
+    Query --> Serper --> ExternalCite
+    InternalCite --> Synthesis
+    ExternalCite --> Synthesis
+```
+
+**Demo hybrid prompt:** `Find recent SMB automation trends and compare them with NovaEdge Solutions services.`
 
 ## Supported File Types
 | Format     | Extension | Extraction                                  |

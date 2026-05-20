@@ -188,6 +188,38 @@ export function useChatMutation() {
   });
 }
 
+export function useConversationDeleteMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (conversationId: string) =>
+      api.delete<void>(`/conversations/${conversationId}`),
+    onMutate: async (conversationId) => {
+      await qc.cancelQueries({ queryKey: ["conversations"] });
+      const previous = qc.getQueriesData<{ items: { id: string }[]; total: number }>({
+        queryKey: ["conversations"],
+      });
+      qc.setQueriesData<{ items: { id: string }[]; total: number }>(
+        { queryKey: ["conversations"] },
+        (old) => {
+          if (!old) return old;
+          const items = old.items.filter((c) => c.id !== conversationId);
+          return { ...old, items, total: Math.max(0, old.total - 1) };
+        },
+      );
+      return { previous };
+    },
+    onError: (_err, _id, context) => {
+      context?.previous?.forEach(([key, data]) => {
+        qc.setQueryData(key, data);
+      });
+    },
+    onSuccess: (_data, conversationId) => {
+      qc.invalidateQueries({ queryKey: ["conversations"] });
+      qc.removeQueries({ queryKey: queryKeys.conversation(conversationId) });
+    },
+  });
+}
+
 // --- Documents --------------------------------------------------------------
 
 export function useDocuments() {

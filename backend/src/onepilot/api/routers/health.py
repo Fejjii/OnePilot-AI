@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from onepilot.core.config import Settings, get_settings
+from onepilot.core.config import Settings, calendar_runtime_status, get_settings, gmail_runtime_status, serper_runtime_status
 from onepilot.repositories.session import get_session
 from onepilot.providers import (
     get_billing_provider,
@@ -16,7 +16,6 @@ from onepilot.providers import (
     get_email_provider,
     get_embeddings_provider,
     get_llm_provider,
-    get_search_provider,
     get_vector_provider,
 )
 from onepilot.providers.embeddings.fallback_embeddings import FallbackEmbeddingsProvider
@@ -64,6 +63,115 @@ def _aggregate_provider_mode(
     if ProviderMode.LIVE in core_modes:
         return "mixed"
     return "demo"
+
+
+def _sanitize_provider_details(
+    raw: dict[str, object] | None,
+) -> dict[str, str | int | bool] | None:
+    """Drop nulls and coerce values so ProviderDiagnostic.details always validates."""
+    if not raw:
+        return None
+    out: dict[str, str | int | bool] = {}
+    for key, value in raw.items():
+        if value is None:
+            continue
+        if isinstance(value, bool):
+            out[key] = value
+        elif isinstance(value, int):
+            out[key] = value
+        elif isinstance(value, str):
+            out[key] = value
+        elif isinstance(value, float):
+            out[key] = int(value) if value.is_integer() else str(value)
+    return out or None
+
+
+def _build_calendar_diagnostic(
+    *,
+    settings: Settings,
+    checked_at: datetime,
+) -> ProviderDiagnostic:
+    """Calendar diagnostics must never break /providers (live API probes can fail)."""
+    from onepilot.core.config import calendar_runtime_status
+    from onepilot.providers.calendar.mock_calendar_provider import MockCalendarProvider
+
+    calendar_status = calendar_runtime_status(settings)
+    calendar_mode_str = str(calendar_status["calendar_mode"])
+    calendar_mode = ProviderMode.MOCK
+    if calendar_mode_str == "live":
+        calendar_mode = ProviderMode.LIVE
+    elif calendar_mode_str == "missing":
+        calendar_mode = ProviderMode.MISSING
+    elif calendar_mode_str == "unhealthy":
+        calendar_mode = ProviderMode.UNHEALTHY
+
+    calendar_is_mock = True
+    calendar_healthy = calendar_mode == ProviderMode.LIVE
+    status_reason: str | None = calendar_status.get("calendar_status_reason")  # type: ignore[assignment]
+    calendar_details: dict[str, object] = {
+        "purpose": "Availability checks and approval-gated event creation",
+        "calendar_mode": calendar_mode_str,
+        "calendar_create_enabled": settings.GOOGLE_CALENDAR_CREATE_ENABLED,
+        "requires_approval_for_create": True,
+        "capability_availability_check": True,
+        "capability_suggest_slots": True,
+        "capability_create_event": bool(
+            settings.GOOGLE_CALENDAR_CREATE_ENABLED and calendar_mode == ProviderMode.LIVE
+        ),
+    }
+
+    try:
+        calendar_provider = get_calendar_provider(settings)
+        calendar_is_mock = isinstance(calendar_provider, MockCalendarProvider)
+        calendar_details["mock"] = calendar_is_mock
+
+        provider_caps = calendar_provider.get_status()
+        caps_dict = provider_caps.capabilities
+        calendar_id = provider_caps.calendar_id
+        masked_calendar_id = calendar_id if calendar_id == "primary" else "configured"
+        status_reason = status_reason or provider_caps.status_reason
+        calendar_healthy = calendar_mode == ProviderMode.LIVE and provider_caps.mode == "live"
+        calendar_details["calendar_id"] = masked_calendar_id
+        if status_reason:
+            calendar_details["calendar_status_reason"] = status_reason
+        if provider_caps.scope_check_ok is not None:
+            calendar_details["scope_check_ok"] = provider_caps.scope_check_ok
+        calendar_details["capability_availability_check"] = bool(
+            caps_dict.get("availability_check", True)
+        )
+        calendar_details["capability_suggest_slots"] = bool(caps_dict.get("suggest_slots", True))
+        calendar_details["capability_create_event"] = bool(
+            settings.GOOGLE_CALENDAR_CREATE_ENABLED and caps_dict.get("create_event", False)
+        )
+    except Exception:
+        calendar_healthy = False
+        if calendar_mode == ProviderMode.LIVE:
+            calendar_mode = ProviderMode.UNHEALTHY
+        calendar_details["mock"] = calendar_is_mock
+        calendar_details["calendar_status_reason"] = status_reason or "unknown"
+
+    if calendar_mode == ProviderMode.LIVE:
+        calendar_reason = "Google Calendar API reachable; event creation after approval"
+    elif status_reason:
+        calendar_reason = f"Calendar provider issue: {status_reason}"
+    elif calendar_is_mock and calendar_status["calendar_configured"]:
+        calendar_reason = "Calendar credentials present but provider running in mock/fallback mode"
+    else:
+        calendar_reason = "Google Calendar OAuth not configured; using mock provider for safe demos"
+
+    return ProviderDiagnostic(
+        name="Google Calendar",
+        category=ProviderCategory.CALENDAR,
+        configured=bool(calendar_status["calendar_configured"]),
+        healthy=calendar_healthy,
+        active=bool(calendar_status["calendar_active"]),
+        fallback_used=bool(calendar_status["calendar_fallback_used"]),
+        mode=calendar_mode,
+        model=None,
+        reason=calendar_reason,
+        last_checked_at=checked_at,
+        details=_sanitize_provider_details(calendar_details),
+    )
 
 
 @router.get("/runtime/config", response_model=RuntimeModelConfigResponse)
@@ -124,6 +232,9 @@ def runtime_model_config(
 
 @router.get("/health")
 def health_check(settings: Settings = Depends(get_settings)) -> dict:
+    serper = serper_runtime_status(settings)
+    gmail = gmail_runtime_status(settings)
+    calendar = calendar_runtime_status(settings)
     return {
         "status": "ok",
         "app": settings.APP_NAME,
@@ -135,6 +246,15 @@ def health_check(settings: Settings = Depends(get_settings)) -> dict:
             "redis": settings.has_redis,
             "langsmith": settings.has_langsmith,
             "database": bool(settings.DATABASE_URL),
+            "serper_configured": serper["serper_configured"],
+            "serper_mode": serper["serper_mode"],
+            "gmail_configured": gmail["gmail_configured"],
+            "gmail_mode": gmail["gmail_mode"],
+            "gmail_send_enabled": settings.GMAIL_SEND_ENABLED,
+            "calendar_configured": calendar["calendar_configured"],
+            "calendar_mode": calendar["calendar_mode"],
+            "calendar_create_enabled": calendar["calendar_create_enabled"],
+            "calendar_status_reason": calendar.get("calendar_status_reason"),
         },
     }
 
@@ -360,59 +480,98 @@ def provider_diagnostics(
     )
     
     # Serper (optional integration; never calls live search without credentials)
-    serper_provider = get_search_provider(settings)
-    serper_configured = bool(settings.SERPER_API_KEY)
-    serper_is_mock = "Mock" in serper_provider.__class__.__name__
-    if serper_configured and not serper_is_mock:
+    serper_status = serper_runtime_status(settings)
+    serper_configured = bool(serper_status["serper_configured"])
+    serper_is_mock = bool(serper_status["serper_fallback_used"])
+    serper_mode_str = str(serper_status["serper_mode"])
+    if serper_mode_str == "live":
         serper_mode = ProviderMode.LIVE
         serper_reason = None
-    elif serper_configured and serper_is_mock:
+    elif serper_mode_str == "mock":
         serper_mode = ProviderMode.MOCK
         serper_reason = "SERPER_API_KEY set but mock adapter active (capstone demo)"
-    else:
+    elif serper_mode_str == "missing":
         serper_mode = ProviderMode.OPTIONAL
         serper_reason = "SERPER_API_KEY not set; web search is optional, mock results in demos"
-    
+    else:
+        serper_mode = ProviderMode.FALLBACK
+        serper_reason = "Serper search fallback path active"
+
     diagnostics.append(
         ProviderDiagnostic(
-            name="Serper",
+            name="Serper Web Search",
             category=ProviderCategory.SEARCH,
             configured=serper_configured,
             healthy=True,
-            active=not serper_is_mock,
+            active=bool(serper_status["serper_active"]),
             fallback_used=serper_is_mock,
             mode=serper_mode,
             model=None,
             reason=serper_reason,
             last_checked_at=now,
-            details={"mock": serper_is_mock},
+            details={
+                "mock": serper_is_mock,
+                "purpose": "External web intelligence and current web search",
+                "serper_mode": serper_mode_str,
+            },
         )
     )
     
-    # Gmail (capstone-safe mock)
-    gmail_provider = get_email_provider()
-    gmail_configured = bool(os.environ.get("GMAIL_CREDENTIALS_JSON", ""))
-    gmail_is_mock = "Mock" in gmail_provider.__class__.__name__
+    from onepilot.core.config import gmail_runtime_status
+    from onepilot.providers.email.gmail_provider import GmailProvider
+    from onepilot.providers.email.mock_email_provider import MockEmailProvider
+
+    gmail_status = gmail_runtime_status(settings)
+    gmail_provider = get_email_provider(settings)
+    gmail_is_mock = isinstance(gmail_provider, MockEmailProvider)
+    gmail_is_live = isinstance(gmail_provider, GmailProvider)
+    gmail_mode_str = str(gmail_status["gmail_mode"])
     gmail_mode = ProviderMode.MOCK
-    gmail_reason = (
-        "Mock Gmail adapter for capstone-safe demos"
-        if gmail_is_mock
-        else "Gmail credentials configured; mock adapter still used in this version"
+    if gmail_mode_str == "live":
+        gmail_mode = ProviderMode.LIVE
+    elif gmail_mode_str == "missing":
+        gmail_mode = ProviderMode.MISSING
+    elif gmail_mode_str == "unhealthy":
+        gmail_mode = ProviderMode.UNHEALTHY
+
+    provider_caps = gmail_provider.get_status()
+    caps_dict = (
+        provider_caps.capabilities
+        if hasattr(provider_caps, "capabilities")
+        else provider_caps.get("capabilities", {})
     )
-    
+    gmail_details: dict[str, str | int | bool] = {
+        "mock": gmail_is_mock,
+        "purpose": "Gmail draft creation and approval-gated email sending",
+        "gmail_mode": gmail_mode_str,
+        "gmail_send_enabled": settings.GMAIL_SEND_ENABLED,
+        "requires_approval": True,
+        "capability_create_draft": bool(caps_dict.get("create_draft", True)),
+        "capability_send_email": bool(
+            settings.GMAIL_SEND_ENABLED and caps_dict.get("send_email", False)
+        ),
+    }
+
+    if gmail_is_live:
+        gmail_reason = "Gmail OAuth configured; live draft creation after approval"
+    elif gmail_is_mock and gmail_status["gmail_configured"]:
+        gmail_reason = "Gmail credentials present but provider running in mock/fallback mode"
+    else:
+        gmail_reason = "Gmail OAuth not configured; using mock provider for safe demos"
+
     diagnostics.append(
         ProviderDiagnostic(
             name="Gmail",
             category=ProviderCategory.EMAIL,
-            configured=gmail_configured,
+            configured=bool(gmail_status["gmail_configured"]),
             healthy=True,
-            active=not gmail_is_mock,
-            fallback_used=gmail_is_mock,
+            active=bool(gmail_status["gmail_active"]),
+            fallback_used=bool(gmail_status["gmail_fallback_used"]),
             mode=gmail_mode,
             model=None,
             reason=gmail_reason,
             last_checked_at=now,
-            details={"mock": gmail_is_mock},
+            details=_sanitize_provider_details(gmail_details),
         )
     )
     
@@ -443,32 +602,7 @@ def provider_diagnostics(
         )
     )
     
-    # Google Calendar (capstone-safe mock)
-    calendar_provider = get_calendar_provider()
-    calendar_configured = bool(os.environ.get("GOOGLE_CALENDAR_CREDENTIALS_JSON", ""))
-    calendar_is_mock = "Mock" in calendar_provider.__class__.__name__
-    calendar_mode = ProviderMode.MOCK
-    calendar_reason = (
-        "Mock Google Calendar adapter for capstone-safe demos"
-        if calendar_is_mock
-        else "Calendar credentials configured; mock adapter still used in this version"
-    )
-    
-    diagnostics.append(
-        ProviderDiagnostic(
-            name="Google Calendar",
-            category=ProviderCategory.CALENDAR,
-            configured=calendar_configured,
-            healthy=True,
-            active=not calendar_is_mock,
-            fallback_used=calendar_is_mock,
-            mode=calendar_mode,
-            model=None,
-            reason=calendar_reason,
-            last_checked_at=now,
-            details={"mock": calendar_is_mock},
-        )
-    )
+    diagnostics.append(_build_calendar_diagnostic(settings=settings, checked_at=now))
     
     # Twilio (capstone-safe mock)
     twilio_configured = bool(os.environ.get("TWILIO_API_KEY", ""))

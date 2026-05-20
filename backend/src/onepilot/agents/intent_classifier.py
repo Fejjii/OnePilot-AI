@@ -66,10 +66,66 @@ _DOCUMENT_SUMMARY_PATTERNS = [
     re.compile(r"\b(summari[sz]e|summary of|tl;dr|key points)\b", re.IGNORECASE),
 ]
 
+_INTERNAL_COMPARISON_PATTERNS = [
+    re.compile(
+        r"\bcompare\b.{0,80}\b(our|novaedge|company)\b.{0,40}\b(service|solution|offering)s?\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bcompare\b.{0,40}\bwith\b.{0,40}\b(novaedge|our (company )?services?)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(market trends?|automation trends?).{0,40}\bcompare\b.{0,40}\b(service|solution)s?\b",
+        re.IGNORECASE,
+    ),
+]
+
 _WORKFLOW_ACTION_PATTERNS = [
     re.compile(
-        r"\b(schedule|book a|book (the|an?)|update (?:the )?crm|sync to crm"
-        r"|send invoice|create ticket|approve|reject)\b",
+        r"\b(update (?:the )?crm|sync to crm|send invoice|create ticket|approve|reject)\b",
+        re.IGNORECASE,
+    ),
+]
+
+_CALENDAR_AVAILABILITY_PATTERNS = [
+    re.compile(
+        r"\b(am i free|are we free|check (my )?availability|availability|busy tomorrow|free tomorrow|free next)\b",
+        re.IGNORECASE,
+    ),
+]
+
+_CALENDAR_SCHEDULING_PATTERNS = [
+    re.compile(
+        r"\b(schedule|book a|book (the|an?)|set up a|create a).{0,40}\b(meeting|call|appointment|slot)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(suggest|propose|offer|recommend).{0,30}\b(slot|time|times|meeting)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bbook.{0,20}\b\d{1,3}[- ]?(?:minute|min).{0,20}\bslot\b",
+        re.IGNORECASE,
+    ),
+]
+
+_COMPOUND_WORKFLOW_PATTERNS = [
+    re.compile(
+        r"(?=.*\b(find|research|search).{0,80}\b(trend|trends|market|news)\b)"
+        r"(?=.*\b(draft|write|compose).{0,60}\b(email|mail|message)\b)"
+        r"(?=.*\b(schedule|book).{0,60}\b(meeting|call|appointment)\b)",
+        re.IGNORECASE | re.DOTALL,
+    ),
+]
+
+_CALENDAR_AND_EMAIL_PATTERNS = [
+    re.compile(
+        r"\b(draft|write|compose|send).{0,40}\b(email|mail|message)\b.{0,80}\b(schedule|book).{0,30}\b(meeting|call|appointment)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(schedule|book).{0,40}\b(meeting|call|appointment)\b.{0,80}\b(draft|write|compose|send).{0,40}\b(email|mail|message)\b",
         re.IGNORECASE,
     ),
 ]
@@ -159,6 +215,9 @@ def _classify_from_message_class(message: str, message_class: MessageClass) -> I
     if message_class == MessageClass.WORKFLOW_REQUEST:
         return _classify_workflow_intent(message)
 
+    if message_class == MessageClass.EXTERNAL_RESEARCH:
+        return _classify_external_research_intent(message)
+
     # Fallback (shouldn't happen with well-designed Stage 1)
     logger.warning("unexpected_message_class", message_class=message_class)
     return IntentResult(
@@ -166,6 +225,24 @@ def _classify_from_message_class(message: str, message_class: MessageClass) -> I
         confidence=0.5,
         source="rules",
         reason=f"fallback_from:{message_class}",
+    )
+
+
+def _classify_external_research_intent(message: str) -> IntentResult:
+    """Map external research messages to web-only or web+knowledge intents."""
+    for pattern in _INTERNAL_COMPARISON_PATTERNS:
+        if pattern.search(message):
+            return IntentResult(
+                intent=Intent.WEB_AND_KNOWLEDGE,
+                confidence=0.88,
+                source="rules",
+                reason="external_research:internal_comparison",
+            )
+    return IntentResult(
+        intent=Intent.WEB_SEARCH,
+        confidence=0.86,
+        source="rules",
+        reason="external_research:web_only",
     )
 
 
@@ -178,6 +255,25 @@ def _classify_workflow_intent(message: str) -> IntentResult:
     Returns:
         IntentResult with workflow-specific intent
     """
+    for pattern in _COMPOUND_WORKFLOW_PATTERNS:
+        if pattern.search(message):
+            return IntentResult(
+                intent=Intent.COMPOUND_WORKFLOW,
+                confidence=0.88,
+                source="rules",
+                reason="workflow:compound_research_email_calendar",
+            )
+
+    # Check for combined email + calendar workflow
+    for pattern in _CALENDAR_AND_EMAIL_PATTERNS:
+        if pattern.search(message):
+            return IntentResult(
+                intent=Intent.CALENDAR_AND_EMAIL,
+                confidence=0.86,
+                source="rules",
+                reason="workflow:calendar_and_email",
+            )
+
     # Check for email drafting
     for pattern in _EMAIL_PATTERNS:
         if pattern.search(message):
@@ -186,6 +282,26 @@ def _classify_workflow_intent(message: str) -> IntentResult:
                 confidence=0.82,
                 source="rules",
                 reason="workflow:email_drafting",
+            )
+
+    # Calendar availability (before scheduling and lead support)
+    for pattern in _CALENDAR_AVAILABILITY_PATTERNS:
+        if pattern.search(message) and not any(p.search(message) for p in _CALENDAR_SCHEDULING_PATTERNS):
+            return IntentResult(
+                intent=Intent.CALENDAR_AVAILABILITY,
+                confidence=0.84,
+                source="rules",
+                reason="workflow:calendar_availability",
+            )
+
+    # Calendar scheduling / slot suggestions (before lead support — "schedule meeting with lead")
+    for pattern in _CALENDAR_SCHEDULING_PATTERNS:
+        if pattern.search(message):
+            return IntentResult(
+                intent=Intent.CALENDAR_SCHEDULING,
+                confidence=0.84,
+                source="rules",
+                reason="workflow:calendar_scheduling",
             )
 
     # Check for lead support
@@ -287,12 +403,29 @@ _LEGACY_KEYWORD_RULES: list[tuple[re.Pattern[str], Intent, float]] = [
     # Workflow action
     (
         re.compile(
-            r"\b(schedule|book a|book (the|an?)|update (?:the )?crm|sync to crm"
-            r"|send invoice|create ticket|approve)\b",
+            r"\b(update (?:the )?crm|sync to crm|send invoice|create ticket|approve)\b",
             re.IGNORECASE,
         ),
         Intent.WORKFLOW_ACTION,
         0.82,
+    ),
+    # Calendar availability
+    (
+        re.compile(
+            r"\b(am i free|check (my )?availability|free tomorrow|busy tomorrow)\b",
+            re.IGNORECASE,
+        ),
+        Intent.CALENDAR_AVAILABILITY,
+        0.84,
+    ),
+    # Calendar scheduling
+    (
+        re.compile(
+            r"\b(schedule|book a|book (the|an?)|suggest).{0,40}\b(meeting|slot|appointment)\b",
+            re.IGNORECASE,
+        ),
+        Intent.CALENDAR_SCHEDULING,
+        0.84,
     ),
     # Knowledge search (lower priority)
     (

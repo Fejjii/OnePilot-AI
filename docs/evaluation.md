@@ -141,7 +141,7 @@ When budget and stability allow:
 
 ## Related testing
 
-- **494+** backend pytest cases (auth, RAG, agents, approvals, security)  
+- **599** backend pytest cases (auth, RAG, agents, Serper, Gmail, Calendar, approvals, security)  
 - Golden RAG integration tests: `backend/tests/test_golden_rag.py`  
 - Security basics: `backend/tests/test_security_basics.py`  
 - Evaluation API: `backend/tests/test_evaluation_summary.py`  

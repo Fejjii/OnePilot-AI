@@ -54,7 +54,12 @@ class TestBranchSelection:
     def test_branch_for_each_intent(self) -> None:
         assert branch_for(Intent.KNOWLEDGE_SEARCH) == "knowledge_search"
         assert branch_for(Intent.DOCUMENT_SUMMARY) == "knowledge_search"
+        assert branch_for(Intent.WEB_SEARCH) == "web_search"
+        assert branch_for(Intent.WEB_AND_KNOWLEDGE) == "web_and_knowledge"
         assert branch_for(Intent.EMAIL_DRAFTING) == "email_assistant"
+        assert branch_for(Intent.CALENDAR_AVAILABILITY) == "calendar_assistant"
+        assert branch_for(Intent.CALENDAR_SCHEDULING) == "calendar_assistant"
+        assert branch_for(Intent.CALENDAR_AND_EMAIL) == "calendar_and_email"
         assert branch_for(Intent.LEAD_SUPPORT) == "lead_assistant"
         assert branch_for(Intent.WORKFLOW_ACTION) == "lead_assistant"
         assert branch_for(Intent.GENERAL_ASSISTANT) == "general_chat"
@@ -215,14 +220,29 @@ class TestRunAgentBranches:
             principal=_principal(org_id, user_id),
             settings=get_settings(),
             conversation_id="conv_test",
-            message="Draft an email to Bob thanking him for the demo.",
+            message="Draft and send an email to Bob thanking him for the demo.",
             history=[],
-            context={"action": "send"},
         )
         assert state.intent == Intent.EMAIL_DRAFTING
         assert state.approval_required is True
         assert state.approval_id and state.approval_id.startswith("apv_")
         assert "Pending approval" in (state.final_response or "")
+
+    def test_email_draft_only_no_approval(
+        self, client_with_session: tuple[TestClient, object]
+    ) -> None:
+        client, session = client_with_session
+        _token, org_id, user_id = _register(client, suffix="_email_draft")
+        state = run_agent(
+            session=session,
+            principal=_principal(org_id, user_id),
+            settings=get_settings(),
+            conversation_id="conv_test",
+            message="Draft an email to a lead about NovaEdge automation services.",
+            history=[],
+        )
+        assert state.intent == Intent.EMAIL_DRAFTING
+        assert state.approval_required is False
 
 
 class TestTraceSteps:

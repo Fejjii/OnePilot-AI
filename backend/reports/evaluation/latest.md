@@ -1,6 +1,6 @@
 # OnePilot AI — Evaluation & Quality Summary
 
-**Generated:** 2026-05-19T11:15:28.549084+00:00
+**Generated:** 2026-05-20T14:46:03.783582+00:00
 
 These are deterministic evaluation checks for capstone/demo quality. They are not a replacement for full production RAGAS or human evaluation.
 
@@ -15,7 +15,7 @@ These are deterministic evaluation checks for capstone/demo quality. They are no
 | Source hit rate | 90.0% |
 | Weak-evidence correctness | 100.0% |
 | Safety guardrail pass rate | 100.0% |
-| Total cases | 52 |
+| Total cases | 63 |
 | Failed cases | 0 |
 
 ## How to regenerate

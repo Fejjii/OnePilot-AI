@@ -130,6 +130,28 @@ def list_conversations(
     return items, total
 
 
+def delete_conversation(
+    session: Session,
+    *,
+    organization_id: str,
+    user_id: str,
+    conversation_id: str,
+) -> None:
+    """Delete a conversation and its messages for the owning user."""
+    conv_repo = ConversationRepository(session)
+    conv = conv_repo.get(conversation_id, organization_id=organization_id)
+    if conv is None or conv.user_id != user_id:
+        raise NotFoundError(f"Conversation '{conversation_id}' not found")
+    conv_repo.delete(conv)
+    session.commit()
+    logger.info(
+        "conversation_deleted",
+        conversation_id=conversation_id,
+        organization_id=organization_id,
+        user_id=user_id,
+    )
+
+
 def get_conversation_with_messages(
     session: Session,
     *,

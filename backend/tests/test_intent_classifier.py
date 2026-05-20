@@ -19,7 +19,7 @@ class TestRuleBasedIntent:
             ("Capture this lead: John from Globex.", Intent.LEAD_SUPPORT),
             ("Qualify this prospect.", Intent.LEAD_SUPPORT),
             ("Summarize the Q3 plan.", Intent.DOCUMENT_SUMMARY),
-            ("Schedule a meeting tomorrow.", Intent.WORKFLOW_ACTION),
+            ("Schedule a meeting tomorrow.", Intent.CALENDAR_SCHEDULING),
             ("Update the CRM with this conversation.", Intent.WORKFLOW_ACTION),
             ("Hey there, how's your day going?", Intent.GENERAL_ASSISTANT),
             ("Tell me a joke please.", Intent.OUT_OF_SCOPE),

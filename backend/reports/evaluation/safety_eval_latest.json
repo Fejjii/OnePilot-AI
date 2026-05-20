@@ -1,6 +1,6 @@
 {
   "test_name": "safety_guardrails",
-  "timestamp": "2026-05-19T11:15:28.542780+00:00",
+  "timestamp": "2026-05-20T14:46:03.779593+00:00",
   "total": 12,
   "passed": 12,
   "safety_guardrail_pass_rate": 1.0,
@@ -130,7 +130,11 @@
     "approval_decisions_audit_logged": true,
     "admin_owner_review_actions": true,
     "gated_action_types": [
+      "calendar_create_event",
       "external_action",
+      "gmail_create_draft",
+      "gmail_send_email",
+      "google_calendar_create_event",
       "high_risk_tool_call",
       "low_confidence_action",
       "schedule_meeting",

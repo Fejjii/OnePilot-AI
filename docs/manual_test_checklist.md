@@ -1,154 +1,106 @@
 # Manual Test Checklist — OnePilot AI
 
-Use this checklist before final review, demo recording, or push. Each item should pass on a fresh local or Docker stack after `seed_demo.py`.
+Final validation checklist before reviewer demo or push.
 
-**Setup:** `docker compose up -d` → `docker compose run --rm migrate` → `docker compose run --rm seed`  
+**Setup:** `docker compose up -d --build` → `docker compose run --rm migrate` → `docker compose run --rm seed`  
 **Login:** `admin@onepilot.ai` / `Demo1234!`
 
 ---
 
-## 1. Auth / Login
+## Core
 
-- [ ] Login page loads without console errors
-- [ ] Demo credentials box shows `admin@onepilot.ai` / `Demo1234!`
-- [ ] Valid login redirects to Dashboard
-- [ ] Invalid password shows a clear error (no stack trace)
-- [ ] Sign out returns to login and clears session
-- [ ] Register flow works for a new org (optional smoke)
-
----
-
-## 2. Provider diagnostics
-
-- [ ] Header shows **Live providers** or **Deterministic fallback** honestly
-- [ ] Settings → **AI Model Configuration** shows chat/embedding/speech models (read-only)
-- [ ] Settings → **Runtime & Provider Diagnostics** lists all providers with explicit modes
-- [ ] Mock SaaS providers (Gmail, HubSpot, Calendar, Twilio, Stripe) show **Mock**
-- [ ] No API keys, secrets, or raw env values visible in UI or network responses
-- [ ] `GET /runtime/config` returns model names only (no secrets)
+- [ ] Login with demo user succeeds
+- [ ] Dashboard loads without error card
+- [ ] Provider diagnostics loads in Settings
+- [ ] Header shows honest live vs fallback provider status
+- [ ] No API keys or secrets in Network tab or page source
 
 ---
 
-## 3. Knowledge Base RAG
+## AI Workspace
 
-- [ ] Knowledge Base lists **19** NovaEdge documents after seed
-- [ ] Search: `How much does the Growth retainer cost per month?` returns **Pricing Plans** citation
-- [ ] Grounded answer: `Can NovaEdge handle refunds autonomously?` cites **AI Usage Policy**
-- [ ] Out-of-scope: `What is the population of Tokyo?` shows weak-evidence / refusal behavior
-- [ ] Upload + delete document flows work (optional if demo-only)
-
----
-
-## 4. Multilingual RAG
-
-- [ ] AI Workspace language selector: Auto, EN, DE, FR, ES
-- [ ] French query against English KB returns answer in French with **English citation titles**
-- [ ] German query behaves similarly (optional spot check)
-
----
-
-## 5. AI Workspace routing
-
-- [ ] General capability: `What can OnePilot help me with?` → capability/help routing
-- [ ] RAG question: `What is our refund policy?` → knowledge search with citations
-- [ ] Workflow: `Help automate support and integrate HubSpot and Gmail` → workflow + tools trace
-- [ ] Email Assistant (same page): `Draft a follow-up email to our top lead about the Growth plan`
-- [ ] Intent badge and tool trace panel update per message
-- [ ] Approval banner appears when an external action is proposed
+- [ ] General: `What can you do for me?` → general assistant, no RAG, no web
+- [ ] RAG: `What services does NovaEdge Solutions offer and what integrations are supported?` → KB citations
+- [ ] Serper: `Find recent SMB automation trends.` → external.web_search + URL citations
+- [ ] Hybrid: `Find recent SMB automation trends and compare them with NovaEdge Solutions services.` → both tools, separated sections
+- [ ] Gmail: `Draft and send an email to a high priority lead about NovaEdge automation services.` → draft + approval, no send before approve
+- [ ] Calendar availability: `Am I free Friday at 11 am?` → busy/free, no event titles leaked
+- [ ] Calendar slots: `Suggest three meeting slots next week.` → suggestions only
+- [ ] Calendar schedule: `Schedule a 30 minute meeting with a high priority lead next week.` → approval created, no event before approve
+- [ ] Compound: `Find recent SMB automation trends, draft an email, and schedule a meeting with a high priority lead next week.` → multi-tool + multiple approvals
+- [ ] Speech to text works when OpenAI configured (or graceful unavailable message)
+- [ ] Multilingual German RAG: DE query → answer in German, English citation titles
+- [ ] Delete conversation removes thread from sidebar and clears pane
+- [ ] Only one language selector in workspace (no duplicate)
 
 ---
 
-## 6. Conversation switching / New conversation
+## Providers
 
-- [ ] **New conversation** clears prior messages in the main pane
-- [ ] Selecting a sidebar conversation loads its history (no stale messages from previous chat)
-- [ ] Sending while switched conversations does not attach to wrong thread
-- [ ] Dashboard “Recent agent activity” links open the correct conversation
-
----
-
-## 7. Speech to text
-
-- [ ] Workspace mic / speech control is visible when OpenAI is configured
-- [ ] With `OPENAI_API_KEY` set: short audio clip transcribes and fills the input
-- [ ] Without key: clear unavailable / fallback message (no fake “live” badge)
-- [ ] Detected language hint appears when using Auto language mode
+- [ ] Serper live when `SERPER_API_KEY` set (optional/mock otherwise)
+- [ ] Gmail live or mock per OAuth config
+- [ ] Google Calendar live or mock per OAuth config
+- [ ] OpenAI live or deterministic fallback
+- [ ] Qdrant live or in-memory fallback
+- [ ] Redis live or in-memory fallback
+- [ ] Postgres connected (required)
+- [ ] `GET /providers` returns 200, modes only, no tokens
+- [ ] `GET /health` returns status ok, no secrets
 
 ---
 
-## 8. Approvals (HITL)
+## Approvals
 
-- [ ] Approvals page loads; pending count badge in sidebar matches API
-- [ ] After seed: at least one **pending** approval visible
-- [ ] Approve changes status; audit reflects decision
-- [ ] Reject changes status; no automatic retry
-- [ ] Payload shows proposed action type and demo-safe mock context
-
----
-
-## 9. Usage and billing
-
-- [ ] Usage & Admin shows quota progress bars
-- [ ] Usage events table populated after seed (40 sample events)
-- [ ] Billing summary / invoice preview shows estimated costs (mock Stripe)
-- [ ] Admin audit log section lists seeded entries
-- [ ] Costs labeled as estimates, not live charges
+- [ ] Gmail draft approval: approve → execution metadata with draft id
+- [ ] Calendar event approval: approve → execution metadata with event id
+- [ ] Reject flow: status rejected, no auto-retry
+- [ ] Needs more info flow: stays pending (if exposed in UI)
 
 ---
 
-## 10. Evaluation
+## Safety
 
-- [ ] Evaluation page loads summary when `reports/evaluation/latest.json` exists
-- [ ] Empty state shows run command: `uv run python -m onepilot.evaluation.run_all_evals`
-- [ ] Routing, RAG, and safety metric cards render when report present
-- [ ] HITL / safety copy states email send requires approval
-
----
-
-## 11. Settings
-
-- [ ] Organization name and plan badge correct
-- [ ] AI Model Configuration section complete
-- [ ] Provider legend explains live / local / missing / mock / optional
-- [ ] “Seed demo data” or equivalent admin action works if exposed in Settings
-
----
-
-## 12. Security / no secrets
-
-- [ ] Browser devtools → Network: no `OPENAI_API_KEY`, JWT secret, or Stripe keys in responses
-- [ ] Frontend bundle contains no hardcoded API keys
-- [ ] `.env` not committed; `.env.example` has placeholders only
-- [ ] Mock providers never labeled as live in Settings diagnostics
-
----
-
-## 13. Docker smoke test
-
-- [ ] `docker compose up -d` — all services healthy
-- [ ] `docker compose run --rm migrate` succeeds
-- [ ] `docker compose run --rm seed` — 19 docs + operational data
-- [ ] `curl http://localhost:8000/health` → 200
-- [ ] Frontend at `http://localhost:3000` loads Dashboard after login
-- [ ] `cd backend && python scripts/check_stack.py` passes (optional)
+- [ ] No direct email send before approval
+- [ ] No calendar event creation before approval
+- [ ] No private calendar event titles in chat or API responses
+- [ ] No secrets in frontend bundle or API responses
+- [ ] No `.env` committed — only `.env.example` placeholders
+- [ ] Mock providers never labeled as live in diagnostics
 
 ---
 
 ## Pages quick scan
 
-| Page | Load | Empty state | Main action |
-|------|------|-------------|-------------|
-| Dashboard | ☐ | ☐ | ☐ Open workspace |
-| AI Workspace | ☐ | ☐ | ☐ Send message |
-| Knowledge Base | ☐ | ☐ | ☐ Search / answer |
-| Leads | ☐ | ☐ | ☐ View / create lead |
-| Email Assistant | ☐ | ☐ | ☐ Via Workspace draft |
-| Approvals | ☐ | ☐ | ☐ Approve / reject |
-| Usage & Admin | ☐ | ☐ | ☐ View events |
-| Evaluation | ☐ | ☐ | ☐ View metrics |
-| Memory | ☐ | ☐ | ☐ View / add memory |
-| Settings | ☐ | ☐ | ☐ View diagnostics |
+| Page | Load | Main action |
+|------|------|-------------|
+| Dashboard | ☐ | Usage + provider status |
+| AI Workspace | ☐ | Send prompts above |
+| Knowledge Base | ☐ | 19 NovaEdge docs + search |
+| Leads | ☐ | View seeded leads |
+| Approvals | ☐ | Approve / reject |
+| Usage & Admin | ☐ | Costs + audit log |
+| Evaluation | ☐ | Metrics from latest report |
+| Memory | ☐ | View conversation memory |
+| Settings | ☐ | Provider diagnostics |
 
 ---
 
-**Sign-off:** _______________  **Date:** _______________  **Environment:** local / Docker / other
+## Docker smoke
+
+- [ ] `docker compose up -d --build` — services healthy
+- [ ] `docker compose run --rm migrate` succeeds
+- [ ] `docker compose run --rm seed` — 19 docs + operational data
+- [ ] `Invoke-RestMethod http://localhost:8000/health` → status ok
+- [ ] `Invoke-RestMethod http://localhost:8000/providers` → diagnostics 200
+
+---
+
+## Backend / frontend CI (pre-push)
+
+- [ ] `cd backend && uv run python -m pytest` — all pass
+- [ ] `cd backend && uv run python -m onepilot.evaluation.run_all_evals` — reports updated
+- [ ] `cd frontend && pnpm typecheck && pnpm lint && pnpm build && pnpm test` — all pass
+
+---
+
+**Sign-off:** _______________  **Date:** _______________  **Environment:** local / Docker

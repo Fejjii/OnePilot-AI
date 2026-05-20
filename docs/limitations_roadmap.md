@@ -12,10 +12,10 @@ This document is an honest, professional assessment of the current state of OneP
 | OpenAI Embeddings | Mock fallback available | Fallback uses token-hash embeddings — adequate for demos, not for production semantic quality. |
 | Qdrant Vector DB | Mock fallback available | In-memory vector store used when `QDRANT_URL` is not set. Not persistent across restarts. |
 | HubSpot CRM | Mocked | In-memory, deterministic. No real HubSpot API calls. |
-| Gmail / Email send | Mocked | Email drafts stored in-memory. No actual emails sent. |
-| Google Calendar | Mocked | In-memory event store. No real calendar integration. |
+| Gmail | Live when OAuth configured | Draft creation after human approval; optional send when `GMAIL_SEND_ENABLED=true`. Mock when not configured. |
+| Google Calendar | Live when OAuth configured | Availability/slots without approval; event creation after approval across selected calendars. Mock when not configured. |
 | Stripe Billing | Mocked | `MockStripeProvider` + billing-ready APIs; estimated usage costs; no real payment processing. |
-| Serper Web Search | Mocked | Returns canned search results. No real HTTP calls. |
+| Serper Web Search | Live when configured | Real HTTP calls when `SERPER_API_KEY` is set; mock canned results otherwise. |
 
 ---
 
@@ -30,7 +30,7 @@ This document is an honest, professional assessment of the current state of OneP
 ### AI & RAG Quality
 5. **Fallback embeddings are low quality** — token-hash embeddings produce correct retrieval only for exact-ish keyword matches. Set `OPENAI_API_KEY` for real semantic similarity.
 6. **No streaming** — chat responses are synchronous; long responses may feel slow.
-7. **No real-time web search** — web search tool uses mock results without `SERPER_API_KEY`.
+7. **External web search depends on Serper** — without `SERPER_API_KEY`, the agent uses mock web results and states that live search is not configured. Internal KB evidence (RAG) remains separate from external web citations.
 8. **Partial multilingual support** — Workspace replies in EN/DE/FR/ES with auto or fixed preference; KB documents and UI chrome remain English. Cross-lingual retrieval uses heuristics, not multilingual embeddings.
 
 ### Infrastructure
@@ -58,7 +58,7 @@ Despite the limitations above, the following components are designed and impleme
 - **Usage event tracking** — per-org quota enforcement with real token counting
 - **Provider adapter pattern** — every external dependency can be swapped without code changes
 - **Approval gates** — no autonomous external actions without human approval
-- **494 passing tests** — covering auth, tenancy, RAG, agent workflow, approvals, memory, multilingual chat/RAG, and security
+- **599 passing tests** — covering auth, tenancy, RAG, agent workflow, Serper, Gmail, Calendar, approvals, memory, multilingual chat/RAG, and security
 - **Ruff + mypy compliance** — clean linting and type checking
 
 ---
@@ -75,9 +75,11 @@ Despite the limitations above, the following components are designed and impleme
 ### Medium-Term (3–6 months)
 - [ ] OAuth 2.0 / SAML SSO integration
 - [ ] Real Stripe billing with webhooks
-- [ ] Real email delivery (SendGrid or Gmail API)
+- [x] Gmail draft creation after approval (OAuth refresh-token flow)
+- [ ] Gmail send in production (enabled via `GMAIL_SEND_ENABLED`; off by default)
+- [ ] Full OAuth consent UI (refresh token via Google Cloud Console for now)
 - [ ] Real HubSpot CRM integration
-- [ ] Real Google Calendar integration
+- [x] Google Calendar live integration (availability, slots, approval-gated event creation)
 - [ ] IP-based rate limiting at the reverse proxy layer
 - [ ] Content safety classification on LLM outputs (Moderation API)
 

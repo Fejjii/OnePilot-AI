@@ -14,6 +14,7 @@ import {
   Wrench,
   ChevronRight,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ import {
 import {
   useChatMutation,
   useConversation,
+  useConversationDeleteMutation,
   useConversations,
 } from "@/lib/queries";
 import { ApiRequestError } from "@/lib/api-client";
@@ -92,6 +94,7 @@ function WorkspaceInner() {
   const conversations = useConversations();
   const conversationDetail = useConversation(activeConversationId);
   const chat = useChatMutation();
+  const deleteConversation = useConversationDeleteMutation();
 
   const [inFlight, setInFlight] = useState<InFlightSend | null>(null);
   const [viewEpoch, setViewEpoch] = useState(0);
@@ -272,6 +275,23 @@ function WorkspaceInner() {
     router.replace(href, { scroll: false });
   }
 
+  async function handleDeleteConversation(id: string) {
+    if (!window.confirm("Delete this conversation?")) return;
+    try {
+      await deleteConversation.mutateAsync(id);
+      if (activeConversationId === id) {
+        navigateToConversation(null);
+      }
+      toast.success("Conversation deleted");
+    } catch (err) {
+      const msg =
+        err instanceof ApiRequestError
+          ? err.message
+          : "Failed to delete conversation";
+      toast.error("Could not delete conversation", { description: msg });
+    }
+  }
+
   async function handleSend(message: string) {
     const trimmed = message.trim();
     if (!trimmed) return;
@@ -329,21 +349,13 @@ function WorkspaceInner() {
         title="AI Workspace"
         description="Grounded chat with intent routing, citations, tool traces, and human approval gates."
         actions={
-          <div className="flex flex-wrap items-center gap-3">
-            <LanguageSelector
-              id="language-preference-header"
-              value={languagePreference}
-              onChange={setLanguagePreference}
-              disabled={chat.isPending}
-            />
-            <Button
-              variant="outline"
-              leftIcon={<Plus className="h-4 w-4" />}
-              onClick={() => navigateToConversation(null)}
-            >
-              New conversation
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            leftIcon={<Plus className="h-4 w-4" />}
+            onClick={() => navigateToConversation(null)}
+          >
+            New conversation
+          </Button>
         }
       />
 
@@ -351,6 +363,12 @@ function WorkspaceInner() {
         <ConversationsSidebar
           activeId={activeConversationId}
           onSelect={navigateToConversation}
+          onDelete={handleDeleteConversation}
+          deletingId={
+            deleteConversation.isPending
+              ? (deleteConversation.variables ?? null)
+              : null
+          }
           conversations={conversations}
         />
         <ChatColumn
@@ -486,12 +504,16 @@ function displayConfidence(confidence: number, weakEvidence: boolean): number {
 interface ConversationsSidebarProps {
   activeId: string | null;
   onSelect: (id: string | null) => void;
+  onDelete: (id: string) => void;
+  deletingId: string | null;
   conversations: ReturnType<typeof useConversations>;
 }
 
 function ConversationsSidebar({
   activeId,
   onSelect,
+  onDelete,
+  deletingId,
   conversations,
 }: ConversationsSidebarProps) {
   const items = conversations.data?.items ?? [];
@@ -522,28 +544,44 @@ function ConversationsSidebar({
           <ul className="space-y-1">
             {items.map((conv) => (
               <li key={conv.id}>
-                <button
-                  type="button"
-                  aria-label={conv.title}
-                  aria-current={activeId === conv.id ? "true" : undefined}
-                  onClick={() => onSelect(conv.id)}
+                <div
                   className={cn(
-                    "block w-full rounded-md px-2 py-2 text-left transition-colors",
+                    "group flex items-center gap-1 rounded-md transition-colors",
                     activeId === conv.id
                       ? "bg-indigo-50 text-indigo-700"
                       : "text-slate-700 hover:bg-slate-100",
                   )}
                 >
-                  <div className="flex items-center gap-1.5">
-                    <p className="line-clamp-1 flex-1 text-xs font-medium">
-                      {conv.title}
+                  <button
+                    type="button"
+                    aria-label={conv.title}
+                    aria-current={activeId === conv.id ? "true" : undefined}
+                    onClick={() => onSelect(conv.id)}
+                    className="block min-w-0 flex-1 rounded-md px-2 py-2 text-left"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <p className="line-clamp-1 flex-1 text-xs font-medium">
+                        {conv.title}
+                      </p>
+                      <ChevronRight className="h-3 w-3 shrink-0 opacity-50" />
+                    </div>
+                    <p className="mt-0.5 text-[10px] text-slate-400">
+                      {formatRelativeTime(conv.updated_at)}
                     </p>
-                    <ChevronRight className="h-3 w-3 shrink-0 opacity-50" />
-                  </div>
-                  <p className="mt-0.5 text-[10px] text-slate-400">
-                    {formatRelativeTime(conv.updated_at)}
-                  </p>
-                </button>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Delete ${conv.title}`}
+                    disabled={deletingId === conv.id}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void onDelete(conv.id);
+                    }}
+                    className="mr-1 shrink-0 rounded p-1 text-slate-400 opacity-70 transition-opacity hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 focus:opacity-100 disabled:opacity-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -814,7 +852,11 @@ function DetailsPanel({ data, sending }: DetailsPanelProps) {
               ) : (
                 <div className="space-y-2">
                   {data.citations.map((c, i) => (
-                    <CitationCard key={`${c.document_id}-${i}`} citation={c} index={i} />
+                    <CitationCard
+                      key={`${c.citation_type ?? "internal"}-${c.document_id || c.url}-${i}`}
+                      citation={c}
+                      index={i}
+                    />
                   ))}
                 </div>
               )}

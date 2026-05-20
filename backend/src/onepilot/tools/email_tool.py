@@ -1,8 +1,7 @@
 """Email draft tool.
 
-Produces a structured :class:`EmailDraft`. Always proposes an approval; never
-sends. Optionally pulls grounding citations from the RAG tool when context
-sounds like an FAQ/knowledge question.
+Produces a structured :class:`EmailDraft`. Never sends to Gmail directly.
+Send / Gmail draft creation requires human approval via the approval workflow.
 """
 
 from __future__ import annotations
@@ -10,7 +9,8 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from onepilot.services import email_service
+from onepilot.core.config import get_settings
+from onepilot.services import email_service, gmail_service
 from onepilot.tools.base import Tool, ToolContext, ToolResult
 
 
@@ -18,7 +18,7 @@ class EmailDraftTool(Tool):
     name = "email.draft"
     description = (
         "Draft a structured email (subject + body) for the user. Never sends. "
-        "Always proposes an approval gate when the user implies sending."
+        "Gmail actions require human approval before any external email operation."
     )
 
     def run(
@@ -46,19 +46,21 @@ class EmailDraftTool(Tool):
         )
         duration_ms = int((time.monotonic() - started) * 1000)
 
-        # Approval is required when the user wants to actually send; for
-        # draft-only we still *propose* one so the user can opt-in from the UI
-        # without re-drafting.
+        settings = ctx.settings or get_settings()
         approval_required = action != "draft_only"
-        approval_action = "send_email"
+        approval_action = gmail_service.resolve_approval_action_type(
+            action,
+            force_send=action == "send" and settings.GMAIL_SEND_ENABLED,
+        )
 
-        proposed_payload = {
-            "subject": outcome.draft.subject,
-            "body": outcome.draft.body,
-            "tone": outcome.draft.tone,
-            "recipient_name": recipient_name,
-            "recipient_email": recipient_email,
-        }
+        proposed_payload = gmail_service.build_approval_payload(
+            subject=outcome.draft.subject,
+            body=outcome.draft.body,
+            recipient_email=recipient_email,
+            recipient_name=recipient_name,
+            tone=outcome.draft.tone,
+            action_type=approval_action,
+        )
 
         return ToolResult(
             tool_name=self.name,
@@ -68,13 +70,14 @@ class EmailDraftTool(Tool):
                 "draft": outcome.draft.model_dump(),
                 "model": outcome.model,
                 "fallback_used": outcome.fallback_used,
+                "gmail_action_pending": approval_required,
             },
             duration_ms=duration_ms,
             approval_required=approval_required,
             approval_action_type=approval_action,
-            approval_title=f"Send email: {outcome.draft.subject[:80]}",
+            approval_title=f"Gmail action: {outcome.draft.subject[:80]}",
             approval_payload=proposed_payload,
-            approval_risk="medium",
+            approval_risk="high" if approval_action == "gmail_send_email" else "medium",
             safety_flags=["fallback_used"] if outcome.fallback_used else [],
             usage={"model": outcome.model, "fallback_used": outcome.fallback_used},
         )

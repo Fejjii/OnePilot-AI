@@ -10,6 +10,13 @@ os.environ["DEV_AUTH_ENABLED"] = "false"
 os.environ["DEV_BYPASS_QUOTAS"] = "false"
 os.environ["QDRANT_URL"] = ""
 os.environ["OPENAI_API_KEY"] = ""
+os.environ["SERPER_API_KEY"] = ""
+os.environ["REDIS_URL"] = ""
+os.environ["GOOGLE_CLIENT_ID"] = ""
+os.environ["GOOGLE_CLIENT_SECRET"] = ""
+os.environ["GOOGLE_REFRESH_TOKEN"] = ""
+os.environ["GMAIL_PROVIDER_MODE"] = "auto"
+os.environ["GOOGLE_CALENDAR_PROVIDER_MODE"] = "auto"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

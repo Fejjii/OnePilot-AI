@@ -19,6 +19,8 @@ export type LanguagePreference = "auto" | LanguageCode;
 export type Intent =
   | "general_assistant"
   | "knowledge_search"
+  | "web_search"
+  | "web_and_knowledge"
   | "lead_support"
   | "email_drafting"
   | "document_summary"
@@ -28,6 +30,7 @@ export type Intent =
 
 export type UsageFeature =
   | "chat_messages"
+  | "web_search"
   | "rag_queries"
   | "document_uploads"
   | "storage_mb"
@@ -123,7 +126,7 @@ export interface ProviderDiagnostic {
   model?: string | null;
   reason?: string | null;
   last_checked_at: string;
-  details?: Record<string, string | number | boolean> | null;
+  details?: Record<string, unknown> | null;
 }
 
 export interface ProviderDiagnosticResponse {
@@ -152,6 +155,9 @@ export interface Citation {
   section?: string | null;
   chunk_text: string;
   relevance_score: number;
+  citation_type?: "internal" | "external" | string;
+  url?: string | null;
+  source?: string | null;
 }
 
 export interface ToolCallTrace {
@@ -367,6 +373,31 @@ export interface ApprovalListResponse {
 export interface ApprovalDecisionRequest {
   status: ApprovalStatus;
   reason?: string | null;
+}
+
+export interface CalendarApprovalPayload {
+  action_type?: "calendar_create_event" | "google_calendar_create_event" | "schedule_meeting";
+  summary?: string;
+  start_time?: string;
+  end_time?: string;
+  timezone?: string;
+  attendees?: string[];
+  description?: string;
+  location?: string;
+  calendar_id?: string;
+  provider_mode?: string;
+}
+
+export interface ApprovalExecutionStatus {
+  status?: string;
+  action?: string;
+  mode?: string;
+  draft_id?: string;
+  message_id?: string;
+  event_id?: string;
+  error_code?: string;
+  safe_error_message?: string;
+  executed_at?: string;
 }
 
 // Memory

@@ -1,172 +1,178 @@
 # Demo Script — OnePilot AI
 
-**Duration:** 5–7 minutes  
-**Format:** SCR (Situation · Complication · Resolution)
-
----
-
-## Narrative Frame
-
-**Situation**  
-Small businesses use many disconnected AI tools and lose time managing scattered knowledge, customer messages, leads, approvals, and operations.
-
-**Complication**  
-Generic chatbots are not enough. Business AI needs company knowledge, safe workflows, usage controls, auditability, and human approval before taking action.
-
-**Resolution**  
-OnePilot AI centralizes business knowledge, AI agents, RAG, approvals, memory, usage tracking, and workflow automation in one SaaS workspace — with every action audited and every external action gated behind human approval.
+**Duration:** 8–10 minutes  
+**Audience:** Capstone reviewer  
+**Login:** `admin@onepilot.ai` / `Demo1234!`
 
 ---
 
 ## Prerequisites
 
-- Docker stack running: `docker compose up -d && docker compose run --rm migrate`
-- Demo data seeded: `docker compose run --rm seed`  
-  (or locally: `cd backend && python scripts/seed_demo.py`)
-- Evaluation report (optional): `cd backend && uv run python -m onepilot.evaluation.run_all_evals`
-- Login: **`admin@onepilot.ai`** / **`Demo1234!`**
-
-Verify:
 ```bash
-cd backend && python scripts/check_stack.py
-```
-
----
-
-## Demo Flow (10 steps)
-
-### 1 — Dashboard (30 s)
-
-1. Open [http://localhost:3000/login](http://localhost:3000/login) and sign in
-2. Land on **Dashboard** — point to conversations, documents (19), leads (12), pending approvals
-3. Note header: **Live providers** vs **Deterministic fallback** (honest about env)
-
-> **Talking point:** Single operational view — usage, knowledge, pipeline, and approval backlog.
-
----
-
-### 2 — Provider & model diagnostics (45 s)
-
-1. Open **Settings**
-2. Show **AI Model Configuration** — `OPENAI_MODEL`, embeddings, speech (read-only, env-driven)
-3. Scroll to **Runtime & Provider Diagnostics** — live vs mock vs missing
-4. Emphasize: keys in environment only; Gmail/HubSpot/Stripe are **mock** for safe demos
-
-> **Talking point:** Reviewers can verify configuration without exposing secrets.
-
----
-
-### 3 — Knowledge Base golden query (60 s)
-
-1. Navigate to **Knowledge Base** — confirm **19 NovaEdge** documents
-2. Search: `How much does the Growth retainer cost per month?`
-3. Show citation from **pricing_plans.md**
-4. Grounded answer: `Can NovaEdge handle refunds autonomously?` → **AI Usage Policy**
-5. Optional weak-evidence: `What is the population of Tokyo?`
-
-> **Talking point:** Answers grounded in company docs, not the open internet.
-
----
-
-### 4 — AI Workspace: general capability (30 s)
-
-1. Open **AI Workspace**
-2. Ask: `What can OnePilot help our team with?`
-3. Show intent routing and helpful capability overview
-
-> **Talking point:** Intent classification routes to the right behavior before tools run.
-
----
-
-### 5 — AI Workspace: RAG question (45 s)
-
-1. Ask: `What is our escalation policy for P1 support tickets?`
-2. Show citations from **escalation_policy.md**
-3. Optional: switch language to **French** and ask the same — answer in FR, citations in English
-
-> **Talking point:** Multilingual replies with original-language citations.
-
----
-
-### 6 — Speech to text (30 s)
-
-1. Use microphone control in Workspace (requires `OPENAI_API_KEY`)
-2. Record a short phrase; show transcript + detected language
-3. If no key: explain graceful unavailability in Settings diagnostics
-
-> **Talking point:** Voice input feeds the same agent pipeline as typed chat.
-
----
-
-### 7 — Email Assistant & Approvals / HITL (90 s)
-
-1. In Workspace, ask: `Draft a follow-up email to Olivia Grant at FinPulse about our Growth plan`
-2. Show **email_drafting** intent and draft output
-3. Or trigger workflow: `Automate HubSpot lead update and send a welcome email`
-4. Open **Approvals** — show pending item, payload, risk level
-5. **Approve** or **Reject** and show status change
-
-> **Talking point:** AI can draft and propose — it cannot send email or update CRM without human approval.
-
----
-
-### 8 — Usage & Billing (30 s)
-
-1. Open **Usage & Admin**
-2. Show usage events, token counts, estimated cost
-3. Show invoice preview (mock Stripe — no real charges)
-4. Glance at audit log entries
-
-> **Talking point:** Full observability for cost control and compliance.
-
----
-
-### 9 — Evaluation page (30 s)
-
-1. Open **Evaluation**
-2. Show routing / RAG / safety metrics from latest report
-3. If empty: show run command on screen
-
-```bash
+docker compose down
+docker compose up -d --build
+docker compose run --rm migrate
+docker compose run --rm seed
 cd backend && uv run python -m onepilot.evaluation.run_all_evals
 ```
 
-> **Talking point:** Deterministic offline quality gates for capstone review.
+Verify: `http://localhost:3000` and `http://localhost:8000/health`
 
 ---
 
-### 10 — Architecture & safety close (45 s)
+## Reviewer Story (12 steps)
 
-> "FastAPI backend, LangGraph agent, Postgres for tenancy and audit, Qdrant for vectors, Redis for cache. Every external integration uses a provider adapter — live when configured, mock or fallback otherwise. Multi-tenant isolation on every query. Prompt injection checks, audit logs, quotas, and mandatory HITL before send_email, schedule_meeting, or update_crm. This is demo-ready locally and in Docker — production deployment and live Stripe/Gmail are roadmap items."
+### 1 — Dashboard (30 s)
 
-Optional: show [docs/architecture.md](architecture.md) diagram.
+Open Dashboard after login.
 
----
+**Show:** SaaS overview, live vs mock provider banner, usage summary, pending approvals, recent activity.
 
-## Email Assistant note
-
-There is no separate Email Assistant page — email drafting lives in **AI Workspace** (intent: `email_drafting`). Dashboard **Quick actions** includes an Email Assistant shortcut to Workspace.
+**Say:** One operational view for knowledge, pipeline, usage, and approval backlog.
 
 ---
 
-## Offline / no-OpenAI demo
+### 2 — AI Workspace: general routing (30 s)
 
-- Without `OPENAI_API_KEY`: deterministic LLM fallback — workflows still demonstrate
-- Without `QDRANT_URL`: in-memory vectors (same process)
-- Mock CRM/email/calendar never call real APIs
-- Re-run seed safely: `python scripts/seed_demo.py` (idempotent)
+**Prompt:** `What can you do for me?`
+
+**Explain:** Routes to **general assistant** — no RAG, no web search. Capability overview only.
 
 ---
 
-## CLI alternative
+### 3 — Internal RAG (45 s)
 
-```bash
-TOKEN=$(curl -s -X POST http://localhost:8000/demo/setup -H 'Content-Type: application/json' -d '{}' | python -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+**Prompt:** `What services does NovaEdge Solutions offer and what integrations are supported?`
 
-curl -s -X POST http://localhost:8000/demo/seed -H "Authorization: Bearer $TOKEN" | python -m json.tool
+**Explain:** Internal company knowledge via Qdrant. Citations from uploaded NovaEdge docs. Confidence and weak-evidence guardrail when evidence is thin.
 
-curl -s -X POST http://localhost:8000/knowledge/answer \
-  -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"How much does the Growth retainer cost per month?"}' | python -m json.tool
-```
+---
+
+### 4 — Serper live web search (45 s)
+
+**Prompt:** `Find recent SMB automation trends.`
+
+**Explain:** External web intelligence via Serper (`external.web_search`). **External web evidence** section with URL citations — separate from internal KB.
+
+Settings → Serper shows **live** when `SERPER_API_KEY` is set.
+
+---
+
+### 5 — Hybrid internal plus external (60 s)
+
+**Prompt:** `Find recent SMB automation trends and compare them with NovaEdge Solutions services.`
+
+**Explain:** `web_and_knowledge` intent runs **both** Serper and RAG. Answer sections: **Internal company knowledge**, **External web evidence**, **Recommendation**.
+
+---
+
+### 6 — Gmail workflow (90 s)
+
+**Prompt:** `Draft and send an email to a high priority lead about NovaEdge automation services.`
+
+**Explain:**
+
+- Agent generates draft in-app (`email.draft`) — no Gmail call yet
+- **Approval required** before any Gmail action
+- After approve on Approvals page → Gmail **draft** created (live or mock)
+- **Send disabled for safety** — `GMAIL_SEND_ENABLED=false` by default
+
+---
+
+### 7 — Calendar workflow (90 s)
+
+**Prompt 1:** `Am I free Friday at 11 am?`
+
+**Explain:** Live Google Calendar across **selected calendars** aggregated. Busy/free only — **no private event titles** exposed in responses or diagnostics.
+
+**Prompt 2:** `Suggest three meeting slots next week.`
+
+**Explain:** Slot suggestion tool — no event created, no approval.
+
+**Prompt 3:** `Schedule a 30 minute meeting with a high priority lead next week.`
+
+**Explain:** Creates **approval request** only. Event appears in Google Calendar **after** admin approves.
+
+---
+
+### 8 — Compound workflow (60 s)
+
+**Prompt:** `Find recent SMB automation trends, draft an email, and schedule a meeting with a high priority lead next week.`
+
+**Explain:** Multi-tool sequential workflow:
+
+1. `external.web_search` — research
+2. `email.draft` + Gmail approval
+3. `calendar.create_event_request` + Calendar approval
+
+No external side effects until approvals are granted.
+
+---
+
+### 9 — Approvals page (45 s)
+
+Open **Approvals**.
+
+**Show:** Pending Gmail and/or Calendar requests, proposed payload, risk level.
+
+**Action:** Approve one item → execution metadata (draft id or event id) on detail view.
+
+**Optional:** Reject or request more info.
+
+---
+
+### 10 — Usage and Admin (30 s)
+
+Open **Usage & Admin**.
+
+**Show:** Token counts, estimated costs, quota progress, invoice preview (mock Stripe), audit log entries.
+
+**Say:** Full observability for cost control and compliance — estimates only, no real charges.
+
+---
+
+### 11 — Evaluation (30 s)
+
+Open **Evaluation**.
+
+**Show:** 100% deterministic offline eval results (routing, RAG golden set, safety/HITL).
+
+**Say:** Regression gates for capstone review — not a substitute for production RAGAS or human eval.
+
+---
+
+### 12 — Settings / provider diagnostics (45 s)
+
+Open **Settings**.
+
+**Show provider diagnostics** (no secrets):
+
+| Provider | Expected mode |
+|----------|---------------|
+| OpenAI | live or fallback |
+| Serper | live or optional |
+| Gmail | live or mock |
+| Google Calendar | live or mock |
+| Qdrant | live or in-memory |
+| Redis | live or in-memory |
+| Postgres | required |
+| LangSmith | local or live |
+
+**Close:** FastAPI + LangGraph + Postgres + Qdrant + Redis. Every external integration uses provider adapters. Multi-tenant isolation, audit logs, quotas, and mandatory HITL before Gmail drafts/events. Demo-ready locally and in Docker.
+
+---
+
+## Offline / no-key demo
+
+- Without `OPENAI_API_KEY`: deterministic LLM fallback — routing and workflows still demonstrate
+- Without `SERPER_API_KEY`: mock web results with clear optional mode label
+- Without Google OAuth: Gmail and Calendar use mock providers; approval flow unchanged
+- Re-run seed safely: `docker compose run --rm seed` (idempotent)
+
+---
+
+## Related docs
+
+- [architecture.md](architecture.md) — system and workflow diagrams
+- [manual_test_checklist.md](manual_test_checklist.md) — pre-push validation
+- [google_workspace_oauth_setup.md](google_workspace_oauth_setup.md) — Gmail + Calendar OAuth

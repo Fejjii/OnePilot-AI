@@ -220,12 +220,62 @@ function ApprovalDetail({ approval, isAdmin, onClear }: ApprovalDetailProps) {
           </p>
         )}
 
+        <EmailApprovalSummary payload={approval.proposed_payload} />
+        <CalendarApprovalSummary payload={approval.proposed_payload} />
+
+        {(() => {
+          const execution = getExecution(approval.proposed_payload);
+          if (!execution) return null;
+          return (
+            <section className="rounded-md border border-emerald-200 bg-emerald-50/50 p-3 text-xs text-emerald-900">
+              <p className="font-semibold uppercase tracking-wide text-emerald-700">
+                Execution status
+              </p>
+              <p className="mt-1">
+                Status:{" "}
+                <span className="font-medium">{execution.status ?? "—"}</span>
+                {execution.mode && (
+                  <>
+                    {" "}
+                    · Provider mode:{" "}
+                    <span className="font-medium">{execution.mode}</span>
+                  </>
+                )}
+              </p>
+              {execution.draft_id && (
+                <p className="mt-1 font-mono text-[11px]">
+                  Draft ID: {execution.draft_id}
+                </p>
+              )}
+              {execution.message_id && (
+                <p className="mt-1 font-mono text-[11px]">
+                  Message ID: {execution.message_id}
+                </p>
+              )}
+              {execution.event_id && (
+                <p className="mt-1 font-mono text-[11px]">
+                  Event ID: {execution.event_id}
+                </p>
+              )}
+              {execution.safe_error_message && (
+                <p className="mt-1 text-amber-800">
+                  {execution.safe_error_message}
+                </p>
+              )}
+            </section>
+          );
+        })()}
+
         <section>
           <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
             Proposed payload
           </h4>
           <pre className="max-h-72 overflow-auto rounded-md border border-slate-200 bg-slate-950 px-3 py-2 text-[11px] leading-relaxed text-slate-200 thin-scrollbar">
-            {JSON.stringify(approval.proposed_payload, null, 2)}
+            {JSON.stringify(
+              stripExecutionFromPayload(approval.proposed_payload),
+              null,
+              2,
+            )}
           </pre>
         </section>
 
@@ -293,6 +343,126 @@ function ApprovalDetail({ approval, isAdmin, onClear }: ApprovalDetailProps) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+interface ApprovalExecution {
+  status?: string;
+  mode?: string;
+  draft_id?: string;
+  message_id?: string;
+  event_id?: string;
+  safe_error_message?: string;
+}
+
+function getExecution(payload: Record<string, unknown>): ApprovalExecution | null {
+  const raw = payload._execution;
+  if (!raw || typeof raw !== "object") return null;
+  return raw as ApprovalExecution;
+}
+
+function stripExecutionFromPayload(payload: Record<string, unknown>) {
+  const rest = { ...payload };
+  delete rest._execution;
+  return rest;
+}
+
+function EmailApprovalSummary({
+  payload,
+}: {
+  payload: Record<string, unknown>;
+}) {
+  const subject = payload.subject as string | undefined;
+  const body = payload.body as string | undefined;
+  const to = payload.to;
+  const toDisplay = Array.isArray(to)
+    ? to.join(", ")
+    : typeof to === "string"
+      ? to
+      : (payload.recipient_email as string | undefined);
+
+  if (!subject && !body && !toDisplay) return null;
+
+  return (
+    <section className="space-y-2 rounded-md border border-slate-200 bg-white p-3">
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        Email preview
+      </h4>
+      {toDisplay && (
+        <p className="text-xs text-slate-600">
+          <span className="font-medium text-slate-800">To:</span> {toDisplay}
+        </p>
+      )}
+      {subject && (
+        <p className="text-xs text-slate-600">
+          <span className="font-medium text-slate-800">Subject:</span> {subject}
+        </p>
+      )}
+      {body && (
+        <p className="max-h-40 overflow-auto whitespace-pre-wrap text-xs leading-relaxed text-slate-700">
+          {body}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function CalendarApprovalSummary({
+  payload,
+}: {
+  payload: Record<string, unknown>;
+}) {
+  const summary = payload.summary as string | undefined;
+  const startTime = payload.start_time as string | undefined;
+  const endTime = payload.end_time as string | undefined;
+  const timezone = payload.timezone as string | undefined;
+  const description = payload.description as string | undefined;
+  const location = payload.location as string | undefined;
+  const attendees = payload.attendees;
+  const attendeeDisplay = Array.isArray(attendees)
+    ? attendees.join(", ")
+    : undefined;
+  const providerMode = payload.provider_mode as string | undefined;
+
+  if (!summary && !startTime && !endTime) return null;
+
+  return (
+    <section className="space-y-2 rounded-md border border-indigo-200 bg-indigo-50/30 p-3">
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
+        Calendar preview
+      </h4>
+      {summary && (
+        <p className="text-xs text-slate-700">
+          <span className="font-medium text-slate-900">Meeting:</span> {summary}
+        </p>
+      )}
+      {(startTime || endTime) && (
+        <p className="text-xs text-slate-700">
+          <span className="font-medium text-slate-900">When:</span>{" "}
+          {startTime ?? "—"} – {endTime ?? "—"}
+          {timezone ? ` (${timezone})` : ""}
+        </p>
+      )}
+      {attendeeDisplay && (
+        <p className="text-xs text-slate-700">
+          <span className="font-medium text-slate-900">Attendees:</span>{" "}
+          {attendeeDisplay}
+        </p>
+      )}
+      {location && (
+        <p className="text-xs text-slate-700">
+          <span className="font-medium text-slate-900">Location:</span> {location}
+        </p>
+      )}
+      {description && (
+        <p className="max-h-32 overflow-auto whitespace-pre-wrap text-xs leading-relaxed text-slate-700">
+          {description}
+        </p>
+      )}
+      {providerMode && (
+        <p className="text-[11px] text-slate-500">Provider mode: {providerMode}</p>
+      )}
+    </section>
   );
 }
 
@@ -382,7 +552,17 @@ function DecisionModal({ approval, decision, onClose }: DecisionModalProps) {
           <p>
             This will record an audit-log entry on the approval and mark its
             status as <span className="font-semibold">{titleize(decision)}</span>.
-            No external systems will be touched.
+            {decision === "approved" &&
+            (approval.action_type === "gmail_create_draft" ||
+              approval.action_type === "gmail_send_email" ||
+              approval.action_type === "send_email")
+              ? "If Gmail is configured, the approved action will create a Gmail draft (or send when enabled)."
+              : decision === "approved" &&
+                  (approval.action_type === "calendar_create_event" ||
+                    approval.action_type === "google_calendar_create_event" ||
+                    approval.action_type === "schedule_meeting")
+                ? "If Google Calendar is configured, the approved action will create a calendar event in mock or live mode."
+                : "No external systems will be touched."}
           </p>
         </div>
         <div>

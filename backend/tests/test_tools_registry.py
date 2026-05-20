@@ -57,9 +57,16 @@ def _upload(client: TestClient, token: str, body: bytes) -> None:
 
 class TestRegistry:
     def test_default_tools_registered(self) -> None:
-        assert {"rag.answer", "email.draft", "lead.support", "chat.general"}.issubset(
-            set(registry.names())
-        )
+        assert {
+            "rag.answer",
+            "external.web_search",
+            "email.draft",
+            "calendar.check_availability",
+            "calendar.suggest_slots",
+            "calendar.create_event_request",
+            "lead.support",
+            "chat.general",
+        }.issubset(set(registry.names()))
 
     def test_get_unknown_raises(self) -> None:
         import pytest
@@ -112,8 +119,8 @@ class TestEmailTool:
         draft = result.output["draft"]
         assert draft["subject"]
         assert draft["body"]
-        # The approval is *proposed* even for draft_only.
-        assert result.approval_action_type == "send_email"
+        assert result.approval_required is False
+        assert result.approval_action_type == "gmail_create_draft"
 
 
 class TestLeadTool:

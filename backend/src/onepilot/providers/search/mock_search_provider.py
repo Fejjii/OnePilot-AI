@@ -34,8 +34,26 @@ _CANNED_RESULTS: list[dict] = [
 class MockSearchProvider(SearchProvider):
     """Canned-response search provider for tests and demos."""
 
-    def search_web(self, query: str, num_results: int = 5) -> list[dict]:
-        results = [
-            {**r, "query": query} for r in _CANNED_RESULTS[:num_results]
-        ]
+    def search_web(
+        self,
+        query: str,
+        num_results: int = 5,
+        *,
+        language: str | None = None,
+        region: str | None = None,
+    ) -> list[dict]:
+        del language, region
+        results: list[dict] = []
+        for index, row in enumerate(_CANNED_RESULTS[:num_results], start=1):
+            results.append(
+                {
+                    "title": row["title"],
+                    "url": row["url"],
+                    "snippet": row["snippet"],
+                    "source": "mock",
+                    "published_date": None,
+                    "rank": index,
+                    "provider": "mock",
+                }
+            )
         return results
