@@ -76,6 +76,36 @@ Work on the **`deployment/azure`** branch only. Do not commit secrets to git —
 1. Copy pre-generated OAuth refresh token and client credentials into secrets (see [Provider setup](#provider-setup)).
 2. Verify `/health` provider fields and approval-gated flows.
 
+### Phase 6b — LangSmith tracing (optional)
+
+1. Create Container App secret `langsmith-api-key` from your LangSmith API key (never commit to git).
+2. Set backend env (preserve existing vars):
+
+   | Variable | Value |
+   |----------|--------|
+   | `LANGSMITH_TRACING` | `true` |
+   | `LANGSMITH_API_KEY` | `secretref:langsmith-api-key` |
+   | `LANGSMITH_PROJECT` | `onepilot-ai` |
+   | `LANGSMITH_ENDPOINT` | `https://api.smith.langchain.com` |
+
+3. Restart the backend revision.
+4. Verify `GET /health` → `providers.langsmith: true` and `GET /providers` → LangSmith `mode: live` (not `missing`).
+5. Run a chat prompt in the workspace; confirm a run appears in the LangSmith project `onepilot-ai`.
+
+Example (replace `<key>` locally; do not paste keys into shell history in shared environments):
+
+```bash
+az containerapp secret set -g rg-onepilot-demo -n ca-onepilot-backend \
+  --secrets langsmith-api-key=<key>
+
+az containerapp update -g rg-onepilot-demo -n ca-onepilot-backend \
+  --set-env-vars \
+    LANGSMITH_TRACING=true \
+    LANGSMITH_API_KEY=secretref:langsmith-api-key \
+    LANGSMITH_PROJECT=onepilot-ai \
+    LANGSMITH_ENDPOINT=https://api.smith.langchain.com
+```
+
 ### Phase 7 — Smoke tests
 
 Use the [smoke test checklist](#smoke-test-checklist).
@@ -187,6 +217,7 @@ Demo login after seed: `admin@onepilot.ai` / `Demo1234!` (or dev auth if `DEV_AU
 | **Serper** | `SERPER_API_KEY` for live web search; mock without key |
 | **Gmail** | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN` — server-side refresh; **no OAuth UI at runtime** if token already generated locally |
 | **Calendar** | Same Google OAuth env; use workspace token script for Calendar scopes — see [google_workspace_oauth_setup.md](google_workspace_oauth_setup.md) |
+| **LangSmith** | `LANGSMITH_TRACING=true`, `LANGSMITH_API_KEY` (secret), `LANGSMITH_PROJECT=onepilot-ai`, `LANGSMITH_ENDPOINT=https://api.smith.langchain.com` — live tracing when key + tracing enabled; otherwise local trace steps |
 
 For review, Gmail/Calendar can stay tested **locally**; copy the same secrets into Azure for cloud parity.
 
@@ -202,6 +233,7 @@ For review, Gmail/Calendar can stay tested **locally**; copy the same secrets in
 - [ ] Serper prompt (web search intent)
 - [ ] Gmail approval prompt (if OAuth configured)
 - [ ] Calendar availability prompt (if OAuth configured)
+- [ ] LangSmith: `/providers` shows LangSmith live; workspace chat creates a trace in project `onepilot-ai`
 - [ ] Approvals page loads
 
 ---
