@@ -64,11 +64,13 @@ class QdrantVectorProvider(VectorProvider):
                     collection_name=collection,
                     vectors_config=qm.VectorParams(size=dimension, distance=qm.Distance.COSINE),
                 )
+                _ensure_organization_id_index(client, collection)
                 return
             raise ProviderUnavailableError("Qdrant get_collection failed") from exc
 
         existing_dimension = _collection_vector_size(collection_info)
         if existing_dimension == dimension:
+            _ensure_organization_id_index(client, collection)
             return
 
         log.warning(
@@ -82,6 +84,7 @@ class QdrantVectorProvider(VectorProvider):
             collection_name=collection,
             vectors_config=qm.VectorParams(size=dimension, distance=qm.Distance.COSINE),
         )
+        _ensure_organization_id_index(client, collection)
 
     def upsert(
         self,
@@ -192,3 +195,23 @@ def _collection_vector_size(collection_info: Any) -> int | None:
 def _is_missing_collection_error(exc: Exception) -> bool:
     message = str(exc).lower()
     return "not found" in message or "does not exist" in message or "missing" in message
+
+
+def _ensure_organization_id_index(client: QdrantClient, collection: str) -> None:
+    """Ensure tenant filter field is indexed (required by Qdrant for payload filters)."""
+    from qdrant_client.http import models as qm
+
+    try:
+        client.create_payload_index(
+            collection_name=collection,
+            field_name="organization_id",
+            field_schema=qm.PayloadSchemaType.KEYWORD,
+        )
+    except Exception as exc:  # pragma: no cover - index may already exist
+        message = str(exc).lower()
+        if "already exists" not in message and "already has" not in message:
+            log.warning(
+                "qdrant_organization_id_index_failed",
+                collection=collection,
+                error=str(exc),
+            )
