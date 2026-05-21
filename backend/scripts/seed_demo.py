@@ -18,6 +18,7 @@ Bearer header) uses — so the UI shows documents immediately after seeding.
 Usage
 -----
     python scripts/seed_demo.py
+    python scripts/seed_demo.py --reindex
     python scripts/seed_demo.py --url http://backend:8000   # inside Docker
 
 Environment variables
@@ -79,6 +80,11 @@ def main(argv: list[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(description="Seed OnePilot AI demo data")
     parser.add_argument("--url", default=os.getenv("BACKEND_URL", DEFAULT_URL))
+    parser.add_argument(
+        "--reindex",
+        action="store_true",
+        help="Rebuild chunks and vector index for existing documents (idempotent)",
+    )
     args = parser.parse_args(argv)
     base_url = args.url.rstrip("/")
 
@@ -101,7 +107,10 @@ def main(argv: list[str] | None = None) -> int:
 
     # ── 3. Seed knowledge base ─────────────────────────────────────────────────
     print("\n[3/4] Seeding NovaEdge knowledge base…")
-    seed = _request(f"{base_url}/demo/seed", method="POST", payload={}, token=token)
+    seed_url = f"{base_url}/demo/seed"
+    if args.reindex:
+        seed_url = f"{seed_url}?reindex=true"
+    seed = _request(seed_url, method="POST", payload={}, token=token)
 
     # ── 4. Verify — GET /documents with the same token ────────────────────────
     print("\n[4/4] Verifying seeded documents…")
@@ -118,7 +127,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  total_documents   : {seed.get('total_documents', '?')}")
     print(f"  total_chunks      : {seed.get('total_chunks', '?')}")
     print(f"  vector_upserts    : {seed.get('vector_upsert_count', '?')}")
+    print(f"  chunks_reindexed  : {seed.get('chunks_reindexed', 0)}")
     print(f"  verified_via_api  : {verified_count} document(s) visible")
+    if seed.get("reindex_hint"):
+        print(f"\n  [INFO] {seed['reindex_hint']}")
     print(f"  leads_created     : {seed.get('leads_created', 0)}")
     print(f"  approvals_created : {seed.get('approvals_created', 0)}")
     print(f"  usage_events      : {seed.get('usage_events_created', 0)}")

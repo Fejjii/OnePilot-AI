@@ -290,6 +290,8 @@ class SeedResult:
     total_documents: int
     total_chunks: int
     vector_upsert_count: int
+    reindex_hint: str | None = None
+    chunks_reindexed: int = 0
 
 
 @dataclass(slots=True)
@@ -456,6 +458,7 @@ def seed_knowledge_base(
     embeddings: EmbeddingsProvider | None = None,
     vector: VectorProvider | None = None,
     docs_dir: Path | None = None,
+    reindex: bool = False,
 ) -> SeedResult:
     """Ingest all NovaEdge markdown docs into the principal's organization.
     
@@ -558,25 +561,32 @@ def seed_knowledge_base(
             logger.exception("seed_reindex_check_failed")
             needs_reindex = True
     
-    # Reindex if needed (e.g., after provider change)
+    # Reindex if explicitly requested or vectors are missing / mismatched
     reindex_upserts = 0
-    if needs_reindex:
+    chunks_reindexed = 0
+    if reindex or needs_reindex:
         logger.info(
             "seed_reindexing",
             organization_id=principal.organization_id,
             document_count=existing_doc_count,
+            forced=reindex,
         )
-        reindex_upserts = document_service.reindex_organization_documents(
+        reindex_result = document_service.reindex_knowledge_base(
             session,
             principal=principal,
             settings=settings,
             embeddings=embeddings,
             vector=vector,
+            source_dir=directory,
+            rebuild_missing_chunks=True,
         )
+        reindex_upserts = reindex_result.vector_upserts
+        chunks_reindexed = reindex_result.chunks_reindexed + reindex_result.chunks_created
         logger.info(
             "seed_reindex_complete",
             organization_id=principal.organization_id,
             vector_upsert_count=reindex_upserts,
+            chunks_reindexed=chunks_reindexed,
         )
 
     created = 0
@@ -685,18 +695,28 @@ def seed_knowledge_base(
         raise RuntimeError("Seed verification failed: document_count is 0")
     if total_chunks == 0 and created > 0:
         raise RuntimeError("Seed verification failed: chunk_count is 0 but documents were created")
-    if total_vector_upserts == 0 and (created > 0 or needs_reindex):
-        raise RuntimeError("Seed verification failed: vector_upsert_count is 0 but documents were created or reindexed")
-    if search_result_count == 0 and total_documents_in_db > 0:
+    if total_vector_upserts == 0 and (created > 0 or needs_reindex or reindex):
+        raise RuntimeError(
+            "Seed verification failed: vector_upsert_count is 0 but documents were created or reindexed"
+        )
+    if search_result_count == 0 and total_documents_in_db > 0 and (reindex or needs_reindex or created > 0):
         raise RuntimeError(
             f"Seed verification failed: knowledge search returns 0 results but {total_documents_in_db} documents exist. "
             f"This indicates a vector index mismatch. Embedding dimension: {embeddings.dimension}"
+        )
+
+    reindex_hint: str | None = None
+    if skipped > 0 and total_vector_upserts == 0 and not reindex and not needs_reindex:
+        reindex_hint = (
+            "Documents already exist. Use --reindex to rebuild chunks and vector index."
         )
     
     return SeedResult(
         documents_created=created,
         documents_skipped=skipped,
         total_documents=total_documents_in_db,
-        total_chunks=total_chunks,
+        total_chunks=final_chunk_count,
         vector_upsert_count=total_vector_upserts,
+        reindex_hint=reindex_hint,
+        chunks_reindexed=chunks_reindexed,
     )

@@ -10,7 +10,7 @@ POST /demo/seed   — seed NovaEdge knowledge-base docs into the caller's org.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from onepilot.api.deps import CurrentPrincipal, DBSession, SettingsDep
@@ -37,6 +37,8 @@ class SeedResponse(BaseModel):
     total_documents: int
     total_chunks: int
     vector_upsert_count: int
+    reindex_hint: str | None = None
+    chunks_reindexed: int = 0
     leads_created: int = 0
     approvals_created: int = 0
     usage_events_created: int = 0
@@ -77,11 +79,13 @@ def _seed_response(
     *,
     principal: CurrentPrincipal,
     settings: SettingsDep,
+    reindex: bool = False,
 ) -> SeedResponse:
     result = seed_module.seed_knowledge_base(
         session,
         principal=principal,
         settings=settings,
+        reindex=reindex,
     )
     operational = seed_module.seed_operational_data(
         session,
@@ -93,6 +97,8 @@ def _seed_response(
         total_documents=result.total_documents,
         total_chunks=result.total_chunks,
         vector_upsert_count=result.vector_upsert_count,
+        reindex_hint=result.reindex_hint,
+        chunks_reindexed=result.chunks_reindexed,
         leads_created=operational.leads_created,
         approvals_created=operational.approvals_created,
         usage_events_created=operational.usage_events_created,
@@ -106,6 +112,7 @@ def seed_current_organization_demo(
     principal: CurrentPrincipal,
     session: DBSession,
     settings: SettingsDep,
+    reindex: bool = Query(False, description="Rebuild chunks and vector index for existing documents"),
 ) -> SeedResponse:
     """Seed knowledge base using the configured embeddings provider.
     
@@ -114,7 +121,7 @@ def seed_current_organization_demo(
     Also seeds operational demo data (leads, approvals, usage, audit) when empty.
     """
     require_admin(principal)
-    return _seed_response(session, principal=principal, settings=settings)
+    return _seed_response(session, principal=principal, settings=settings, reindex=reindex)
 
 
 @router.post("/seed", response_model=SeedResponse)
@@ -122,6 +129,7 @@ def seed_demo(
     principal: CurrentPrincipal,
     session: DBSession,
     settings: SettingsDep,
+    reindex: bool = Query(False, description="Rebuild chunks and vector index for existing documents"),
 ) -> SeedResponse:
     """Seed knowledge base using the configured embeddings provider.
     
@@ -130,4 +138,4 @@ def seed_demo(
     Also seeds operational demo data (leads, approvals, usage, audit) when empty.
     """
     require_admin(principal)
-    return _seed_response(session, principal=principal, settings=settings)
+    return _seed_response(session, principal=principal, settings=settings, reindex=reindex)

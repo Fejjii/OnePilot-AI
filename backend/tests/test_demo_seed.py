@@ -46,6 +46,16 @@ class TestDemoSeedEndpoint:
         assert second["documents_skipped"] == first["documents_created"]
         assert second["total_documents"] == first["total_documents"]
 
+    def test_seed_reindex_query_param(self, client: TestClient) -> None:
+        token = _register(client, suffix="_reindex")
+        client.post("/demo/seed", headers=_h(token))
+        second = client.post("/demo/seed?reindex=true", headers=_h(token))
+        assert second.status_code == 200, second.text
+        body = second.json()
+        assert body["documents_created"] == 0
+        assert body["total_chunks"] > 0
+        assert body["vector_upsert_count"] > 0
+
     def test_seeded_documents_are_searchable(self, client: TestClient) -> None:
         token = _register(client, suffix="_search")
         client.post("/demo/seed", headers=_h(token))

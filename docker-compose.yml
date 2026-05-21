@@ -152,7 +152,8 @@ services:
       GOOGLE_CALENDAR_SLOT_DURATION_MINUTES: ${GOOGLE_CALENDAR_SLOT_DURATION_MINUTES:-30}
       GOOGLE_CALENDAR_WORKDAY_START: ${GOOGLE_CALENDAR_WORKDAY_START:-09:00}
       GOOGLE_CALENDAR_WORKDAY_END: ${GOOGLE_CALENDAR_WORKDAY_END:-17:00}
-    command: ["python", "scripts/seed_demo.py"]
+    entrypoint: ["python", "scripts/seed_demo.py"]
+    command: []
     depends_on:
       backend:
         condition: service_healthy

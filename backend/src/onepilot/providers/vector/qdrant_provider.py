@@ -94,10 +94,11 @@ class QdrantVectorProvider(VectorProvider):
 
         client = self._get_client()
         points = []
-        for chunk_id, vec, payload in zip(ids, vectors, payloads):
-            qdrant_point_id = str(uuid.uuid4())
-            payload["chunk_ulid"] = chunk_id  # Store original ULID in payload
-            points.append(qm.PointStruct(id=qdrant_point_id, vector=vec, payload=payload))
+        for point_id, vec, payload in zip(ids, vectors, payloads):
+            payload.setdefault("chunk_ulid", payload.get("chunk_id", point_id))
+            points.append(
+                qm.PointStruct(id=_to_point_id(point_id), vector=vec, payload=payload)
+            )
 
         client.upsert(collection_name=collection, points=points, wait=True)
         return len(ids)

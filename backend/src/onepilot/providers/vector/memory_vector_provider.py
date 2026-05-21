@@ -60,7 +60,15 @@ class MemoryVectorProvider(VectorProvider):
             scored.append((score, rec))
         scored.sort(key=lambda x: x[0], reverse=True)
         return [
-            VectorSearchResult(id=rec.id, score=score, payload=rec.payload)
+            VectorSearchResult(
+                id=str(
+                    rec.payload.get("chunk_ulid")
+                    or rec.payload.get("chunk_id")
+                    or rec.id
+                ),
+                score=score,
+                payload=rec.payload,
+            )
             for score, rec in scored[:top_k]
         ]
 

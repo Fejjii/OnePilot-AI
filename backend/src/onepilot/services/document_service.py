@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import time
+import uuid
 from dataclasses import dataclass
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
@@ -30,6 +32,26 @@ from onepilot.services import (
 logger = get_logger(__name__)
 
 VECTOR_COLLECTION_PREFIX: str = "documents_"
+_STABLE_ID_NAMESPACE = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+
+
+def stable_chunk_id(organization_id: str, document_id: str, ordinal: int) -> str:
+    """Deterministic chunk primary key for idempotent reindex rebuilds."""
+    digest = uuid.uuid5(
+        _STABLE_ID_NAMESPACE,
+        f"chunk:{organization_id}:{document_id}:{ordinal}",
+    )
+    return f"chunk_{digest.hex[:26]}"
+
+
+def stable_vector_point_id(organization_id: str, document_id: str, ordinal: int) -> str:
+    """Deterministic vector point id (organization, document, chunk ordinal)."""
+    return str(
+        uuid.uuid5(
+            _STABLE_ID_NAMESPACE,
+            f"vector:{organization_id}:{document_id}:{ordinal}",
+        )
+    )
 
 
 def _embedding_fallback(embeddings: EmbeddingsProvider) -> bool:
@@ -43,8 +65,107 @@ class UploadResult:
     vector_upsert_count: int
 
 
+@dataclass(slots=True)
+class ReindexResult:
+    documents_seen: int
+    documents_created: int
+    documents_skipped: int
+    chunks_created: int
+    chunks_reindexed: int
+    vector_upserts: int
+    qdrant_collection: str
+    provider_mode: str
+    qdrant_configured: bool
+    sample_search_hits: int
+
+
 def collection_name(organization_id: str) -> str:
     return f"{VECTOR_COLLECTION_PREFIX}{organization_id}"
+
+
+def _vector_provider_mode(settings: Settings, vector: VectorProvider) -> str:
+    if settings.has_qdrant and "qdrant" in type(vector).__name__.lower():
+        return "qdrant"
+    return "memory"
+
+
+def _rebuild_document_chunks(
+    session: Session,
+    *,
+    principal: Principal,
+    document: Document,
+    content: bytes,
+    chunk_repo: DocumentChunkRepository,
+    doc_repo: DocumentRepository,
+) -> list[DocumentChunk]:
+    """Replace chunks for a document using deterministic chunk ids."""
+    chunk_repo.delete_by_document(document.id, organization_id=principal.organization_id)
+    title, text = ingestion_service.load_document(content, document.filename, document.content_type)
+    chunks = chunking_service.chunk_text(text)
+    if not chunks:
+        raise ValidationError(f"Document '{document.filename}' produced no chunks")
+
+    chunk_models: list[DocumentChunk] = []
+    for chunk in chunks:
+        chunk_models.append(
+            DocumentChunk(
+                id=stable_chunk_id(principal.organization_id, document.id, chunk.ordinal),
+                organization_id=principal.organization_id,
+                document_id=document.id,
+                ordinal=chunk.ordinal,
+                section=chunk.section,
+                content=chunk.content,
+                token_count=chunk.token_count,
+                chunk_metadata={
+                    "document_title": title,
+                    "filename": document.filename,
+                    "section": chunk.section,
+                },
+            )
+        )
+
+    chunk_repo.bulk_create(chunk_models)
+    doc_repo.update(
+        document,
+        {"title": title, "chunk_count": len(chunk_models)},
+    )
+    return chunk_models
+
+
+def _upsert_chunks_to_vector(
+    *,
+    principal: Principal,
+    document: Document,
+    chunk_models: list[DocumentChunk],
+    embeddings: EmbeddingsProvider,
+    vector: VectorProvider,
+) -> int:
+    embed_inputs = [
+        f"{c.section}\n\n{c.content}" if c.section else c.content for c in chunk_models
+    ]
+    vectors = embeddings.embed(embed_inputs)
+    collection = collection_name(principal.organization_id)
+    vector.ensure_collection(collection, embeddings.dimension)
+    return vector.upsert(
+        collection=collection,
+        ids=[
+            stable_vector_point_id(principal.organization_id, document.id, c.ordinal)
+            for c in chunk_models
+        ],
+        vectors=vectors,
+        payloads=[
+            {
+                "chunk_id": c.id,
+                "chunk_ulid": c.id,
+                "document_id": document.id,
+                "document_title": document.title,
+                "section": c.section,
+                "organization_id": principal.organization_id,
+                "ordinal": c.ordinal,
+            }
+            for c in chunk_models
+        ],
+    )
 
 
 def reindex_organization_documents(
@@ -54,66 +175,132 @@ def reindex_organization_documents(
     settings: Settings,
     embeddings: EmbeddingsProvider | None = None,
     vector: VectorProvider | None = None,
+    source_dir: Path | None = None,
+    rebuild_missing_chunks: bool = True,
 ) -> int:
-    """Rebuild the tenant's vector index from the persisted document chunks.
+    """Rebuild the tenant's vector index from persisted (or rebuilt) document chunks."""
+    result = reindex_knowledge_base(
+        session,
+        principal=principal,
+        settings=settings,
+        embeddings=embeddings,
+        vector=vector,
+        source_dir=source_dir,
+        rebuild_missing_chunks=rebuild_missing_chunks,
+    )
+    return result.vector_upserts
 
-    This is used as a self-healing path when the vector collection exists but
-    was created with a different embedding dimension.
-    """
+
+def reindex_knowledge_base(
+    session: Session,
+    *,
+    principal: Principal,
+    settings: Settings,
+    embeddings: EmbeddingsProvider | None = None,
+    vector: VectorProvider | None = None,
+    source_dir: Path | None = None,
+    rebuild_missing_chunks: bool = True,
+) -> ReindexResult:
+    """Reindex all knowledge-base documents for a tenant without duplicating documents."""
     embeddings = embeddings or get_embeddings_provider(settings)
     vector = vector or get_vector_provider(settings)
+    collection = collection_name(principal.organization_id)
 
     doc_repo = DocumentRepository(session)
-    docs = doc_repo.list_for_org(principal.organization_id, offset=0, limit=10_000)
-    if not docs:
-        return 0
-
     chunk_repo = DocumentChunkRepository(session)
-    chunk_models: list[DocumentChunk] = []
-    embed_inputs: list[str] = []
-    payloads: list[dict] = []
-    for doc in docs:
-        for chunk in chunk_repo.list_by_document(doc.id, organization_id=principal.organization_id):
-            chunk_models.append(chunk)
-            embed_inputs.append(
-                f"{chunk.section}\n\n{chunk.content}" if chunk.section else chunk.content
-            )
-            payloads.append(
-                {
-                    "chunk_id": chunk.id,
-                    "document_id": chunk.document_id,
-                    "document_title": doc.title,
-                    "section": chunk.section,
-                    "organization_id": principal.organization_id,
-                    "ordinal": chunk.ordinal,
-                }
-            )
+    docs = doc_repo.list_for_org(principal.organization_id, offset=0, limit=10_000)
 
-    if not chunk_models:
-        return 0
-
+    chunks_created = 0
+    chunks_reindexed = 0
+    vector_upserts = 0
     started = time.monotonic()
-    vectors = embeddings.embed(embed_inputs)
-    embed_latency_ms = int((time.monotonic() - started) * 1000)
 
-    collection = collection_name(principal.organization_id)
-    vector.ensure_collection(collection, embeddings.dimension)
-    upsert_count = vector.upsert(
-        collection=collection,
-        ids=[chunk.id for chunk in chunk_models],
-        vectors=vectors,
-        payloads=payloads,
-    )
+    for doc in docs:
+        chunk_models = chunk_repo.list_by_document(
+            doc.id, organization_id=principal.organization_id
+        )
+        if not chunk_models and rebuild_missing_chunks and source_dir is not None:
+            source_path = source_dir / doc.filename
+            if not source_path.is_file():
+                logger.warning(
+                    "reindex_missing_source",
+                    organization_id=principal.organization_id,
+                    document_id=doc.id,
+                    filename=doc.filename,
+                )
+                continue
+            chunk_models = _rebuild_document_chunks(
+                session,
+                principal=principal,
+                document=doc,
+                content=source_path.read_bytes(),
+                chunk_repo=chunk_repo,
+                doc_repo=doc_repo,
+            )
+            chunks_created += len(chunk_models)
+        elif chunk_models:
+            chunks_reindexed += len(chunk_models)
+        else:
+            logger.warning(
+                "reindex_no_chunks",
+                organization_id=principal.organization_id,
+                document_id=doc.id,
+                filename=doc.filename,
+            )
+            continue
+
+        vector_upserts += _upsert_chunks_to_vector(
+            principal=principal,
+            document=doc,
+            chunk_models=chunk_models,
+            embeddings=embeddings,
+            vector=vector,
+        )
 
     session.commit()
-    logger.warning(
+    embed_latency_ms = int((time.monotonic() - started) * 1000)
+    logger.info(
         "knowledge_base_reindexed",
         organization_id=principal.organization_id,
-        chunk_count=len(chunk_models),
-        vector_upsert_count=upsert_count,
+        documents_seen=len(docs),
+        chunks_created=chunks_created,
+        chunks_reindexed=chunks_reindexed,
+        vector_upsert_count=vector_upserts,
         latency_ms=embed_latency_ms,
+        provider_mode=_vector_provider_mode(settings, vector),
     )
-    return upsert_count
+
+    sample_hits = 0
+    if vector_upserts > 0:
+        from onepilot.services import rag_service
+
+        try:
+            outcome = rag_service.search(
+                session,
+                principal=principal,
+                query="NovaEdge services integrations HubSpot Gmail Calendar",
+                top_k=3,
+                settings=settings,
+                embeddings=embeddings,
+                vector=vector,
+                enforce_quota=False,
+            )
+            sample_hits = len(outcome.hits)
+        except Exception:
+            logger.exception("reindex_sample_search_failed")
+
+    return ReindexResult(
+        documents_seen=len(docs),
+        documents_created=0,
+        documents_skipped=len(docs),
+        chunks_created=chunks_created,
+        chunks_reindexed=chunks_reindexed,
+        vector_upserts=vector_upserts,
+        qdrant_collection=collection,
+        provider_mode=_vector_provider_mode(settings, vector),
+        qdrant_configured=settings.has_qdrant,
+        sample_search_hits=sample_hits,
+    )
 
 
 def upload_document(
@@ -198,11 +385,15 @@ def upload_document(
     vector.ensure_collection(collection_name(principal.organization_id), embeddings.dimension)
     upsert_count = vector.upsert(
         collection=collection_name(principal.organization_id),
-        ids=[c.id for c in chunk_models],
+        ids=[
+            stable_vector_point_id(principal.organization_id, document.id, c.ordinal)
+            for c in chunk_models
+        ],
         vectors=vectors,
         payloads=[
             {
                 "chunk_id": c.id,
+                "chunk_ulid": c.id,
                 "document_id": document.id,
                 "document_title": title,
                 "section": c.section,
