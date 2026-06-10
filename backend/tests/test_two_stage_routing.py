@@ -285,3 +285,18 @@ class TestPriorityAndOverrides:
             intent_result = classify_intent(msg, message_class=msg_result.message_class)
             assert intent_result.intent == Intent.KNOWLEDGE_SEARCH, f"Failed for: {msg}"
             assert msg_result.message_class == MessageClass.BUSINESS_KNOWLEDGE
+
+    def test_german_hubspot_integration_routes_to_knowledge_search(self) -> None:
+        """German integration questions must not fall through to clarification."""
+        message = "Welche Integrationen unterstützt NovaEdge mit HubSpot und Gmail?"
+        msg_result = classify_message(message)
+        assert msg_result.message_class == MessageClass.BUSINESS_KNOWLEDGE
+        intent_result = classify_intent(message, message_class=msg_result.message_class)
+        assert intent_result.intent == Intent.KNOWLEDGE_SEARCH
+
+    def test_french_integration_routes_to_knowledge_search(self) -> None:
+        message = "Quelles intégrations NovaEdge prend en charge avec HubSpot et Gmail?"
+        msg_result = classify_message(message)
+        assert msg_result.message_class == MessageClass.BUSINESS_KNOWLEDGE
+        intent_result = classify_intent(message, message_class=msg_result.message_class)
+        assert intent_result.intent == Intent.KNOWLEDGE_SEARCH

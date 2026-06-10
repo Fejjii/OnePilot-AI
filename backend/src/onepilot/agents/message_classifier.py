@@ -180,6 +180,23 @@ _BUSINESS_KNOWLEDGE_PATTERNS = [
         ),
         2.0,
     ),
+    # Multilingual business knowledge (German, French, Spanish)
+    (
+        re.compile(
+            r"\b(integrationen?|intégrations?|integraciones?|unterstützt|unterstütz|"
+            r"bietet|propose|ofrece|admite|richtlinie|politique|política|politica|"
+            r"rückerstatt|ruckerstatt|remboursement|reembolso|dienstleistungen?|servicios?)\b",
+            re.IGNORECASE,
+        ),
+        3.0,
+    ),
+    (
+        re.compile(
+            r"\b(welche|quelle|quelles?|cuáles?|qué|wie|comment|como|cómo)\b",
+            re.IGNORECASE,
+        ),
+        1.5,
+    ),
 ]
 
 # Workflow/action indicators

@@ -24,7 +24,9 @@ from sqlalchemy import create_engine, event  # noqa: E402
 from sqlalchemy.orm import Session, sessionmaker  # noqa: E402
 
 from onepilot.api.main import create_app  # noqa: E402
+from onepilot.core.config import get_settings  # noqa: E402
 from onepilot.providers import reset_provider_cache  # noqa: E402
+from onepilot.security.rate_limit import reset_rate_limiter  # noqa: E402
 from onepilot.repositories.base import Base  # noqa: E402
 from onepilot.repositories.models import Plan  # noqa: E402
 from onepilot.repositories.session import get_session  # noqa: E402
@@ -129,9 +131,13 @@ def db_session(engine) -> Generator[Session, None, None]:
 
 @pytest.fixture(autouse=True)
 def _reset_providers():
+    get_settings.cache_clear()
     reset_provider_cache()
+    reset_rate_limiter()
     yield
+    get_settings.cache_clear()
     reset_provider_cache()
+    reset_rate_limiter()
 
 
 @pytest.fixture

@@ -1,6 +1,6 @@
 {
   "test_name": "rag_golden",
-  "timestamp": "2026-05-20T14:46:03.766561+00:00",
+  "timestamp": "2026-06-10T13:10:43.327572+00:00",
   "total": 10,
   "rag_golden_pass_rate": 1.0,
   "source_hit_rate": 0.9,

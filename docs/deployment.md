@@ -23,7 +23,7 @@ OnePilot AI uses **Docker Compose** to orchestrate all services:
 
 ```bash
 # 1. Clone the repository
-git clone <repo-url>
+git clone https://github.com/Fejjii/OnePilot-AI.git
 cd OnePilot-AI
 
 # 2. Copy environment file
@@ -64,7 +64,62 @@ After seeding, use:
 - **Email:** `admin@onepilot.ai`
 - **Password:** `Demo1234!`
 
-Or use dev auth mode (enabled by default) — access the app without credentials.
+Or use dev auth mode when `DEV_AUTH_ENABLED=true` in `.env` — access the app without credentials. **Never enable dev auth in public deployments.**
+
+Full pre-deploy checklist: [deployment_checklist.md](deployment_checklist.md)
+
+### Post-deploy smoke test
+
+After deploying the backend, run:
+
+```bash
+python scripts/smoke_test_public_demo.py --base-url https://your-api.example.com \
+  --demo-email admin@onepilot.ai --demo-password Demo1234!
+```
+
+This checks health, provider diagnostics, login, chat, prompt-injection blocking, and knowledge search without requiring live OpenAI, Gmail, or Calendar.
+
+---
+
+## Public Demo Deployment (Vercel + Railway / Render / Azure)
+
+This stack is designed for a **LinkedIn demo**: frontend on Vercel, backend on a container host, managed Postgres, and Qdrant Cloud (or self-hosted Qdrant). Not every component is production-hardened — see honest gaps below.
+
+### Minimum production environment variables
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `APP_ENV` | **Yes** | Set to `production` |
+| `DATABASE_URL` | **Yes** | Managed PostgreSQL connection string |
+| `JWT_SECRET` | **Yes** | Strong random secret, **≥ 32 characters** — never use placeholder values |
+| `DEV_AUTH_ENABLED` | **Yes** | Must be `false` — startup fails if `true` in production |
+| `CORS_ORIGINS` | **Yes** | Comma-separated frontend URLs, e.g. `https://onepilot-demo.vercel.app` — no wildcards |
+| `QDRANT_URL` | **Recommended** | Qdrant Cloud or self-hosted URL; without it, vectors fall back to in-memory (not durable across restarts) |
+| `QDRANT_API_KEY` | If using Qdrant Cloud | API key for hosted Qdrant |
+| `OPENAI_API_KEY` | No | Optional; deterministic LLM/embeddings fallback without it |
+| `REDIS_URL` | No (strongly recommended) | When set and reachable, rate limits use Redis (shared across workers). Falls back to in-memory per process if unset or unavailable. |
+| `GMAIL_PROVIDER_MODE` | Recommended for public demo | Set to `mock` unless using a dedicated demo Google account |
+| `GOOGLE_CALENDAR_PROVIDER_MODE` | Recommended for public demo | Set to `mock` unless using a dedicated demo Google account |
+
+Do **not** connect personal Gmail or Calendar accounts to a public demo. Use mock providers or an isolated demo Google Workspace account.
+
+### Vercel (frontend)
+
+1. Import the GitHub repository and set the root directory to `frontend/`.
+2. Copy `frontend/.env.local.example` → set `NEXT_PUBLIC_API_URL` to your deployed backend URL (e.g. `https://onepilot-api.up.railway.app`).
+3. Deploy. `NEXT_PUBLIC_API_URL` is baked in at build time — redeploy after changing it.
+4. Add the Vercel URL to backend `CORS_ORIGINS`.
+
+### Railway / Render / Azure Container Apps (backend)
+
+1. Build from `backend/Dockerfile` (or use Docker Compose locally for validation).
+2. Set the minimum production env vars above.
+3. Run migrations before serving traffic: `alembic upgrade head` (or `docker compose run --rm migrate` locally).
+4. Seed demo data if needed: `python scripts/seed_demo.py` (creates `admin@onepilot.ai` / `Demo1234!`).
+5. Expose port `8000` and verify `GET /health` returns `status: ok`.
+6. Run `scripts/smoke_test_public_demo.py` against the public URL.
+
+**Postgres** is required. **Qdrant** is strongly recommended for persistent RAG; without it the app runs in demo mode with in-memory vectors. **Redis** is strongly recommended for public demos and multi-instance backends so rate limits are shared across workers; the app still runs without it using per-process memory fallback.
 
 ---
 
@@ -123,7 +178,7 @@ cp .env.example .env
 
 **Optional (with fallbacks):**
 - `OPENAI_API_KEY` — for real LLM/embeddings (uses deterministic fallback without it)
-- `REDIS_URL` — for caching and rate limiting (in-memory fallback)
+- `REDIS_URL` — Redis for shared rate-limit counters (in-memory fallback when unset)
 - `QDRANT_URL` — for vector search (in-memory fallback)
 - `SERPER_API_KEY` — for web search (mock results without it)
 - `LANGSMITH_API_KEY` — for LangSmith tracing (disabled by default)
@@ -185,19 +240,22 @@ make frontend-dev
 | `LANGSMITH_API_KEY` | No | — | LangSmith tracing API key (optional) |
 | `LANGSMITH_TRACING` | No | `false` | Enable LangSmith trace export |
 | `SERPER_API_KEY` | No | — | Serper web search API key (optional) |
-| `JWT_SECRET` | **Yes** | `change-me-...` | Secret for signing JWTs — **change in production!** |
+| `JWT_SECRET` | **Yes** | `change-me-...` | Secret for signing JWTs — **≥ 32 chars in production** |
 | `JWT_ALGORITHM` | No | `HS256` | JWT signing algorithm |
 | `JWT_EXPIRE_MINUTES` | No | `60` | JWT expiry in minutes |
-| `DEV_AUTH_ENABLED` | No | `true` | Bypass JWT in dev mode (disable in production) |
+| `CORS_ORIGINS` | **Yes** (production) | — | Comma-separated frontend URLs (no wildcards) |
+| `DEV_AUTH_ENABLED` | No | `false` | Set `true` in local `.env` only; **must be false in production** |
 | `DEV_ORG_ID` | No | `org_demo_onepilot` | Default org ID for dev auth |
 | `DEV_USER_ID` | No | `usr_demo_admin` | Default user ID for dev auth |
 | `DEV_BYPASS_QUOTAS` | No | `false` | Skip quota checks in dev mode |
 
 ### Frontend Environment Variables
 
+Copy `frontend/.env.local.example` to `frontend/.env.local` for local dev.
+
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `NEXT_PUBLIC_API_URL` | **Yes** | `http://localhost:8000` | Backend API base URL (baked into build) |
+| `NEXT_PUBLIC_API_URL` | **Yes** | `http://localhost:8000` | Backend API base URL (baked into build; no secrets) |
 
 ---
 
@@ -230,19 +288,17 @@ make frontend-dev
 ## Runtime Modes
 
 ### Development Mode (`APP_ENV=dev`)
-- **Dev auth enabled:** Access without JWT (if `DEV_AUTH_ENABLED=true`)
+- **Dev auth:** Set `DEV_AUTH_ENABLED=true` in `.env` to bypass JWT when no header is sent
+- **CORS:** `http://localhost:3000` and `http://127.0.0.1:3000` always allowed; optional extra origins via `CORS_ORIGINS`
 - **Hot reload:** Backend and frontend auto-reload on code changes
-- **Verbose logging:** DEBUG level logs to stdout
 - **Mock providers:** Fallback providers are acceptable
-- **CORS:** Permissive (localhost origins)
 
 ### Production Mode (`APP_ENV=production`)
-- **Dev auth disabled:** Must set `DEV_AUTH_ENABLED=false`
+- **Startup validation:** Fails fast if `DEV_AUTH_ENABLED=true`, weak `JWT_SECRET`, or missing `CORS_ORIGINS`
 - **JWT required:** All API requests must include `Authorization: Bearer <token>`
-- **Structured logging:** JSON logs with request IDs
-- **Real providers:** Mock providers log warnings
-- **CORS:** Strict origin whitelist
-- **Secret management:** Use environment variables injected by orchestrator
+- **CORS:** Only origins listed in `CORS_ORIGINS` (no wildcards, no implicit localhost)
+- **Rate limiting:** Login, register, chat, and upload use **Redis fixed-window counters** when `REDIS_URL` is reachable; otherwise **in-memory** per process. Check `rate_limit_backend` on `/health`.
+- **Gmail / Calendar:** Use `mock` provider mode or a dedicated demo Google account — not personal accounts
 
 ---
 
@@ -255,7 +311,7 @@ make frontend-dev
 5. **No CDN** — frontend static assets served directly by Next.js
 6. **No object storage** — uploaded files are not persisted (chunks are stored in Postgres)
 7. **No message queue** — no async job processing (add Celery/RabbitMQ/Redis)
-8. **No rate limiting at proxy** — rate limiting is in-memory in the backend (resets on restart)
+8. **Rate limiting without Redis** — falls back to per-process memory counters (not shared across workers or restarts)
 
 See [limitations_roadmap.md](limitations_roadmap.md) for the full list.
 
@@ -395,9 +451,9 @@ make setup           # Full setup: infra + install + migrate + seed
 **Symptom:** API requests return network errors
 
 **Fixes:**
-1. Verify `NEXT_PUBLIC_API_URL` is set in `frontend/.env.local`
+1. Verify `NEXT_PUBLIC_API_URL` is set in `frontend/.env.local` (see `frontend/.env.local.example`)
 2. Ensure backend is running on port 8000
-3. Check CORS settings in `backend/src/onepilot/api/main.py`
+3. Check `CORS_ORIGINS` on the backend includes your frontend URL in production
 
 ### Migrations fail
 **Symptom:** `alembic upgrade head` exits with error

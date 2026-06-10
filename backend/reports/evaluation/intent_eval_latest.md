@@ -1,6 +1,6 @@
 # Intent & Routing Evaluation Report
 
-**Generated:** 2026-05-20T14:46:03.728490+00:00
+**Generated:** 2026-06-10T13:10:43.313068+00:00
 
 ## Summary
 

@@ -13,6 +13,7 @@ from onepilot.core.errors import (
     PermissionDeniedError,
     ProviderUnavailableError,
     QuotaExceededError,
+    RateLimitExceededError,
     ValidationError,
 )
 
@@ -48,6 +49,7 @@ _ERROR_CLASSES: list[tuple[type[OnePilotError], int]] = [
     (PermissionDeniedError, 403),
     (AuthenticationError, 401),
     (QuotaExceededError, 429),
+    (RateLimitExceededError, 429),
     (ValidationError, 422),
     (ProviderUnavailableError, 503),
     (GuardrailBlockedError, 400),

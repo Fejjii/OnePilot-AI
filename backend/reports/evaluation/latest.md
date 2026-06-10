@@ -1,6 +1,6 @@
 # OnePilot AI — Evaluation & Quality Summary
 
-**Generated:** 2026-05-20T14:46:03.783582+00:00
+**Generated:** 2026-06-10T13:10:43.333397+00:00
 
 These are deterministic evaluation checks for capstone/demo quality. They are not a replacement for full production RAGAS or human evaluation.
 

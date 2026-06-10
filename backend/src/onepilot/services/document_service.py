@@ -19,6 +19,10 @@ from onepilot.repositories.documents import DocumentChunkRepository, DocumentRep
 from onepilot.repositories.models import Document, DocumentChunk
 from onepilot.security.auth import Principal
 from onepilot.security.file_validation import validate_file
+from onepilot.security.rate_limit import (
+    FEATURE_DOCUMENT_UPLOAD,
+    enforce_rate_limit_for_principal,
+)
 from onepilot.services import (
     audit_service,
     chunking_service,
@@ -130,6 +134,8 @@ def upload_document(
     enforce_quota: bool = True,
 ) -> UploadResult:
     """Upload, chunk, embed, and persist a document for the current tenant."""
+    enforce_rate_limit_for_principal(principal, FEATURE_DOCUMENT_UPLOAD)
+
     validation = validate_file(filename, content_type, len(content))
     if not validation.valid:
         raise ValidationError("; ".join(validation.errors))

@@ -5,6 +5,15 @@ from pathlib import Path
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Known weak JWT secrets — must not be used when APP_ENV=production.
+_WEAK_JWT_SECRETS: frozenset[str] = frozenset(
+    {
+        "change-me-in-production",
+        "change-me-in-production-use-a-long-random-string",
+    }
+)
+_MIN_JWT_SECRET_LENGTH = 32
+
 # backend/src/onepilot/core/config.py -> repo root is four parents up
 _BACKEND_ROOT = Path(__file__).resolve().parents[3]
 _PROJECT_ROOT = _BACKEND_ROOT.parent
@@ -79,7 +88,11 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60
 
-    DEV_AUTH_ENABLED: bool = True
+    # Safe default is false; local dev enables via .env (DEV_AUTH_ENABLED=true).
+    DEV_AUTH_ENABLED: bool = False
+
+    # Comma-separated frontend origins for production CORS (e.g. https://app.vercel.app).
+    CORS_ORIGINS: str = ""
     DEV_ORG_ID: str = "org_demo_onepilot"
     DEV_USER_ID: str = "usr_demo_admin"
     DEV_BYPASS_QUOTAS: bool = False
@@ -104,6 +117,10 @@ class Settings(BaseSettings):
     @property
     def is_test(self) -> bool:
         return self.APP_ENV == "test"
+
+    @property
+    def is_production(self) -> bool:
+        return self.APP_ENV == "production"
 
     @property
     def has_openai(self) -> bool:
@@ -140,6 +157,54 @@ class Settings(BaseSettings):
     @property
     def has_calendar_oauth(self) -> bool:
         return self.has_gmail_oauth
+
+    def cors_origins_list(self) -> list[str]:
+        """Resolved CORS allowlist. Localhost is always included in dev/test."""
+        configured = [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+        if self.is_dev or self.is_test:
+            local = ["http://localhost:3000", "http://127.0.0.1:3000"]
+            seen: set[str] = set()
+            merged: list[str] = []
+            for origin in local + configured:
+                if origin not in seen:
+                    seen.add(origin)
+                    merged.append(origin)
+            return merged
+        if "*" in configured:
+            raise ValueError("Wildcard CORS origin (*) is not allowed in production")
+        return configured
+
+    def validate_startup_config(self) -> list[str]:
+        """Fail fast on unsafe production configuration. Returns non-fatal warnings."""
+        warnings: list[str] = []
+        if not self.is_production:
+            return warnings
+
+        if self.DEV_AUTH_ENABLED:
+            raise RuntimeError(
+                "DEV_AUTH_ENABLED must be false when APP_ENV=production. "
+                "Dev auth bypasses JWT and must not run in public deployments."
+            )
+
+        secret = self.JWT_SECRET.strip()
+        if (
+            not secret
+            or secret in _WEAK_JWT_SECRETS
+            or len(secret) < _MIN_JWT_SECRET_LENGTH
+        ):
+            raise RuntimeError(
+                "JWT_SECRET must be a strong random secret (at least "
+                f"{_MIN_JWT_SECRET_LENGTH} characters) when APP_ENV=production. "
+                "Do not use default or placeholder values."
+            )
+
+        if not self.cors_origins_list():
+            raise RuntimeError(
+                "CORS_ORIGINS must list at least one frontend URL when APP_ENV=production "
+                "(comma-separated, e.g. https://your-app.vercel.app)."
+            )
+
+        return warnings
 
 
 def serper_runtime_status(settings: Settings) -> dict[str, bool | str]:

@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from onepilot.core.config import Settings, calendar_runtime_status, get_settings, gmail_runtime_status, serper_runtime_status
+from onepilot.security.rate_limit import rate_limit_runtime_status
 from onepilot.repositories.session import get_session
 from onepilot.providers import (
     get_billing_provider,
@@ -235,6 +236,7 @@ def health_check(settings: Settings = Depends(get_settings)) -> dict:
     serper = serper_runtime_status(settings)
     gmail = gmail_runtime_status(settings)
     calendar = calendar_runtime_status(settings)
+    rate_limit = rate_limit_runtime_status(settings)
     return {
         "status": "ok",
         "app": settings.APP_NAME,
@@ -244,6 +246,8 @@ def health_check(settings: Settings = Depends(get_settings)) -> dict:
             "openai": settings.has_openai,
             "qdrant": settings.has_qdrant,
             "redis": settings.has_redis,
+            "rate_limit_backend": rate_limit["rate_limit_backend"],
+            "rate_limit_shared": rate_limit["rate_limit_shared"],
             "langsmith": settings.has_langsmith,
             "database": bool(settings.DATABASE_URL),
             "serper_configured": serper["serper_configured"],
@@ -363,7 +367,8 @@ def provider_diagnostics(
     redis_configured = settings.has_redis
     redis_healthy = redis_configured
     redis_mode = ProviderMode.LIVE if redis_configured else ProviderMode.MISSING
-    redis_reason = None if redis_configured else "REDIS_URL not set; process-local cache in use"
+    rate_limit_status = rate_limit_runtime_status(settings)
+    redis_reason = None if redis_configured else "REDIS_URL not set; rate limits use in-memory fallback"
     
     if redis_configured:
         try:
@@ -375,6 +380,15 @@ def provider_diagnostics(
             redis_mode = ProviderMode.UNHEALTHY
             redis_reason = f"Redis connection failed: {exc}"
     
+    redis_details: dict[str, str | bool] = {
+        "rate_limit_backend": str(rate_limit_status["rate_limit_backend"]),
+        "rate_limit_shared": bool(rate_limit_status["rate_limit_shared"]),
+    }
+    if not redis_configured:
+        redis_details["fallback"] = "In-memory rate limiting per process"
+    elif not redis_healthy:
+        redis_details["fallback"] = "In-memory rate limiting per process"
+    
     diagnostics.append(
         ProviderDiagnostic(
             name="Redis",
@@ -382,12 +396,12 @@ def provider_diagnostics(
             configured=redis_configured,
             healthy=redis_healthy,
             active=redis_configured and redis_healthy,
-            fallback_used=not redis_configured,
+            fallback_used=not redis_configured or not redis_healthy,
             mode=redis_mode,
             model=None,
             reason=redis_reason,
             last_checked_at=now,
-            details={"fallback": "Process-local cache"} if not redis_configured else None,
+            details=redis_details,
         )
     )
     

@@ -18,6 +18,7 @@ logger = get_logger(__name__)
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
+    settings.validate_startup_config()
     logger.info("app_startup", env=settings.APP_ENV, app=settings.APP_NAME)
 
     # Initialize tracing
@@ -47,7 +48,7 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+        allow_origins=settings.cors_origins_list(),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

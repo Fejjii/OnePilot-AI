@@ -2,7 +2,9 @@
 
 **OnePilot AI** is a production-style AI-powered business workspace for small and medium businesses. It combines a company knowledge base, retrieval-augmented generation (RAG), agentic workflow automation, email drafting, lead management, human approval gates, usage tracking, memory, and security guardrails in a single multi-tenant SaaS platform.
 
-> **Capstone project status:** All 8 phases complete. **599** backend tests passing. Full Docker stack validated. Frontend typecheck, lint, build, and tests passing.
+> **Capstone project status:** All 8 phases complete. **641** backend tests passing. CI workflow validates backend, frontend, and evaluation suite. Full Docker stack validated locally.
+
+**Public demo capable — not full production SaaS.** Suitable for a LinkedIn demo deployment (Vercel + Railway/Render) with managed Postgres, Qdrant, and Redis. Gmail, Calendar, HubSpot, and Stripe run in **mock mode** by default. Redis-backed rate limiting is implemented with in-memory fallback. Qdrant is **strongly recommended** for durable RAG. See [docs/deployment_checklist.md](docs/deployment_checklist.md).
 
 ---
 
@@ -42,7 +44,7 @@ Small businesses use many disconnected AI tools and lose time managing scattered
 | Memory | Session, conversation, and long-term memory per org |
 | Audit logs | Every sensitive action is logged with actor, org, and metadata |
 | Usage tracking | Per-org quota enforcement and usage event history |
-| Security | JWT auth, RBAC, prompt injection detection, sensitive data redaction, rate limiting |
+| Security | JWT auth, RBAC, prompt injection detection, sensitive data redaction, Redis-backed rate limiting |
 | Provider adapters | Every external dependency has mock, fallback, or live modes; diagnostics in Settings |
 | External web search | Serper-backed `external.web_search` tool; separated from internal RAG citations |
 
@@ -90,7 +92,7 @@ See [docs/usage_billing.md](docs/usage_billing.md).
 - JWT authentication with RBAC (Owner, Admin, Member, Viewer)
 - Multi-tenant isolation on every query (`organization_id`)
 - Prompt injection detection and sensitive-data redaction
-- Rate limiting (in-memory; Redis-backed planned)
+- Rate limiting (Redis fixed-window when `REDIS_URL` is set; in-memory fallback per process)
 - No API keys in the frontend; model names only via `/runtime/config`
 - Audit trail for sensitive actions
 
@@ -206,7 +208,7 @@ flowchart TB
 ### 1. Clone and configure
 
 ```bash
-git clone <repo-url> onepilot-ai
+git clone https://github.com/Fejjii/OnePilot-AI.git onepilot-ai
 cd onepilot-ai
 cp .env.example .env
 # Edit .env — set OPENAI_API_KEY if you want real LLM responses (optional)
@@ -238,7 +240,7 @@ python scripts/dev_setup.py
 
 ```bash
 cd frontend
-cp .env.example .env.local    # NEXT_PUBLIC_API_URL=http://localhost:8000
+cp .env.local.example .env.local    # NEXT_PUBLIC_API_URL=http://localhost:8000
 pnpm install
 pnpm dev
 ```
@@ -309,13 +311,13 @@ curl http://localhost:6333/healthz      # qdrant
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` (root) and `frontend/.env.example` to `frontend/.env.local`.
+Copy `.env.example` to `.env` (root) and `frontend/.env.local.example` to `frontend/.env.local`.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `APP_ENV` | No | `dev` | `dev` or `production` |
 | `DATABASE_URL` | **Yes** | — | PostgreSQL connection string |
-| `REDIS_URL` | No | — | Redis connection string (optional, in-memory fallback) |
+| `REDIS_URL` | No (strongly recommended) | — | Redis for shared rate-limit counters; in-memory fallback if unset |
 | `QDRANT_URL` | No | — | Qdrant base URL (optional, in-memory fallback) |
 | `QDRANT_API_KEY` | No | — | Qdrant API key for cloud |
 | `OPENAI_API_KEY` | No | — | OpenAI key (optional, deterministic fallback without it) |
@@ -333,9 +335,10 @@ Copy `.env.example` to `.env` (root) and `frontend/.env.example` to `frontend/.e
 | `GOOGLE_REFRESH_TOKEN` | No | — | Google OAuth refresh token (server env only) |
 | `GMAIL_SEND_ENABLED` | No | `false` | Allow Gmail send after approval (off by default) |
 | `GOOGLE_CALENDAR_CREATE_ENABLED` | No | `true` | Allow Calendar event creation after approval |
-| `JWT_SECRET` | **Yes** | `change-me-...` | Secret for signing JWTs — **change in production** |
+| `JWT_SECRET` | **Yes** | `change-me-...` | Secret for signing JWTs — **change in production** (≥32 chars) |
 | `JWT_EXPIRE_MINUTES` | No | `60` | JWT expiry in minutes |
-| `DEV_AUTH_ENABLED` | No | `true` | Bypass JWT in dev mode (disable in production) |
+| `CORS_ORIGINS` | **Yes** (production) | — | Comma-separated frontend URLs (e.g. Vercel deployment) |
+| `DEV_AUTH_ENABLED` | No | `false` | Bypass JWT when no header — set `true` in local `.env` only; **must be false in production** |
 | `DEV_BYPASS_QUOTAS` | No | `false` | Skip quota checks in dev |
 | `NEXT_PUBLIC_API_URL` | **Yes** (frontend) | `http://localhost:8000` | Backend URL (baked into frontend build) |
 
@@ -345,7 +348,7 @@ Copy `.env.example` to `.env` (root) and `frontend/.env.example` to `frontend/.e
 |----------|------------------|---------------------|
 | OpenAI LLM / embeddings / speech | **Live** | **Missing** → deterministic fallback |
 | Qdrant | **Live** | **Missing** → in-memory vectors |
-| Redis | **Live** | **Missing** → process-local cache |
+| Redis | **Live** — shared rate limits | **Missing** → in-memory rate limits per process |
 | Postgres | **Required** | — |
 | LangSmith | **Live** tracing | **Missing** or **Local** trace steps |
 | Serper Web Search | **Live** with `SERPER_API_KEY` | **Optional** — mock canned results; app stays up without key |
@@ -359,7 +362,7 @@ Provider keys are set via environment variables only. **No API keys are stored i
 
 ## Running Tests
 
-### Backend (599 tests)
+### Backend (641 tests)
 
 ```bash
 cd backend
@@ -392,6 +395,26 @@ pnpm build        # production build
 make test     # backend + frontend tests
 make lint     # backend + frontend linters
 ```
+
+### CI
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on push/PR to `main`/`master`:
+
+- Backend: install, full pytest, security tests, evaluation suite
+- Frontend: install, typecheck, Vitest, production build
+
+Optional Docker smoke test job is documented as a future CI step in the workflow file.
+
+### Pre-deploy smoke test
+
+```bash
+python scripts/smoke_test_public_demo.py \
+  --base-url http://localhost:8000 \
+  --demo-email admin@onepilot.ai \
+  --demo-password Demo1234!
+```
+
+Full checklist: [docs/deployment_checklist.md](docs/deployment_checklist.md)
 
 ---
 
@@ -446,6 +469,7 @@ Full pre-push checklist: [docs/manual_test_checklist.md](docs/manual_test_checkl
 | [Limitations & Roadmap](docs/limitations_roadmap.md) | Honest assessment of mock components and future work |
 | [Data Model](docs/data_model.md) | Database schema and entity relationships |
 | [Deployment](docs/deployment.md) | Docker and local run guide |
+| [Deployment Checklist](docs/deployment_checklist.md) | Pre-deploy checklist for public LinkedIn demo |
 | [Usage & Billing](docs/usage_billing.md) | Usage events and mock billing |
 | [Google Workspace OAuth](docs/google_workspace_oauth_setup.md) | Gmail + Calendar OAuth refresh token setup |
 | [Gmail OAuth](docs/gmail_oauth_setup.md) | Legacy Gmail-only OAuth helper (Calendar scopes not included) |
@@ -465,7 +489,7 @@ Full pre-push checklist: [docs/manual_test_checklist.md](docs/manual_test_checkl
 | 7 | Frontend pages & integration | ✅ Complete |
 | 8 | Docker, docs, finalization | ✅ Complete |
 
-**599 backend tests passing.** Frontend: typecheck, lint, build, and Vitest pass.
+**641 backend tests passing.** Frontend: typecheck, lint, build, and Vitest pass.
 
 ---
 
@@ -519,9 +543,9 @@ Transcription returns a detected `language` code. When preference is Auto, that 
 1. **Provider modes** — Gmail and Google Calendar are **live** when Google OAuth env vars include the required scopes (approval-gated draft/send and calendar event creation). See [docs/google_workspace_oauth_setup.md](docs/google_workspace_oauth_setup.md). HubSpot, Stripe, and Twilio use in-memory mocks. Serper is **live when `SERPER_API_KEY` is set**; otherwise mock/optional mode.
 2. **JWT in localStorage** — Tokens are stored in `localStorage` for simplicity. In production, use HTTP-only cookies.
 3. **No streaming** — Chat responses are synchronous (no Server-Sent Events or WebSocket yet).
-4. **Rate limiting** — In-memory token bucket resets on restart. Redis-backed rate limiting is planned.
+4. **Rate limiting** — Redis-backed when `REDIS_URL` is reachable (shared across workers). Without Redis, limits are in-memory per process and reset on restart.
 5. **No OAuth/SSO** — Username/password only.
-6. **No production deployment** — This is a local and Docker Compose setup. Kubernetes/cloud deployment is not included.
+6. **Not full production SaaS** — Public demo deployment is supported (Vercel + Railway/Render) with documented gaps; no Kubernetes manifests, no HTTP-only cookies, no refresh tokens.
 7. **Email Assistant** — No standalone page; email drafting runs inside AI Workspace.
 8. **Editable model selection** — Models are environment-driven; UI selection is planned for a future version.
 

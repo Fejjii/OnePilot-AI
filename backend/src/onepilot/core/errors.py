@@ -53,6 +53,16 @@ class QuotaExceededError(OnePilotError):
         super().__init__(message=message, code=code, status_code=status_code)
 
 
+class RateLimitExceededError(OnePilotError):
+    def __init__(
+        self,
+        message: str = "Rate limit exceeded",
+        code: str = "RATE_LIMIT_EXCEEDED",
+        status_code: int = 429,
+    ) -> None:
+        super().__init__(message=message, code=code, status_code=status_code)
+
+
 class ValidationError(OnePilotError):
     def __init__(
         self,

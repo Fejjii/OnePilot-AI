@@ -8,7 +8,11 @@ from pydantic import BaseModel
 
 from onepilot.core.config import get_settings
 from onepilot.core.constants import PlanCode, Role
-from onepilot.core.errors import AuthenticationError
+from onepilot.core.errors import AuthenticationError, ValidationError
+
+# bcrypt only uses the first 72 bytes; reject longer passwords before hashing.
+BCRYPT_MAX_PASSWORD_BYTES = 72
+MIN_PASSWORD_LENGTH = 8
 
 
 class Principal(BaseModel):
@@ -18,13 +22,34 @@ class Principal(BaseModel):
     plan_code: PlanCode
 
 
+def validate_password(password: str) -> None:
+    """Reject passwords outside bcrypt-safe bounds before hashing."""
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise ValidationError(
+            f"Password must be at least {MIN_PASSWORD_LENGTH} characters"
+        )
+    byte_len = len(password.encode("utf-8"))
+    if byte_len > BCRYPT_MAX_PASSWORD_BYTES:
+        raise ValidationError(
+            f"Password must be at most {BCRYPT_MAX_PASSWORD_BYTES} bytes "
+            f"(got {byte_len} bytes)"
+        )
+
+
 def hash_password(password: str) -> str:
-    pw_bytes = password.encode("utf-8")[:72]
+    validate_password(password)
+    pw_bytes = password.encode("utf-8")
     return bcrypt.hashpw(pw_bytes, bcrypt.gensalt(rounds=12)).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    pw_bytes = plain.encode("utf-8")[:72]
+    byte_len = len(plain.encode("utf-8"))
+    if byte_len > BCRYPT_MAX_PASSWORD_BYTES:
+        raise ValidationError(
+            f"Password must be at most {BCRYPT_MAX_PASSWORD_BYTES} bytes "
+            f"(got {byte_len} bytes)"
+        )
+    pw_bytes = plain.encode("utf-8")
     return bcrypt.checkpw(pw_bytes, hashed.encode("utf-8"))
 
 

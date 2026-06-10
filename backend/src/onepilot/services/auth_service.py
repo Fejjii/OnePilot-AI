@@ -16,11 +16,11 @@ from onepilot.security.auth import (
     Principal,
     create_access_token,
     hash_password,
+    validate_password,
     verify_password,
 )
 
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
-MIN_PASSWORD_LENGTH = 8
 
 
 def _slugify(name: str) -> str:
@@ -35,8 +35,7 @@ def register(
     full_name: str,
     organization_name: str,
 ) -> tuple[User, Organization, str, datetime]:
-    if len(password) < MIN_PASSWORD_LENGTH:
-        raise ValidationError(f"Password must be at least {MIN_PASSWORD_LENGTH} characters")
+    validate_password(password)
 
     user_repo = UserRepository(session)
     if user_repo.get_by_email(email):

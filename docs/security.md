@@ -15,7 +15,7 @@
 ### Authentication
 
 - **JWT (HS256)** with configurable secret (`JWT_SECRET`), algorithm, and expiry (`JWT_EXPIRE_MINUTES`, default 60)
-- **DEV_AUTH fallback** — when `DEV_AUTH_ENABLED=true` and no `Authorization` header is sent, the request is attributed to a fixed demo user/org. This is disabled in production by setting `DEV_AUTH_ENABLED=false`.
+- **DEV_AUTH fallback** — when `DEV_AUTH_ENABLED=true` and no `Authorization` header is sent, the request is attributed to a fixed demo user/org. The safe field default is `false`; local dev sets `true` in `.env`. **Startup fails** if `APP_ENV=production` and `DEV_AUTH_ENABLED=true`.
 - Password hashing via **bcrypt** (passlib, 12 rounds)
 - Token payload: `user_id`, `organization_id`, `role`, `plan_code`
 
@@ -95,10 +95,31 @@ Flagged messages are blocked before reaching the agent and logged as audit event
 
 ### Rate Limiting
 
-- In-memory token bucket per `(org_id, user_id, feature)` combination
-- Default limits: 60 chat requests/minute, 20 document uploads/minute
-- Swappable to Redis-backed implementation by replacing the provider
-- **Known limitation:** in-memory rate limiter resets on backend restart
+Fixed-window limits per feature (raises `429 RATE_LIMIT_EXCEEDED`):
+
+| Endpoint / feature | Limit | Key |
+|--------------------|-------|-----|
+| `POST /chat` | 60 / minute | org + user |
+| `POST /documents/upload` | 20 / minute | org + user |
+| `POST /auth/login` | 10 / minute | email (hashed in Redis keys) |
+| `POST /auth/register` | 5 / hour | client IP (hashed in Redis keys) |
+
+**Backend selection**
+
+- When `REDIS_URL` is set and reachable, counters are stored in Redis (shared across workers; TTL-based fixed windows).
+- When `REDIS_URL` is unset or Redis errors at runtime, the limiter falls back to **in-memory** counters for that process.
+- `/health` and `/providers` expose `rate_limit_backend` (`redis` or `memory`) without user identifiers.
+
+**Recommendations**
+
+- **Public demo / multi-instance production:** set `REDIS_URL` (strongly recommended, not strictly required).
+- **Local single-process dev:** memory fallback is acceptable.
+
+**Known limitations**
+
+- Memory fallback resets on restart and is not shared across instances.
+- If Redis fails mid-flight, the process degrades to memory for the remainder of its lifetime.
+- No IP rate limiting at the reverse proxy (add WAF/nginx limits for extra protection).
 
 ---
 
@@ -169,11 +190,11 @@ All fallback usage is logged with `fallback_used=True` in responses and audit lo
 |-----|------|----------------|
 | JWT in `localStorage` | XSS can steal tokens | Move to HTTP-only cookies + refresh tokens |
 | No token refresh | Tokens expire after `JWT_EXPIRE_MINUTES` | Implement `/auth/refresh` |
-| In-memory rate limiting | Resets on restart | Use Redis-backed rate limiter |
+| In-memory rate limiting fallback | Resets on restart; not shared across workers | Set `REDIS_URL` for shared Redis counters |
 | No CSRF protection | Relevant if cookies are used | Add CSRF middleware when switching to cookies |
 | No security headers | Missing CSP, HSTS, etc. | Add security headers middleware in production |
 | No IP-based rate limiting | Brute force possible | Add IP rate limiting at reverse proxy |
 | No OAuth/SSO | Password-only login | Add OAuth 2.0 / SAML for enterprise |
 | No audit log immutability | Logs can be deleted by DB admin | Send logs to append-only external store |
 | No content safety classification | LLM output not safety-filtered | Add Moderation API call on LLM output |
-| DEV_AUTH_ENABLED risk | If left on in production, all auth is bypassed | Ensure `DEV_AUTH_ENABLED=false` in production |
+| DEV_AUTH_ENABLED risk | If left on in production, all auth is bypassed | Startup validation rejects `DEV_AUTH_ENABLED=true` when `APP_ENV=production` |
