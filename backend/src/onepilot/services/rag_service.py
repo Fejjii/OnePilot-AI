@@ -598,16 +598,25 @@ def answer(
                 "context. Do not invent information. If the context is insufficient, say so "
                 "in the requested response language. Cite source document titles in brackets "
                 "exactly as they appear in the context — never translate document or section "
-                f"names. {lang_instruction}"
+                f"names. {lang_instruction}\n\n"
+                "Format the answer exactly with these markdown sections:\n"
+                "## Summary\n"
+                "(1-2 sentences)\n"
+                "## Key points\n"
+                "(bullet list)\n"
+                "## Evidence or sources\n"
+                "(cite document titles from context; do not invent sources)\n"
+                "## Suggested next action\n"
+                "(one practical follow-up step)"
             ),
         },
         {
             "role": "user",
             "content": (
                 f"Question: {query}\n\nContext:\n{context}\n\n"
-                f"Write a concise, factual answer in {answer_lang} (max 5 sentences) using "
-                "only the context above. Include bracketed citations with original document "
-                "titles from the context."
+                f"Write a grounded answer in {answer_lang} using only the context above. "
+                "Use the required section headings. Include bracketed citations with original "
+                "document titles from the context."
             ),
         },
     ]

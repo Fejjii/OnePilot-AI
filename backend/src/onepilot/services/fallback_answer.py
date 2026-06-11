@@ -115,8 +115,27 @@ def synthesize_answer(
     max_answer_len = max_length - len(citation_prefix)
     if len(answer_text) > max_answer_len:
         answer_text = answer_text[:max_answer_len].rsplit(" ", 1)[0] + "..."
-    
-    return citation_prefix + answer_text
+
+    summary = answer_text.strip() or "The knowledge base contains relevant information on this topic."
+    key_points = extract_key_points(relevant_hits, max_points=3) or [summary[:220]]
+    evidence = f"- {citation_prefix.strip()} {answer_text.strip()}".strip()
+    next_action = "Review the cited internal documents and confirm details with your team if needed."
+
+    return "\n".join(
+        [
+            "## Summary",
+            summary,
+            "",
+            "## Key points",
+            *[f"- {point}" for point in key_points],
+            "",
+            "## Evidence or sources",
+            evidence,
+            "",
+            "## Suggested next action",
+            next_action,
+        ]
+    ).strip()
 
 
 def _split_sentences(text: str) -> list[str]:

@@ -265,8 +265,6 @@ class TestOutOfScope:
             "Tell me a joke",
             "Write me a love poem",
             "Sing a song",
-            "What's the stock price of Tesla?",
-            "Tell me about cryptocurrency",
             "Play a game with me",
             "Generate an image of a cat",
         ],
@@ -277,6 +275,19 @@ class TestOutOfScope:
         assert result.message_class == MessageClass.OUT_OF_SCOPE
         assert result.confidence >= 0.85
         assert "out_of_scope" in result.reason.lower() or "scope" in result.reason.lower()
+
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "What's the stock price of Tesla?",
+            "What is the price of bitcoin?",
+            "Tell me about cryptocurrency prices today",
+        ],
+    )
+    def test_market_price_queries_route_to_external_research(self, message: str) -> None:
+        """Public market/current-fact queries should use web search, not internal KB."""
+        result = classify_message(message)
+        assert result.message_class == MessageClass.EXTERNAL_RESEARCH
 
 
 class TestDisambiguation:

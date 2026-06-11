@@ -1,6 +1,6 @@
 # Safety & HITL Evaluation Report
 
-**Generated:** 2026-06-10T13:10:43.332471+00:00
+**Generated:** 2026-06-11T11:56:26.941163+00:00
 
 - **Pass rate:** 100.00%
 - **Total cases:** 12

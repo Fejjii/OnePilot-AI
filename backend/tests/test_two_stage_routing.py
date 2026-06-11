@@ -300,3 +300,48 @@ class TestPriorityAndOverrides:
         assert msg_result.message_class == MessageClass.BUSINESS_KNOWLEDGE
         intent_result = classify_intent(message, message_class=msg_result.message_class)
         assert intent_result.intent == Intent.KNOWLEDGE_SEARCH
+
+
+class TestDemoRoutingMatrix:
+    """Private demo routing scenarios for RAG, Serper, Gmail, Calendar, and safety."""
+
+    @pytest.mark.parametrize(
+        "message,expected_class,expected_intent",
+        [
+            (
+                "What is NovaEdge refund policy?",
+                MessageClass.BUSINESS_KNOWLEDGE,
+                Intent.KNOWLEDGE_SEARCH,
+            ),
+            (
+                "What is the price of bitcoin?",
+                MessageClass.EXTERNAL_RESEARCH,
+                Intent.WEB_SEARCH,
+            ),
+            (
+                "Search the web for recent AI automation trends for SMBs",
+                MessageClass.EXTERNAL_RESEARCH,
+                Intent.WEB_SEARCH,
+            ),
+            (
+                "Draft an email to a lead",
+                MessageClass.WORKFLOW_REQUEST,
+                Intent.EMAIL_DRAFTING,
+            ),
+            (
+                "Schedule a 30 minute demo call tomorrow afternoon",
+                MessageClass.WORKFLOW_REQUEST,
+                Intent.CALENDAR_SCHEDULING,
+            ),
+        ],
+    )
+    def test_demo_routing(
+        self,
+        message: str,
+        expected_class: MessageClass,
+        expected_intent: Intent,
+    ) -> None:
+        msg_result = classify_message(message)
+        intent_result = classify_intent(message, message_class=msg_result.message_class)
+        assert msg_result.message_class == expected_class
+        assert intent_result.intent == expected_intent

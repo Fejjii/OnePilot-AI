@@ -14,8 +14,9 @@ _PATTERNS: list[tuple[re.Pattern[str], str]] = [
     ),
     (
         re.compile(
-            r"(reveal|show|display)\s+(your\s+)?(system\s+prompt|instructions)"
-            r"|what\s+is\s+your\s+system\s+prompt",
+            r"(reveal|show|display|print|expose)\s+(your\s+)?(system\s+prompt|instructions|secrets?)"
+            r"|what\s+is\s+your\s+system\s+prompt"
+            r"|reveal\s+system\s+secrets?",
             re.IGNORECASE,
         ),
         "System prompt extraction attempt",
@@ -43,7 +44,7 @@ _PATTERNS: list[tuple[re.Pattern[str], str]] = [
     ),
     (
         re.compile(
-            r"(expose|show|reveal)\s+(api\s+key|secret)"
+            r"(expose|show|reveal|print)\s+(api\s+key|secret|environment(\s+variable)?s?|env(\s+var)?s?)"
             r"|print\s+environment",
             re.IGNORECASE,
         ),

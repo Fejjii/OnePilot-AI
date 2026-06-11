@@ -102,6 +102,20 @@ _COMPOUND_WORKFLOW_PATTERN = re.compile(
 
 # External / current web research indicators
 _EXTERNAL_RESEARCH_PATTERNS = [
+    (
+        re.compile(
+            r"\b(search the web|web search|google search|look up online)\b",
+            re.IGNORECASE,
+        ),
+        3.5,
+    ),
+    (
+        re.compile(
+            r"\b(bitcoin|btc|ethereum|eth|crypto(currency)?|stock price|share price|market price)\b",
+            re.IGNORECASE,
+        ),
+        3.5,
+    ),
     (re.compile(r"\b(recent|latest|current|up[- ]?to[- ]?date)\b", re.IGNORECASE), 2.5),
     (re.compile(r"\b(news|headline|press release)\b", re.IGNORECASE), 2.5),
     (
@@ -155,14 +169,31 @@ _BUSINESS_KNOWLEDGE_PATTERNS = [
         2.5,
     ),
     # Business domains
+    # Generic product/pricing questions (internal by default in demo context)
     (
         re.compile(
-            r"\b(pricing|price|cost|refund|payment|billing|subscription"
+            r"\b(how much (does|do)|what (does|do)|what('s| is) the cost|pricing tiers?)\b",
+            re.IGNORECASE,
+        ),
+        2.5,
+    ),
+    (
+        re.compile(
+            r"\b(pricing|refund|payment|billing|subscription"
             r"|integration|integrations|api|support|security|privacy"
             r"|onboarding|setup|configuration|deployment|escalation)\b",
             re.IGNORECASE,
         ),
         3.0,  # Increased weight
+    ),
+    # Internal price/cost questions (avoid matching public market prices)
+    (
+        re.compile(
+            r"\b(our|your|novaedge|company|plan|service).{0,40}\b(price|pricing|cost)\b"
+            r"|\b(price|pricing|cost).{0,40}\b(our|your|novaedge|plan|service|subscription)\b",
+            re.IGNORECASE,
+        ),
+        3.0,
     ),
     # Search/explain intent with business context
     (
@@ -248,7 +279,7 @@ _OUT_OF_SCOPE_PATTERNS = [
     (
         re.compile(
             r"\b(weather|joke|love poem|story|song|game|play|entertain"
-            r"|stock\s+(price|tip)|crypto(currency)?|lottery|gambling)\b",
+            r"|stock\s+tip|lottery|gambling)\b",
             re.IGNORECASE,
         ),
         3.5,
@@ -268,12 +299,38 @@ _OUT_OF_SCOPE_PATTERNS = [
         ),
         4.0,
     ),
-    # Stock/financial queries
-    (
-        re.compile(r"\b(stock price|share price|Tesla|Apple|Microsoft).*(stock|share|price)\b", re.IGNORECASE),
-        3.0,
-    ),
 ]
+
+# Deterministic pre-routing: internal NovaEdge KB vs external current facts
+_INTERNAL_BUSINESS_CONTEXT = re.compile(
+    r"\b("
+    r"novaedge|our\b|we\b|company|knowledge base|"
+    r"refund policy|pricing plan|subscription plan|pro plan|team plan|"
+    r"your (service|product|solution|pricing|policy|plan|refund|support|onboarding|security)"
+    r")\b",
+    re.IGNORECASE,
+)
+
+_UNSAFE_REQUEST = re.compile(
+    r"\b("
+    r"stock\s+tips?|financial advice|"
+    r"ignore\s+(previous|all|your)\s+instructions|"
+    r"reveal\s+(system\s+secrets?|your\s+system\s+prompt)|"
+    r"print\s+environment(\s+variable)?s?"
+    r")\b",
+    re.IGNORECASE,
+)
+
+_EXTERNAL_FACT_ENTITY = re.compile(
+    r"\b("
+    r"bitcoin|btc|ethereum|eth|dogecoin|solana|"
+    r"crypto(currency)?s?|"
+    r"stock\s+(price|prices|market)|share\s+(price|prices)|"
+    r"commodit(y|ies)|gold|silver|oil|nasdaq|s&p|forex|exchange rate|"
+    r"tesla|apple|microsoft|google|amazon|nvidia"
+    r")\b",
+    re.IGNORECASE,
+)
 
 # Minimum message length for classification
 _MIN_CHARS_FOR_CLASSIFICATION = 4
@@ -336,6 +393,23 @@ def classify_message(message: str) -> MessageClassResult:
             message_class=MessageClass.UNCLEAR,
             confidence=0.6,
             reason="message_too_short",
+            scores={},
+        )
+
+    # Deterministic pre-routing before semantic scoring
+    if _UNSAFE_REQUEST.search(cleaned):
+        return MessageClassResult(
+            message_class=MessageClass.OUT_OF_SCOPE,
+            confidence=0.92,
+            reason="unsafe_or_disallowed_request",
+            scores={},
+        )
+
+    if _looks_like_external_current_facts(cleaned):
+        return MessageClassResult(
+            message_class=MessageClass.EXTERNAL_RESEARCH,
+            confidence=0.9,
+            reason="external_current_facts_heuristic",
             scores={},
         )
 
@@ -455,6 +529,13 @@ def classify_message(message: str) -> MessageClassResult:
 # ---------------------------------------------------------------------------
 # Helper functions
 # ---------------------------------------------------------------------------
+
+
+def _looks_like_external_current_facts(message: str) -> bool:
+    """Route public/current-fact questions to web search instead of internal KB."""
+    if _INTERNAL_BUSINESS_CONTEXT.search(message):
+        return False
+    return bool(_EXTERNAL_FACT_ENTITY.search(message))
 
 
 def _score_patterns(message: str, patterns: list[tuple[re.Pattern[str], float]]) -> float:

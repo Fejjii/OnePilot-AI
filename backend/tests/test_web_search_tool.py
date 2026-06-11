@@ -77,6 +77,50 @@ def test_no_web_search_for_internal_kb() -> None:
     assert intent.intent == Intent.KNOWLEDGE_SEARCH
 
 
+def test_routing_bitcoin_price_to_web_search() -> None:
+    message = "What is the price of bitcoin?"
+    msg = classify_message(message)
+    assert msg.message_class == MessageClass.EXTERNAL_RESEARCH
+    intent = classify(message, message_class=msg.message_class)
+    assert intent.intent == Intent.WEB_SEARCH
+    assert branch_for(intent.intent) == "web_search"
+
+
+def test_routing_explicit_web_search_query() -> None:
+    message = "Search the web for recent AI automation trends for SMBs"
+    msg = classify_message(message)
+    assert msg.message_class == MessageClass.EXTERNAL_RESEARCH
+    intent = classify(message, message_class=msg.message_class)
+    assert intent.intent == Intent.WEB_SEARCH
+
+
+def test_routing_novaedge_refund_to_knowledge_search() -> None:
+    message = "What is NovaEdge refund policy?"
+    msg = classify_message(message)
+    assert msg.message_class == MessageClass.BUSINESS_KNOWLEDGE
+    intent = classify(message, message_class=msg.message_class)
+    assert intent.intent == Intent.KNOWLEDGE_SEARCH
+    assert branch_for(intent.intent) == "knowledge_search"
+
+
+def test_routing_email_draft_to_email_assistant() -> None:
+    message = "Draft an email to a lead"
+    msg = classify_message(message)
+    assert msg.message_class == MessageClass.WORKFLOW_REQUEST
+    intent = classify(message, message_class=msg.message_class)
+    assert intent.intent == Intent.EMAIL_DRAFTING
+    assert branch_for(intent.intent) == "email_assistant"
+
+
+def test_routing_calendar_demo_call() -> None:
+    message = "Schedule a 30 minute demo call tomorrow afternoon"
+    msg = classify_message(message)
+    assert msg.message_class == MessageClass.WORKFLOW_REQUEST
+    intent = classify(message, message_class=msg.message_class)
+    assert intent.intent == Intent.CALENDAR_SCHEDULING
+    assert branch_for(intent.intent) == "calendar_assistant"
+
+
 def test_no_web_search_for_correction() -> None:
     msg = classify_message("This is not what I meant.")
     assert msg.message_class == MessageClass.CORRECTION_OR_META
@@ -116,5 +160,5 @@ def test_agent_combined_flow_records_both_tools(
     assert "external.web_search" in tool_names
     assert "rag.answer" in tool_names
     assert state.intent == Intent.WEB_AND_KNOWLEDGE
-    assert "Internal company knowledge" in (state.final_response or "")
-    assert "External web evidence" in (state.final_response or "")
+    assert "## Summary" in (state.final_response or "")
+    assert "## Evidence or sources" in (state.final_response or "")

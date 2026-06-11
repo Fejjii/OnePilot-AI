@@ -1,12 +1,12 @@
 {
   "test_name": "intent_and_routing",
-  "timestamp": "2026-06-10T13:10:43.313068+00:00",
-  "total": 41,
-  "correct": 41,
+  "timestamp": "2026-06-11T11:56:22.335660+00:00",
+  "total": 46,
+  "correct": 46,
   "accuracy": 1.0,
   "intent_accuracy": 1.0,
-  "routing_total": 41,
-  "routing_correct": 41,
+  "routing_total": 46,
+  "routing_correct": 46,
   "routing_accuracy": 1.0,
   "per_intent_accuracy": {
     "general_assistant": 1.0,
@@ -28,19 +28,19 @@
       "general_assistant": 7
     },
     "knowledge_search": {
-      "knowledge_search": 5
+      "knowledge_search": 6
     },
     "clarification": {
       "clarification": 8
     },
     "email_drafting": {
-      "email_drafting": 5
+      "email_drafting": 6
     },
     "lead_support": {
       "lead_support": 3
     },
     "calendar_scheduling": {
-      "calendar_scheduling": 4
+      "calendar_scheduling": 5
     },
     "workflow_action": {
       "workflow_action": 1
@@ -52,7 +52,7 @@
       "document_summary": 2
     },
     "web_search": {
-      "web_search": 1
+      "web_search": 3
     },
     "web_and_knowledge": {
       "web_and_knowledge": 1
@@ -438,6 +438,61 @@
       "passed": true,
       "expected_message_class": "external_research",
       "predicted_message_class": "external_research",
+      "routing_pass": true
+    },
+    {
+      "message": "What is the price of bitcoin?",
+      "category": "web_search_eval",
+      "expected_intent": "web_search",
+      "predicted_intent": "web_search",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "external_research",
+      "predicted_message_class": "external_research",
+      "routing_pass": true
+    },
+    {
+      "message": "Search the web for recent AI automation trends for SMBs",
+      "category": "web_search_eval",
+      "expected_intent": "web_search",
+      "predicted_intent": "web_search",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "external_research",
+      "predicted_message_class": "external_research",
+      "routing_pass": true
+    },
+    {
+      "message": "What is NovaEdge refund policy?",
+      "category": "web_search_eval",
+      "expected_intent": "knowledge_search",
+      "predicted_intent": "knowledge_search",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "business_knowledge",
+      "predicted_message_class": "business_knowledge",
+      "routing_pass": true
+    },
+    {
+      "message": "Draft an email to a lead",
+      "category": "web_search_eval",
+      "expected_intent": "email_drafting",
+      "predicted_intent": "email_drafting",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "workflow_request",
+      "predicted_message_class": "workflow_request",
+      "routing_pass": true
+    },
+    {
+      "message": "Schedule a 30 minute demo call tomorrow afternoon",
+      "category": "web_search_eval",
+      "expected_intent": "calendar_scheduling",
+      "predicted_intent": "calendar_scheduling",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "workflow_request",
+      "predicted_message_class": "workflow_request",
       "routing_pass": true
     },
     {

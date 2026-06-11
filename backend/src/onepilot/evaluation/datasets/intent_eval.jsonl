@@ -32,6 +32,11 @@
 {"message": "What services does NovaEdge Solutions offer?", "expected_intent": "knowledge_search", "expected_message_class": "business_knowledge", "category": "web_search_eval"}
 {"message": "Find recent SMB automation trends", "expected_intent": "web_search", "expected_message_class": "external_research", "category": "web_search_eval"}
 {"message": "Find recent SMB automation trends and compare them with NovaEdge Solutions services", "expected_intent": "web_and_knowledge", "expected_message_class": "external_research", "category": "web_search_eval"}
+{"message": "What is the price of bitcoin?", "expected_intent": "web_search", "expected_message_class": "external_research", "category": "web_search_eval"}
+{"message": "Search the web for recent AI automation trends for SMBs", "expected_intent": "web_search", "expected_message_class": "external_research", "category": "web_search_eval"}
+{"message": "What is NovaEdge refund policy?", "expected_intent": "knowledge_search", "expected_message_class": "business_knowledge", "category": "web_search_eval"}
+{"message": "Draft an email to a lead", "expected_intent": "email_drafting", "expected_message_class": "workflow_request", "category": "web_search_eval"}
+{"message": "Schedule a 30 minute demo call tomorrow afternoon", "expected_intent": "calendar_scheduling", "expected_message_class": "workflow_request", "category": "web_search_eval"}
 {"message": "This is not what I meant.", "expected_intent": "general_assistant", "expected_message_class": "correction_or_meta", "category": "web_search_eval"}
 {"message": "Draft an email to a high priority lead about NovaEdge automation services.", "expected_intent": "email_drafting", "expected_message_class": "workflow_request", "category": "gmail_eval"}
 {"message": "Draft and send an email to a high priority lead about NovaEdge automation services.", "expected_intent": "email_drafting", "expected_message_class": "workflow_request", "category": "gmail_eval", "expects_approval": true}
