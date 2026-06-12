@@ -601,13 +601,13 @@ def answer(
                 f"names. {lang_instruction}\n\n"
                 "Format the answer exactly with these markdown sections:\n"
                 "## Summary\n"
-                "(1-2 sentences)\n"
+                "(1-2 short sentences maximum)\n"
                 "## Key points\n"
-                "(bullet list)\n"
+                "(3-5 concise bullet points)\n"
                 "## Evidence or sources\n"
-                "(cite document titles from context; do not invent sources)\n"
+                "(brief citations with document titles from context; do not invent sources)\n"
                 "## Suggested next action\n"
-                "(one practical follow-up step)"
+                "(one sentence only)"
             ),
         },
         {
@@ -615,8 +615,8 @@ def answer(
             "content": (
                 f"Question: {query}\n\nContext:\n{context}\n\n"
                 f"Write a grounded answer in {answer_lang} using only the context above. "
-                "Use the required section headings. Include bracketed citations with original "
-                "document titles from the context."
+                "Use the required section headings. Keep each section concise. Include "
+                "bracketed citations with original document titles from the context."
             ),
         },
     ]

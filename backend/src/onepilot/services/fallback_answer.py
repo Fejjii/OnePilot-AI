@@ -117,7 +117,8 @@ def synthesize_answer(
         answer_text = answer_text[:max_answer_len].rsplit(" ", 1)[0] + "..."
 
     summary = answer_text.strip() or "The knowledge base contains relevant information on this topic."
-    key_points = extract_key_points(relevant_hits, max_points=3) or [summary[:220]]
+    key_points = extract_key_points(relevant_hits, max_points=5) or [summary[:220]]
+    key_points = key_points[:5]
     evidence = f"- {citation_prefix.strip()} {answer_text.strip()}".strip()
     next_action = "Review the cited internal documents and confirm details with your team if needed."
 

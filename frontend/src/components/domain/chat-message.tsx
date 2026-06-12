@@ -2,6 +2,7 @@ import { User, Bot } from "lucide-react";
 import type { MessageResponse } from "@/types/api";
 import { IntentBadge } from "./intent-badge";
 import { ConfidenceBadge } from "./confidence-badge";
+import { AssistantMessageContent } from "./assistant-message-content";
 import { formatDateTime } from "@/lib/utils";
 
 interface ChatMessageProps {
@@ -45,13 +46,17 @@ export function ChatMessage({ message }: ChatMessageProps) {
         </div>
         <div
           className={
-            "mt-1 whitespace-pre-wrap rounded-lg px-3 py-2 text-sm leading-relaxed " +
+            "mt-1 rounded-lg px-3 py-2.5 text-sm leading-relaxed " +
             (isUser
-              ? "bg-slate-100 text-slate-900"
-              : "border border-slate-200 bg-white text-slate-800")
+              ? "whitespace-pre-wrap bg-slate-100 text-slate-900"
+              : "border border-slate-200 bg-white text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.03)]")
           }
         >
-          {message.content}
+          {isAssistant ? (
+            <AssistantMessageContent content={message.content} />
+          ) : (
+            <span className="whitespace-pre-wrap">{message.content}</span>
+          )}
         </div>
       </div>
     </div>

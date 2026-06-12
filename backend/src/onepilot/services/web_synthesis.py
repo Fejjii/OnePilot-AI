@@ -123,7 +123,7 @@ def _web_summary(query: str, web: WebSearchResponse, configured: bool) -> str:
 
 def _web_key_points(web: WebSearchResponse) -> list[str]:
     points: list[str] = []
-    for item in web.citations[:3]:
+    for item in web.citations[:5]:
         snippet = item.snippet.strip()
         if not snippet:
             continue
@@ -131,21 +131,17 @@ def _web_key_points(web: WebSearchResponse) -> list[str]:
         points.append(f"{title}: {snippet[:220]}")
     if not points and web.result_count == 0:
         points.append("No live web snippets were returned for this query.")
-    return points
+    return points[:5]
 
 
 def _web_next_action(query: str, web: WebSearchResponse, configured: bool) -> str:
     if not configured:
         return (
-            f"Configure SERPER_API_KEY to research '{query[:80]}' with live web results, "
-            "or refine the query."
+            f"Configure SERPER_API_KEY to research '{query[:80]}' with live web results."
         )
     if web.result_count == 0:
         return "Refine the search query or try a more specific timeframe or topic."
-    return (
-        "Review the web sources above, verify claims against a second source, "
-        "and decide whether follow-up research or internal playbook review is needed."
-    )
+    return "Verify the web sources above against a second source before acting."
 
 
 def _combined_summary(
@@ -172,27 +168,29 @@ def _combined_key_points(
     elif internal_weak:
         points.append("Internal KB did not provide confident coverage for this topic.")
 
-    for item in web.citations[:2]:
+    for item in web.citations[:3]:
         snippet = item.snippet.strip()
         if snippet:
             title = item.title or item.url or "Web source"
             points.append(f"External: {title} — {snippet[:180]}")
 
-    return points
+    return points[:5]
 
 
 def _combined_next_action(
     query: str, web: WebSearchResponse, internal_weak: bool, configured: bool
 ) -> str:
-    parts = [
-        "Align external trend signals with NovaEdge offerings where they strengthen positioning."
-    ]
+    if internal_weak and (not configured or web.result_count == 0):
+        return (
+            "Refresh internal service documentation and configure live web search "
+            f"to improve comparisons for '{query[:60]}'."
+        )
     if internal_weak:
-        parts.append(
-            "Consider uploading or refreshing internal service documentation to improve comparisons."
+        return (
+            "Refresh internal service documentation to strengthen the NovaEdge comparison."
         )
     if not configured or web.result_count == 0:
-        parts.append(
-            f"Add SERPER_API_KEY to enrich market research for queries like '{query[:60]}'."
+        return (
+            f"Configure SERPER_API_KEY to enrich market research for '{query[:60]}'."
         )
-    return " ".join(parts)
+    return "Align external trend signals with NovaEdge offerings where they strengthen positioning."
