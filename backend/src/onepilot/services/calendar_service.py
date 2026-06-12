@@ -82,12 +82,21 @@ def _parse_time_window(
     return parsed.time_min, parsed.time_max, parsed.query_type, parsed.label
 
 
-def _localize_slot_for_display(
+def _utc_naive_to_local_wall_clock(
     utc_naive: datetime, *, timezone: str
 ) -> datetime:
-    """Convert UTC-naive API timestamps to local wall-clock for user-facing output."""
+    """Convert UTC-naive instants to local wall-clock for Google Calendar API."""
     tz = ZoneInfo(timezone)
     return utc_naive.replace(tzinfo=UTC).astimezone(tz).replace(tzinfo=None)
+
+
+def _resolve_calendar_provider_mode(provider: object) -> str:
+    """Return live/mock/missing mode for UI and diagnostics."""
+    if hasattr(provider, "get_status"):
+        return str(provider.get_status().mode)
+    if isinstance(provider, MockCalendarProvider):
+        return "mock"
+    return "mock"
 
 
 def _parse_duration_minutes(message: str, settings: Settings) -> int:
@@ -276,16 +285,19 @@ def prepare_event_approval(
     timezone = _default_timezone(cfg)
     provider = get_calendar_provider(cfg)
 
+    provider_mode = _resolve_calendar_provider_mode(provider)
+
     if query_type == "specific":
-        start_time = time_min
+        start_time = _utc_naive_to_local_wall_clock(time_min, timezone=timezone)
         parsed_duration = (time_max - time_min).total_seconds() / 60
         if parsed_duration >= duration:
-            end_time = time_max
+            end_time = _utc_naive_to_local_wall_clock(time_max, timezone=timezone)
         else:
             end_time = start_time + timedelta(minutes=duration)
-        suggestion = {"mode": getattr(provider, "_mode", "mock"), "suggested_slots": []}
+        suggestion = {"mode": provider_mode, "suggested_slots": []}
     elif window_label == "tomorrow afternoon":
-        start_time = time_min.replace(hour=13, minute=0, second=0, microsecond=0)
+        local_day = _utc_naive_to_local_wall_clock(time_min, timezone=timezone)
+        start_time = local_day.replace(hour=13, minute=0, second=0, microsecond=0)
         end_time = start_time + timedelta(minutes=duration)
         suggestion = provider.suggest_slots(
             time_min,
@@ -309,12 +321,18 @@ def prepare_event_approval(
                 if isinstance(slots[0], dict)
                 else slots[0].end_time
             )
-            start_time = datetime.fromisoformat(
-                str(start_raw).replace("Z", "+00:00")
-            ).replace(tzinfo=None)
-            end_time = datetime.fromisoformat(
-                str(end_raw).replace("Z", "+00:00")
-            ).replace(tzinfo=None)
+            start_time = _utc_naive_to_local_wall_clock(
+                datetime.fromisoformat(str(start_raw).replace("Z", "+00:00")).replace(
+                    tzinfo=None
+                ),
+                timezone=timezone,
+            )
+            end_time = _utc_naive_to_local_wall_clock(
+                datetime.fromisoformat(str(end_raw).replace("Z", "+00:00")).replace(
+                    tzinfo=None
+                ),
+                timezone=timezone,
+            )
     else:
         suggestion = provider.suggest_slots(
             time_min,
@@ -338,14 +356,23 @@ def prepare_event_approval(
                 if isinstance(slots[0], dict)
                 else slots[0].end_time
             )
-            start_time = datetime.fromisoformat(
-                str(start_raw).replace("Z", "+00:00")
-            ).replace(tzinfo=None)
-            end_time = datetime.fromisoformat(
-                str(end_raw).replace("Z", "+00:00")
-            ).replace(tzinfo=None)
+            start_time = _utc_naive_to_local_wall_clock(
+                datetime.fromisoformat(str(start_raw).replace("Z", "+00:00")).replace(
+                    tzinfo=None
+                ),
+                timezone=timezone,
+            )
+            end_time = _utc_naive_to_local_wall_clock(
+                datetime.fromisoformat(str(end_raw).replace("Z", "+00:00")).replace(
+                    tzinfo=None
+                ),
+                timezone=timezone,
+            )
         else:
-            start_time = time_min.replace(hour=10, minute=0, second=0, microsecond=0)
+            start_time = _utc_naive_to_local_wall_clock(
+                time_min.replace(hour=10, minute=0, second=0, microsecond=0),
+                timezone=timezone,
+            )
             end_time = start_time + timedelta(minutes=duration)
 
     payload = build_approval_payload(
@@ -372,15 +399,13 @@ def prepare_event_approval(
         event="calendar.approval_created",
         result={"status": "pending", "summary": payload.get("summary")},
     )
-    display_start = _localize_slot_for_display(start_time, timezone=timezone)
-    display_end = _localize_slot_for_display(end_time, timezone=timezone)
     return {
         "approval_payload": payload,
         "selected_slot": {
-            "start_time": display_start.isoformat(),
-            "end_time": display_end.isoformat(),
+            "start_time": start_time.isoformat(),
+            "end_time": end_time.isoformat(),
         },
-        "provider_mode": suggestion.get("mode", "mock"),
+        "provider_mode": suggestion.get("mode", provider_mode),
         "timezone": timezone,
         "fallback_used": bool(suggestion.get("fallback_used")),
         "approval_status": "pending",

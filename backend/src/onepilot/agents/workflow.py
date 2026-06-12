@@ -288,12 +288,13 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             "usage_metadata": dict(state.usage_metadata),
         }
         email_action = gmail_service.infer_email_action(state.message, state.context)
+        recipient_email = _resolve_recipient_email(state)
         result = registry.get("email.draft").run(
             _ctx(deps),
             context=state.message,
             tone=state.context.get("tone", "professional"),
             recipient_name=state.context.get("recipient_name"),
-            recipient_email=state.context.get("recipient_email"),
+            recipient_email=recipient_email,
             action=email_action,
         )
         _record_tool_call(update, result)
@@ -371,7 +372,7 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             context=state.message,
             tone=state.context.get("tone", "professional"),
             recipient_name=state.context.get("recipient_name"),
-            recipient_email=state.context.get("recipient_email"),
+            recipient_email=_resolve_recipient_email(state),
             action=email_action,
         )
         _record_tool_call(update, email_result)
@@ -477,7 +478,7 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             context=state.message,
             tone=state.context.get("tone", "professional"),
             recipient_name=state.context.get("recipient_name"),
-            recipient_email=state.context.get("recipient_email"),
+            recipient_email=_resolve_recipient_email(state),
             action=email_action,
         )
         _record_tool_call(update, email_result)
@@ -817,6 +818,15 @@ def _web_response_from_tool(result: ToolResult) -> WebSearchResponse:
         latency_ms=int(payload.get("latency_ms", result.duration_ms)),
         result_count=int(payload.get("result_count", len(citations))),
     )
+
+
+def _resolve_recipient_email(state: AgentState) -> str | None:
+    from onepilot.services import lead_service
+
+    explicit = state.context.get("recipient_email")
+    if explicit:
+        return str(explicit)
+    return lead_service.extract_email(state.message)
 
 
 def _format_email(draft: dict, tool_output: dict | None = None) -> str:

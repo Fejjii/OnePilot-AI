@@ -373,3 +373,20 @@ class TestDemoRoutingMatrix:
         intent_result = classify_intent(message, message_class=msg_result.message_class)
         assert msg_result.message_class == MessageClass.BUSINESS_KNOWLEDGE
         assert intent_result.intent == Intent.KNOWLEDGE_SEARCH
+
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "Draft an email to [test@example.com](mailto:test@example.com) thanking them for interest in NovaEdge automation services.",
+            "Draft an email to test@example.com thanking them for interest in NovaEdge automation services.",
+            "Write an email to test@example.com about NovaEdge services.",
+            "Compose a reply to test@example.com about the refund policy.",
+        ],
+    )
+    def test_email_draft_prompts_route_to_email_assistant(self, message: str) -> None:
+        msg_result = classify_message(message)
+        intent_result = classify_intent(message, message_class=msg_result.message_class)
+        assert msg_result.message_class == MessageClass.WORKFLOW_REQUEST, (
+            f"Expected workflow_request, got {msg_result.message_class} ({msg_result.reason})"
+        )
+        assert intent_result.intent == Intent.EMAIL_DRAFTING

@@ -45,7 +45,11 @@ _MESSAGE_CLASS_TO_INTENT: dict[MessageClass, Intent] = {
 # Workflow requests need deeper inspection to route correctly
 _EMAIL_PATTERNS = [
     re.compile(
-        r"\b(draft|write|compose|reply to|send)\b.*\b(email|message|mail|reply|response)\b",
+        r"\b(draft|write|compose|reply to|send)\b.{0,160}\b(email|message|mail|reply|response)\b",
+        re.IGNORECASE | re.DOTALL,
+    ),
+    re.compile(
+        r"\b(reply to|email)\b.{0,80}@[\w.+-]+\.[\w.-]+",
         re.IGNORECASE,
     ),
     re.compile(r"\b(follow[- ]?up|outreach|cold email|introduction email)\b", re.IGNORECASE),

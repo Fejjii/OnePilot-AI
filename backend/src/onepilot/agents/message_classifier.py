@@ -65,9 +65,21 @@ _CONVERSATIONAL_PATTERNS = [
         ),
         2.5,
     ),
-    # Testing/checking
-    (re.compile(r"\b(test|testing|can you (hear|read|see) me|are you (there|listening))\b", re.IGNORECASE), 2.0),
+    # Testing/checking (do not match email addresses like test@example.com)
+    (
+        re.compile(
+            r"\b(test|testing)\b(?!@)"
+            r"|\b(can you (hear|read|see) me|are you (there|listening))\b",
+            re.IGNORECASE,
+        ),
+        2.0,
+    ),
 ]
+
+_EMAIL_DRAFT_WORKFLOW = re.compile(
+    r"\b(draft|write|compose|reply to)\b.{0,160}\b(email|message|mail)\b",
+    re.IGNORECASE | re.DOTALL,
+)
 
 # Correction/Meta indicators
 _CORRECTION_META_PATTERNS = [
@@ -432,6 +444,14 @@ def classify_message(message: str) -> MessageClassResult:
             message_class=MessageClass.EXTERNAL_RESEARCH,
             confidence=0.9,
             reason="external_current_facts_heuristic",
+            scores={},
+        )
+
+    if _EMAIL_DRAFT_WORKFLOW.search(cleaned):
+        return MessageClassResult(
+            message_class=MessageClass.WORKFLOW_REQUEST,
+            confidence=0.9,
+            reason="email_draft_workflow_heuristic",
             scores={},
         )
 
