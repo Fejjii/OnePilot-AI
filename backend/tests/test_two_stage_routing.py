@@ -345,3 +345,31 @@ class TestDemoRoutingMatrix:
         intent_result = classify_intent(message, message_class=msg_result.message_class)
         assert msg_result.message_class == expected_class
         assert intent_result.intent == expected_intent
+
+    def test_french_berlin_weather_routes_to_web_search(self) -> None:
+        message = "C'est quoi la température à Berlin aujourd'hui ?"
+        msg_result = classify_message(message)
+        intent_result = classify_intent(message, message_class=msg_result.message_class)
+        assert msg_result.message_class == MessageClass.EXTERNAL_RESEARCH
+        assert intent_result.intent == Intent.WEB_SEARCH
+
+    def test_french_oil_barrel_price_routes_to_web_search(self) -> None:
+        message = "C'est quoi le prix du baril de pétrole aujourd'hui ?"
+        msg_result = classify_message(message)
+        intent_result = classify_intent(message, message_class=msg_result.message_class)
+        assert msg_result.message_class == MessageClass.EXTERNAL_RESEARCH
+        assert intent_result.intent == Intent.WEB_SEARCH
+
+    def test_english_bitcoin_price_routes_to_web_search(self) -> None:
+        message = "What is the price of bitcoin?"
+        msg_result = classify_message(message)
+        intent_result = classify_intent(message, message_class=msg_result.message_class)
+        assert msg_result.message_class == MessageClass.EXTERNAL_RESEARCH
+        assert intent_result.intent == Intent.WEB_SEARCH
+
+    def test_novaedge_refund_routes_to_rag(self) -> None:
+        message = "What is NovaEdge refund policy?"
+        msg_result = classify_message(message)
+        intent_result = classify_intent(message, message_class=msg_result.message_class)
+        assert msg_result.message_class == MessageClass.BUSINESS_KNOWLEDGE
+        assert intent_result.intent == Intent.KNOWLEDGE_SEARCH

@@ -203,6 +203,97 @@ class TestGmailApprovalExecution:
         assert "_execution" not in (apv.proposed_payload or {})
 
 
+class TestEmailDraftToolBehavior:
+    def test_live_gmail_draft_only_creates_draft_without_approval(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from onepilot.tools.base import ToolContext
+        from onepilot.tools.email_tool import EmailDraftTool
+
+        settings = Settings(
+            GOOGLE_CLIENT_ID="client-id",
+            GOOGLE_CLIENT_SECRET="client-secret",
+            GOOGLE_REFRESH_TOKEN="refresh-token",
+            GMAIL_PROVIDER_MODE="auto",
+            GMAIL_SEND_ENABLED=False,
+        )
+        draft = MagicMock(
+            subject="Thanks for your interest",
+            body="Hello,\n\nThank you for your interest in NovaEdge.",
+            tone="professional",
+            model_dump=lambda mode="json": {
+                "subject": "Thanks for your interest",
+                "body": "Hello,\n\nThank you for your interest in NovaEdge.",
+                "tone": "professional",
+            },
+        )
+        monkeypatch.setattr(
+            "onepilot.tools.email_tool.email_service.draft_email",
+            lambda *args, **kwargs: MagicMock(
+                draft=draft,
+                model="test-model",
+                fallback_used=False,
+            ),
+        )
+        monkeypatch.setattr(
+            "onepilot.tools.email_tool.gmail_service.is_live_gmail_provider",
+            lambda *_args, **_kwargs: True,
+        )
+        monkeypatch.setattr(
+            "onepilot.tools.email_tool.gmail_service.create_draft_direct",
+            lambda *args, **kwargs: {
+                "status": "success",
+                "draft_id": "draft_123",
+                "mode": "live",
+                "action": "create_draft",
+            },
+        )
+
+        ctx = ToolContext(
+            session=MagicMock(),
+            principal=MagicMock(),
+            settings=settings,
+        )
+        result = EmailDraftTool().run(ctx, context="Draft email to lead", action="draft_only")
+
+        assert result.tool_name == "email.draft"
+        assert result.approval_required is False
+        assert result.output["gmail_draft_id"] == "draft_123"
+        assert result.output["gmail_status"] == "created"
+
+    def test_send_intent_still_requires_approval(self) -> None:
+        from onepilot.tools.base import ToolContext
+        from onepilot.tools.email_tool import EmailDraftTool
+
+        settings = Settings(GMAIL_SEND_ENABLED=False)
+        ctx = ToolContext(
+            session=MagicMock(),
+            principal=MagicMock(),
+            settings=settings,
+        )
+        with patch(
+            "onepilot.tools.email_tool.email_service.draft_email",
+            return_value=MagicMock(
+                draft=MagicMock(
+                    subject="Hi",
+                    body="Body",
+                    tone="professional",
+                    model_dump=lambda mode="json": {
+                        "subject": "Hi",
+                        "body": "Body",
+                        "tone": "professional",
+                    },
+                ),
+                model="test",
+                fallback_used=False,
+            ),
+        ):
+            result = EmailDraftTool().run(ctx, context="Send email", action="send")
+
+        assert result.approval_required is True
+        assert result.approval_action_type == "gmail_create_draft"
+
+
 class TestGmailRouting:
     def test_infer_send_from_message(self) -> None:
         assert gmail_service.infer_email_action(

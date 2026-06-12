@@ -298,7 +298,7 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
         )
         _record_tool_call(update, result)
         draft = result.output.get("draft", {})
-        update["draft_output"] = _format_email(draft)
+        update["draft_output"] = _format_email(draft, result.output)
         if result.approval_required and result.approval_action_type:
             approval = approval_service.create(
                 deps.session,
@@ -384,7 +384,7 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
 
         sections = [
             "Email draft",
-            _format_email(email_result.output.get("draft", {})),
+            _format_email(email_result.output.get("draft", {}), email_result.output),
             "",
             "Calendar proposal",
             _format_calendar_output(calendar_result),
@@ -494,7 +494,7 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             research_summary,
             "",
             "## Draft email preview",
-            _format_email(email_result.output.get("draft", {})),
+            _format_email(email_result.output.get("draft", {}), email_result.output),
             "",
             "## Meeting proposal",
             _format_calendar_output(calendar_result),
@@ -819,10 +819,18 @@ def _web_response_from_tool(result: ToolResult) -> WebSearchResponse:
     )
 
 
-def _format_email(draft: dict) -> str:
+def _format_email(draft: dict, tool_output: dict | None = None) -> str:
     subject = draft.get("subject", "(no subject)")
     body = draft.get("body", "")
-    return f"Subject: {subject}\n\n{body}"
+    lines = [f"Subject: {subject}", "", body]
+    output = tool_output or {}
+    gmail_status = output.get("gmail_status")
+    draft_id = output.get("gmail_draft_id")
+    if gmail_status == "created" and draft_id:
+        lines.extend(["", f"Gmail draft created (id: {draft_id}). Send remains disabled."])
+    elif gmail_status == "preview_only":
+        lines.extend(["", "Preview only — Gmail draft was not created."])
+    return "\n".join(lines)
 
 
 def _format_calendar_output(result: ToolResult) -> str:
@@ -836,10 +844,12 @@ def _format_calendar_output(result: ToolResult) -> str:
     payload = output.get("approval_payload") or {}
     slot = output.get("selected_slot") or {}
     lines = [
-        f"Meeting proposal: {payload.get('summary', 'Meeting')}",
-        f"Proposed: {slot.get('start_time')} – {slot.get('end_time')} ({payload.get('timezone')})",
+        f"Title: {payload.get('summary', 'Meeting')}",
+        f"Date and time: {slot.get('start_time')} – {slot.get('end_time')}",
+        f"Timezone: {payload.get('timezone')}",
+        f"Approval status: {output.get('approval_status', 'pending')}",
         f"Provider mode: {output.get('provider_mode', output.get('mode'))}",
-        "Awaiting approval before creating the calendar event.",
+        "Next action: Review and approve to create the calendar event.",
     ]
     return "\n".join(lines)
 

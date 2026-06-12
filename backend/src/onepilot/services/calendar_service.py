@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from pydantic import ValidationError as PydanticValidationError
 from sqlalchemy.orm import Session
@@ -68,7 +69,9 @@ def _default_timezone(settings: Settings) -> str:
     return settings.GOOGLE_CALENDAR_DEFAULT_TIMEZONE or "Europe/Berlin"
 
 
-def _parse_time_window(message: str, settings: Settings) -> tuple[datetime, datetime, str, str]:
+def _parse_time_window(
+    message: str, settings: Settings
+) -> tuple[datetime, datetime, str, str]:
     """Best-effort window from message cues; returns (min, max, query_type, label)."""
     parsed = parse_calendar_window(
         message,
@@ -77,6 +80,14 @@ def _parse_time_window(message: str, settings: Settings) -> tuple[datetime, date
         slot_duration_minutes=int(settings.GOOGLE_CALENDAR_SLOT_DURATION_MINUTES),
     )
     return parsed.time_min, parsed.time_max, parsed.query_type, parsed.label
+
+
+def _localize_slot_for_display(
+    utc_naive: datetime, *, timezone: str
+) -> datetime:
+    """Convert UTC-naive API timestamps to local wall-clock for user-facing output."""
+    tz = ZoneInfo(timezone)
+    return utc_naive.replace(tzinfo=UTC).astimezone(tz).replace(tzinfo=None)
 
 
 def _parse_duration_minutes(message: str, settings: Settings) -> int:
@@ -260,28 +271,82 @@ def prepare_event_approval(
     settings: Settings | None = None,
 ) -> dict:
     cfg = settings or get_settings()
-    time_min, time_max, _, window_label = _parse_time_window(message, cfg)
+    time_min, time_max, query_type, window_label = _parse_time_window(message, cfg)
     duration = _parse_duration_minutes(message, cfg)
+    timezone = _default_timezone(cfg)
     provider = get_calendar_provider(cfg)
-    suggestion = provider.suggest_slots(
-        time_min,
-        time_max,
-        timezone=_default_timezone(cfg),
-        duration_minutes=duration,
-        max_slots=1,
-        workday_start=cfg.GOOGLE_CALENDAR_WORKDAY_START,
-        workday_end=cfg.GOOGLE_CALENDAR_WORKDAY_END,
-        calendar_id=cfg.GOOGLE_CALENDAR_ID or "primary",
-    )
-    slots = suggestion.get("suggested_slots") or []
-    if slots:
-        start_raw = slots[0].get("start_time") if isinstance(slots[0], dict) else slots[0].start_time
-        end_raw = slots[0].get("end_time") if isinstance(slots[0], dict) else slots[0].end_time
-        start_time = datetime.fromisoformat(str(start_raw).replace("Z", "+00:00")).replace(tzinfo=None)
-        end_time = datetime.fromisoformat(str(end_raw).replace("Z", "+00:00")).replace(tzinfo=None)
-    else:
-        start_time = time_min.replace(hour=10, minute=0, second=0, microsecond=0)
+
+    if query_type == "specific":
+        start_time = time_min
+        parsed_duration = (time_max - time_min).total_seconds() / 60
+        if parsed_duration >= duration:
+            end_time = time_max
+        else:
+            end_time = start_time + timedelta(minutes=duration)
+        suggestion = {"mode": getattr(provider, "_mode", "mock"), "suggested_slots": []}
+    elif window_label == "tomorrow afternoon":
+        start_time = time_min.replace(hour=13, minute=0, second=0, microsecond=0)
         end_time = start_time + timedelta(minutes=duration)
+        suggestion = provider.suggest_slots(
+            time_min,
+            time_max,
+            timezone=timezone,
+            duration_minutes=duration,
+            max_slots=1,
+            workday_start=cfg.GOOGLE_CALENDAR_WORKDAY_START,
+            workday_end=cfg.GOOGLE_CALENDAR_WORKDAY_END,
+            calendar_id=cfg.GOOGLE_CALENDAR_ID or "primary",
+        )
+        slots = suggestion.get("suggested_slots") or []
+        if slots:
+            start_raw = (
+                slots[0].get("start_time")
+                if isinstance(slots[0], dict)
+                else slots[0].start_time
+            )
+            end_raw = (
+                slots[0].get("end_time")
+                if isinstance(slots[0], dict)
+                else slots[0].end_time
+            )
+            start_time = datetime.fromisoformat(
+                str(start_raw).replace("Z", "+00:00")
+            ).replace(tzinfo=None)
+            end_time = datetime.fromisoformat(
+                str(end_raw).replace("Z", "+00:00")
+            ).replace(tzinfo=None)
+    else:
+        suggestion = provider.suggest_slots(
+            time_min,
+            time_max,
+            timezone=timezone,
+            duration_minutes=duration,
+            max_slots=1,
+            workday_start=cfg.GOOGLE_CALENDAR_WORKDAY_START,
+            workday_end=cfg.GOOGLE_CALENDAR_WORKDAY_END,
+            calendar_id=cfg.GOOGLE_CALENDAR_ID or "primary",
+        )
+        slots = suggestion.get("suggested_slots") or []
+        if slots:
+            start_raw = (
+                slots[0].get("start_time")
+                if isinstance(slots[0], dict)
+                else slots[0].start_time
+            )
+            end_raw = (
+                slots[0].get("end_time")
+                if isinstance(slots[0], dict)
+                else slots[0].end_time
+            )
+            start_time = datetime.fromisoformat(
+                str(start_raw).replace("Z", "+00:00")
+            ).replace(tzinfo=None)
+            end_time = datetime.fromisoformat(
+                str(end_raw).replace("Z", "+00:00")
+            ).replace(tzinfo=None)
+        else:
+            start_time = time_min.replace(hour=10, minute=0, second=0, microsecond=0)
+            end_time = start_time + timedelta(minutes=duration)
 
     payload = build_approval_payload(
         summary=_infer_summary(message, context),
@@ -307,15 +372,18 @@ def prepare_event_approval(
         event="calendar.approval_created",
         result={"status": "pending", "summary": payload.get("summary")},
     )
+    display_start = _localize_slot_for_display(start_time, timezone=timezone)
+    display_end = _localize_slot_for_display(end_time, timezone=timezone)
     return {
         "approval_payload": payload,
         "selected_slot": {
-            "start_time": start_time.isoformat(),
-            "end_time": end_time.isoformat(),
+            "start_time": display_start.isoformat(),
+            "end_time": display_end.isoformat(),
         },
         "provider_mode": suggestion.get("mode", "mock"),
-        "timezone": _default_timezone(cfg),
+        "timezone": timezone,
         "fallback_used": bool(suggestion.get("fallback_used")),
+        "approval_status": "pending",
     }
 
 

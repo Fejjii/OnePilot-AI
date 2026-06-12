@@ -95,7 +95,12 @@ FACET_KEYWORDS: dict[str, set[str]] = {
         "priority",
         "critical",
         "emergency",
-        "issue",  # Added to catch "escalate issues"
+        "issue",
+        "rules",
+        "handoff",
+        "routing",
+        "tier",
+        "sla",
     },
     "security": {
         "security",
@@ -311,7 +316,10 @@ FACET_EXPANSION_TEMPLATES: dict[str, str] = {
     "refunds": "refund policy cancellation money back return reimbursement",
     "onboarding": "onboarding implementation setup getting started configuration kickoff",
     "support": "support troubleshooting help assistance response time tickets",
-    "escalation": "escalation urgent priority critical severity emergency",
+    "escalation": (
+        "escalation rules customer support escalation support policy handoff rules "
+        "priority escalation severity levels routing tiers SLA urgent critical emergency"
+    ),
     "security": "security access control encryption authentication audit compliance",
     "privacy": "privacy GDPR personal data data processing compliance regulation",
     "email": "email inbox Gmail follow-up sequences messaging correspondence",
@@ -407,6 +415,19 @@ def detect_facets(query: str, threshold: float = 0.15) -> FacetDetectionResult:
         if any(alias in query_lower for alias in aliases):
             facet_scores[facet_name] = max(facet_scores.get(facet_name, 0.0), 0.35)
 
+    escalation_phrases = (
+        "escalation rules",
+        "customer support escalation",
+        "support escalation",
+        "handoff rules",
+        "priority escalation",
+        "support policy",
+    )
+    if any(phrase in query_lower for phrase in escalation_phrases):
+        facet_scores["escalation"] = max(facet_scores.get("escalation", 0.0), 0.55)
+    if "escalat" in query_lower:
+        facet_scores["escalation"] = max(facet_scores.get("escalation", 0.0), 0.4)
+
     # Filter facets above threshold
     detected_facets = [
         facet for facet, score in facet_scores.items() if score >= threshold
@@ -445,18 +466,27 @@ def generate_facet_queries(
             )
         )
 
-    # Generate facet-specific queries for compound queries
+    policy_facets = {"escalation", "refunds", "privacy", "security", "support"}
     if facet_result.is_compound:
-        for facet in facet_result.detected_facets:
-            expansion = FACET_EXPANSION_TEMPLATES.get(facet, "")
-            if expansion:
-                facet_query = f"{expansion} NovaEdge Solutions"
-                weight = facet_result.facet_scores.get(facet, 0.5)
-                queries.append(
-                    FacetRetrievalQuery(
-                        facet=facet, query_text=facet_query, weight=weight
-                    )
+        facets_to_expand = facet_result.detected_facets
+    elif (
+        len(facet_result.detected_facets) == 1
+        and facet_result.detected_facets[0] in policy_facets
+    ):
+        facets_to_expand = facet_result.detected_facets
+    else:
+        facets_to_expand = []
+
+    for facet in facets_to_expand:
+        expansion = FACET_EXPANSION_TEMPLATES.get(facet, "")
+        if expansion:
+            facet_query = f"{expansion} NovaEdge Solutions"
+            weight = facet_result.facet_scores.get(facet, 0.5)
+            queries.append(
+                FacetRetrievalQuery(
+                    facet=facet, query_text=facet_query, weight=weight
                 )
+            )
 
     return queries
 

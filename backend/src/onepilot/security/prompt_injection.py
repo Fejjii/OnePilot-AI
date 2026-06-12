@@ -44,7 +44,16 @@ _PATTERNS: list[tuple[re.Pattern[str], str]] = [
     ),
     (
         re.compile(
-            r"(expose|show|reveal|print)\s+(api\s+key|secret|environment(\s+variable)?s?|env(\s+var)?s?)"
+            r"(?:expose|show|reveal|display|print|give|tell|share|list|dump|leak|provide)"
+            r"(?:\s+me)?\s+(?:the\s+)?(?:all\s+)?"
+            r"(?:api\s*keys?|secrets?|tokens?|credentials?|environment\s+variables?|env\s+vars?|\.env\b"
+            r"|refresh\s+tokens?|google\s+refresh\s+tokens?|oauth\s+secrets?|client\s+secrets?"
+            r"|railway\s+variables?|vercel\s+variables?|provider\s+credentials?)"
+            r"|(?:show|reveal|display|expose|print)\s+(?:me\s+)?(?:your\s+)?(?:system\s+prompt|tool\s+instructions?)"
+            r"|(?:what|where)\s+(?:is|are)\s+(?:the\s+)?(?:your\s+)?(?:api\s*keys?|refresh\s+tokens?|google\s+refresh\s+tokens?|system\s+prompt|tool\s+instructions?)"
+            r"|google\s+refresh\s+tokens?"
+            r"|(?:environment\s+variables?|env\s+vars?).{0,40}(?:refresh\s+tokens?|google\s+refresh\s+tokens?)"
+            r"|(?:refresh\s+tokens?|google\s+refresh\s+tokens?).{0,40}(?:environment\s+variables?|env\s+vars?)"
             r"|print\s+environment",
             re.IGNORECASE,
         ),

@@ -62,6 +62,19 @@ class TestFacetDetection:
         assert "escalation" in result.detected_facets
         assert result.is_compound
 
+    def test_detect_customer_support_escalation_rules(self) -> None:
+        result = detect_facets(
+            "What are the escalation rules for customer support?"
+        )
+        assert "escalation" in result.detected_facets
+        queries = generate_facet_queries(
+            "What are the escalation rules for customer support?",
+            result,
+        )
+        escalation_queries = [q.query_text for q in queries if q.facet == "escalation"]
+        assert escalation_queries
+        assert any("handoff" in text.lower() for text in escalation_queries)
+
     def test_detect_compound_security_and_privacy(self) -> None:
         """Test detection of compound facets: security + privacy."""
         result = detect_facets("What security controls and data privacy policies do you follow?")

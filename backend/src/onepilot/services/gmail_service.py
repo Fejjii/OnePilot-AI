@@ -32,6 +32,43 @@ _SEND_INTENT = re.compile(
 )
 
 
+def is_live_gmail_provider(settings: Settings | None = None) -> bool:
+    """Return True when the configured email provider is live Gmail."""
+    from onepilot.providers.email.gmail_provider import GmailProvider
+
+    cfg = settings or get_settings()
+    provider = get_email_provider(cfg)
+    return isinstance(provider, GmailProvider)
+
+
+def create_draft_direct(
+    session: Session,
+    *,
+    principal: Principal,
+    subject: str,
+    body: str,
+    recipient_email: str | None = None,
+    cc: list[str] | None = None,
+    bcc: list[str] | None = None,
+    settings: Settings | None = None,
+) -> dict:
+    """Create a Gmail draft immediately (demo mode with send disabled)."""
+    payload = build_approval_payload(
+        subject=subject,
+        body=body,
+        recipient_email=recipient_email,
+        action_type="gmail_create_draft",
+        cc=cc,
+        bcc=bcc,
+    )
+    return _create_draft_from_payload(
+        session,
+        principal=principal,
+        payload=payload,
+        settings=settings or get_settings(),
+    )
+
+
 def infer_email_action(message: str, context: dict | None) -> str:
     """Return ``draft_only`` or ``send`` from explicit context or message cues."""
     ctx = context or {}

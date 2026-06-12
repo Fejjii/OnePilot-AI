@@ -20,13 +20,18 @@ _WEEKDAY_NAMES = {
 _AFTERNOON = re.compile(r"\bafternoon\b", re.IGNORECASE)
 _TOMORROW = re.compile(r"\btomorrow\b", re.IGNORECASE)
 _NEXT_WEEK = re.compile(r"\b(next week|following week)\b", re.IGNORECASE)
+_AMPM = r"a\.?\s*m\.?|p\.?\s*m\.?"
+_SCHEDULE_CUE = re.compile(
+    r"\b(schedule|book|set up|create|meeting|call|demo|appointment)\b",
+    re.IGNORECASE,
+)
 _WEEKDAY_AT_TIME = re.compile(
-    r"\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b"
-    r".{0,20}\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b",
+    rf"\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b"
+    rf".{{0,20}}\b(?:at\s+)?(\d{{1,2}})(?::(\d{{2}}))?\s*({_AMPM})?\b",
     re.IGNORECASE,
 )
 _AT_TIME = re.compile(
-    r"\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b",
+    rf"\b(?:at\s+)?(\d{{1,2}})(?::(\d{{2}}))?\s*({_AMPM})\b",
     re.IGNORECASE,
 )
 
@@ -57,12 +62,23 @@ def _to_utc_naive(local_dt: datetime) -> datetime:
     return local_dt.astimezone(UTC).replace(tzinfo=None)
 
 
+def _normalize_ampm(ampm: str | None) -> str | None:
+    if not ampm:
+        return None
+    cleaned = re.sub(r"[\.\s]", "", ampm.lower())
+    if cleaned.startswith("p"):
+        return "pm"
+    if cleaned.startswith("a"):
+        return "am"
+    return ampm.lower()
+
+
 def _parse_hour(hour: int, minute: int, ampm: str | None) -> tuple[int, int]:
-    if ampm:
-        ampm_l = ampm.lower()
-        if ampm_l == "pm" and hour < 12:
+    normalized = _normalize_ampm(ampm)
+    if normalized:
+        if normalized == "pm" and hour < 12:
             hour += 12
-        if ampm_l == "am" and hour == 12:
+        if normalized == "am" and hour == 12:
             hour = 0
     return hour, minute
 
@@ -117,7 +133,7 @@ def parse_calendar_window(
     # Tomorrow afternoon — 13:00–17:00 local
     if _TOMORROW.search(lower):
         target_date = (local_now + timedelta(days=1)).date()
-        if _AFTERNOON.search(lower):
+        if _AFTERNOON.search(lower) and not _AT_TIME.search(message):
             start_local = datetime(
                 target_date.year,
                 target_date.month,
@@ -140,6 +156,28 @@ def parse_calendar_window(
                 timezone=timezone,
                 query_type="range",
                 label="tomorrow afternoon",
+            )
+        tomorrow_at = _AT_TIME.search(message)
+        if tomorrow_at:
+            hour = int(tomorrow_at.group(1))
+            minute = int(tomorrow_at.group(2) or 0)
+            ampm = tomorrow_at.group(3)
+            hour, minute = _parse_hour(hour, minute, ampm)
+            start_local = datetime(
+                target_date.year,
+                target_date.month,
+                target_date.day,
+                hour,
+                minute,
+                tzinfo=tz,
+            )
+            end_local = start_local + duration
+            return ParsedCalendarWindow(
+                time_min=_to_utc_naive(start_local),
+                time_max=_to_utc_naive(end_local),
+                timezone=timezone,
+                query_type="specific",
+                label=f"tomorrow {hour:02d}:{minute:02d}",
             )
         start_local = datetime(target_date.year, target_date.month, target_date.day, 0, 0, tzinfo=tz)
         end_local = start_local + timedelta(days=1)
@@ -165,9 +203,14 @@ def parse_calendar_window(
             label="next week",
         )
 
-    # Generic at 11 am today/tomorrow context without weekday
+    # Explicit local time for scheduling or availability checks
     at_match = _AT_TIME.search(message)
-    if at_match and ("free" in lower or "available" in lower or "busy" in lower):
+    if at_match and (
+        "free" in lower
+        or "available" in lower
+        or "busy" in lower
+        or _SCHEDULE_CUE.search(lower)
+    ):
         hour = int(at_match.group(1))
         minute = int(at_match.group(2) or 0)
         ampm = at_match.group(3)

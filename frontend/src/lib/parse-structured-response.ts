@@ -23,10 +23,21 @@ export interface SourceItem {
   raw: string;
 }
 
+export interface MeetingProposalDetails {
+  title: string;
+  startTime: string;
+  endTime: string;
+  timezone: string;
+  approvalStatus: string;
+  providerMode: string;
+  nextAction: string;
+}
+
 export type ParsedAssistantResponse =
   | { kind: "structured"; sections: StructuredSection[] }
   | { kind: "compound"; sections: StructuredSection[] }
   | { kind: "email"; subject: string; body: string }
+  | { kind: "meeting-proposal"; proposal: MeetingProposalDetails }
   | { kind: "plain"; content: string };
 
 const STANDARD_SECTION_TITLES: Record<string, StructuredSectionId> = {
@@ -135,6 +146,33 @@ function parseEmailDraft(content: string): { subject: string; body: string } | n
   };
 }
 
+function parseMeetingProposal(content: string): MeetingProposalDetails | null {
+  const titleMatch = content.match(/^(?:Title|Meeting proposal):\s*(.+)$/m);
+  const timeMatch = content.match(
+    /^(?:Date and time|Proposed):\s*(.+?)\s+[–—]\s+(.+?)(?:\s*\([^)]+\))?$/m,
+  );
+  const timezoneMatch = content.match(/^Timezone:\s*(.+)$/m);
+  const approvalMatch = content.match(/^Approval status:\s*(.+)$/m);
+  const providerMatch = content.match(/^Provider mode:\s*(.+)$/m);
+  const nextActionMatch = content.match(/^Next action:\s*(.+)$/m);
+
+  if (!titleMatch || !timeMatch) {
+    return null;
+  }
+
+  return {
+    title: titleMatch[1].trim(),
+    startTime: timeMatch[1].trim(),
+    endTime: timeMatch[2].trim(),
+    timezone: timezoneMatch?.[1]?.trim() ?? "",
+    approvalStatus: approvalMatch?.[1]?.trim() ?? "pending",
+    providerMode: providerMatch?.[1]?.trim() ?? "",
+    nextAction:
+      nextActionMatch?.[1]?.trim() ??
+      "Review and approve to create the calendar event.",
+  };
+}
+
 function hasStandardKnowledgeSections(sections: StructuredSection[]): boolean {
   const ids = new Set(sections.map((section) => section.id));
   return (
@@ -152,6 +190,11 @@ export function parseStructuredResponse(content: string): ParsedAssistantRespons
   const emailDraft = parseEmailDraft(trimmed);
   if (emailDraft && !trimmed.startsWith("##")) {
     return { kind: "email", ...emailDraft };
+  }
+
+  const meetingProposal = parseMeetingProposal(trimmed);
+  if (meetingProposal && !trimmed.startsWith("##")) {
+    return { kind: "meeting-proposal", proposal: meetingProposal };
   }
 
   if (contentHasCompoundHeaders(trimmed)) {

@@ -35,6 +35,25 @@ describe("parseStructuredResponse", () => {
     expect(parsed.sections[1].items).toHaveLength(3);
   });
 
+  it("parses calendar meeting proposals as structured cards", () => {
+    const parsed = parseStructuredResponse(
+      [
+        "Title: Demo call",
+        "Date and time: 2026-06-13T15:00:00 – 2026-06-13T15:30:00",
+        "Timezone: Europe/Berlin",
+        "Approval status: pending",
+        "Provider mode: live",
+        "Next action: Review and approve to create the calendar event.",
+      ].join("\n"),
+    );
+    expect(parsed.kind).toBe("meeting-proposal");
+    if (parsed.kind !== "meeting-proposal") return;
+    expect(parsed.proposal.title).toBe("Demo call");
+    expect(parsed.proposal.startTime).toContain("15:00:00");
+    expect(parsed.proposal.timezone).toBe("Europe/Berlin");
+    expect(parsed.proposal.approvalStatus).toBe("pending");
+  });
+
   it("parses email drafts without markdown headings", () => {
     const parsed = parseStructuredResponse(
       "Subject: Follow-up on demo\n\nHi Alex,\n\nThanks for your time today.",

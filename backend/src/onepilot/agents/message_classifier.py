@@ -316,7 +316,10 @@ _UNSAFE_REQUEST = re.compile(
     r"stock\s+tips?|financial advice|"
     r"ignore\s+(previous|all|your)\s+instructions|"
     r"reveal\s+(system\s+secrets?|your\s+system\s+prompt)|"
-    r"print\s+environment(\s+variable)?s?"
+    r"print\s+environment(\s+variable)?s?|"
+    r"google\s+refresh\s+tokens?|refresh\s+tokens?|"
+    r"railway\s+variables?|vercel\s+variables?|"
+    r"oauth\s+secrets?|client\s+secrets?|provider\s+credentials?"
     r")\b",
     re.IGNORECASE,
 )
@@ -326,8 +329,27 @@ _EXTERNAL_FACT_ENTITY = re.compile(
     r"bitcoin|btc|ethereum|eth|dogecoin|solana|"
     r"crypto(currency)?s?|"
     r"stock\s+(price|prices|market)|share\s+(price|prices)|"
-    r"commodit(y|ies)|gold|silver|oil|nasdaq|s&p|forex|exchange rate|"
+    r"commodit(y|ies)|gold|silver|oil|barrel|baril|pétrole|petrole|"
+    r"nasdaq|s&p|forex|exchange rate|"
     r"tesla|apple|microsoft|google|amazon|nvidia"
+    r")\b",
+    re.IGNORECASE,
+)
+
+_MULTILINGUAL_EXTERNAL_FACT = re.compile(
+    r"\b("
+    r"température|temperature|météo|meteo|wetter|temperatur|"
+    r"prix|preis|precio|baril|pétrole|petrole|ölpreis|olpreis|"
+    r"actualité|actualite|aktuell|actuel|cours|kurs|"
+    r"action|aktie|bitcoin|crypto|marché|marche|börse|borse"
+    r")\b",
+    re.IGNORECASE,
+)
+
+_CURRENT_FACT_CUE = re.compile(
+    r"\b("
+    r"aujourd'hui|aujourd hui|today|heute|now|current|latest|"
+    r"right now|en ce moment|gerade"
     r")\b",
     re.IGNORECASE,
 )
@@ -535,7 +557,17 @@ def _looks_like_external_current_facts(message: str) -> bool:
     """Route public/current-fact questions to web search instead of internal KB."""
     if _INTERNAL_BUSINESS_CONTEXT.search(message):
         return False
-    return bool(_EXTERNAL_FACT_ENTITY.search(message))
+    if _EXTERNAL_FACT_ENTITY.search(message):
+        return True
+    if _MULTILINGUAL_EXTERNAL_FACT.search(message) and _CURRENT_FACT_CUE.search(message):
+        return True
+    if _MULTILINGUAL_EXTERNAL_FACT.search(message) and re.search(
+        r"\b(berlin|paris|london|new york|tokyo|münchen|munich|frankfurt)\b",
+        message,
+        re.IGNORECASE,
+    ):
+        return True
+    return False
 
 
 def _score_patterns(message: str, patterns: list[tuple[re.Pattern[str], float]]) -> float:

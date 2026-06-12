@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import {
   ArrowRight,
   BookOpen,
+  CalendarDays,
   ExternalLink,
   Globe,
   Lightbulb,
@@ -13,6 +14,7 @@ import {
   parseEvidenceContent,
   parseSourceLine,
   parseStructuredResponse,
+  type MeetingProposalDetails,
   type ParsedAssistantResponse,
   type SourceItem,
   type StructuredSection,
@@ -211,6 +213,53 @@ function StructuredKnowledgeResponse({ sections }: { sections: StructuredSection
   );
 }
 
+function MeetingProposalCard({ proposal }: { proposal: MeetingProposalDetails }) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-1.5">
+        <CalendarDays className="h-3.5 w-3.5 text-indigo-500" />
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          Meeting proposal
+        </p>
+      </div>
+      <div className="rounded-md border border-slate-200 bg-slate-50/50 px-3 py-3 space-y-2">
+        <div>
+          <p className="text-[11px] font-medium text-slate-500">Title</p>
+          <p className="mt-0.5 text-sm font-medium text-slate-900">{proposal.title}</p>
+        </div>
+        <div>
+          <p className="text-[11px] font-medium text-slate-500">Date and time</p>
+          <p className="mt-0.5 text-sm text-slate-800">
+            {proposal.startTime} – {proposal.endTime}
+          </p>
+        </div>
+        {proposal.timezone && (
+          <div>
+            <p className="text-[11px] font-medium text-slate-500">Timezone</p>
+            <p className="mt-0.5 text-sm text-slate-800">{proposal.timezone}</p>
+          </div>
+        )}
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div>
+            <p className="text-[11px] font-medium text-slate-500">Approval status</p>
+            <p className="mt-0.5 text-sm text-slate-800">{proposal.approvalStatus}</p>
+          </div>
+          {proposal.providerMode && (
+            <div>
+              <p className="text-[11px] font-medium text-slate-500">Provider mode</p>
+              <p className="mt-0.5 text-sm text-slate-800">{proposal.providerMode}</p>
+            </div>
+          )}
+        </div>
+        <div>
+          <p className="text-[11px] font-medium text-slate-500">Next action</p>
+          <p className="mt-0.5 text-sm text-slate-700">{proposal.nextAction}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EmailDraftContent({ subject, body }: { subject: string; body: string }) {
   return (
     <div className="space-y-3">
@@ -285,6 +334,8 @@ function renderParsedResponse(parsed: ParsedAssistantResponse) {
       return <CompoundWorkflowResponse sections={parsed.sections} />;
     case "email":
       return <EmailDraftContent subject={parsed.subject} body={parsed.body} />;
+    case "meeting-proposal":
+      return <MeetingProposalCard proposal={parsed.proposal} />;
     case "plain":
       return <PlainTextBlock content={parsed.content} />;
   }
@@ -295,7 +346,8 @@ export function AssistantMessageContent({ content }: AssistantMessageContentProp
   const isRich =
     parsed.kind === "structured" ||
     parsed.kind === "compound" ||
-    parsed.kind === "email";
+    parsed.kind === "email" ||
+    parsed.kind === "meeting-proposal";
 
   return (
     <div
