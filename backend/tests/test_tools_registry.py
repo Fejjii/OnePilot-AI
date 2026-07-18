@@ -119,8 +119,10 @@ class TestEmailTool:
         draft = result.output["draft"]
         assert draft["subject"]
         assert draft["body"]
-        assert result.approval_required is False
+        assert result.approval_required is True
         assert result.approval_action_type == "gmail_create_draft"
+        assert result.approval_payload is not None
+        assert result.output["gmail_action_pending"] is True
 
 
 class TestLeadTool:

@@ -180,8 +180,7 @@ class TestRunAgentBranches:
             settings=get_settings(),
             conversation_id="conv_test",
             message=(
-                "Capture this lead: John Doe at Acme is asking about pricing. "
-                "His email is john@acme.io."
+                "Capture this lead: John Doe at Acme is asking about pricing."
             ),
             history=[],
         )
@@ -228,7 +227,7 @@ class TestRunAgentBranches:
         assert state.approval_id and state.approval_id.startswith("apv_")
         assert "Pending approval" in (state.final_response or "")
 
-    def test_email_draft_only_no_approval(
+    def test_email_draft_only_requires_approval_in_mock_mode(
         self, client_with_session: tuple[TestClient, object]
     ) -> None:
         client, session = client_with_session
@@ -242,7 +241,8 @@ class TestRunAgentBranches:
             history=[],
         )
         assert state.intent == Intent.EMAIL_DRAFTING
-        assert state.approval_required is False
+        assert state.approval_required is True
+        assert state.approval_id and state.approval_id.startswith("apv_")
 
 
 class TestTraceSteps:
