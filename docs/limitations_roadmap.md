@@ -60,9 +60,8 @@ Despite the limitations above, the following components are designed and impleme
 - **Usage event tracking** — per-org quota enforcement with real token counting
 - **Provider adapter pattern** — every external dependency can be swapped without code changes
 - **Approval gates** — no autonomous external actions without human approval
-- **690 passing backend tests** (3 skipped) — auth, tenancy, RAG, agent workflow, Serper, Gmail, Calendar, approvals, memory, multilingual chat/RAG, security, and demo entry
-- **86 passing frontend tests** — pages, demo flow, landing, and component behavior
-- **Ruff + mypy compliance** — clean linting and type checking
+- **Backend + frontend CI suites** — auth, tenancy, RAG, agent workflow, Serper, Gmail, Calendar, approvals, memory (incl. shared-demo isolation), multilingual chat/RAG, security, demo entry, landing, guided workspace, mobile nav (see root `README.md` for the latest verified counts)
+- **Ruff + TypeScript checks** — lint/typecheck enforced in CI
 
 ---
 
@@ -77,17 +76,23 @@ Despite the limitations above, the following components are designed and impleme
 | Public landing page with one-click demo entry | Done |
 | Canonical branch consolidation (`main` + thin `deployment/public-demo`) | Done |
 | Live public demo (Vercel frontend + Railway backend, mock Gmail/Calendar) | Done |
+| Guided workspace (prompt chips, provider badges, feedback states) | Done |
+| Mobile-first workspace navigation | Done |
+| Agent memory recall/persist + shared-demo isolation | Done |
+| Portfolio docs (README, capability matrix, launch kit, demo script) | Done (OP-013)
 
 ---
 
 ## Roadmap
 
-### Near-Term (1–3 months)
+### Near-Term
 - [ ] HTTP-only cookie auth with refresh tokens
 - [ ] Real OpenAI streaming (Server-Sent Events)
 - [ ] Object storage for uploaded files (S3 / Cloudflare R2)
 - [ ] Background task queue (Celery + Redis or ARQ)
+- [ ] Optional demo-reset endpoint for accumulated conversations/approvals
 - [x] Workspace sample prompt chips and mock/live integration badges
+- [x] Portfolio README, capability matrix, demo script, launch materials
 
 ### Medium-Term (3–6 months)
 - [ ] OAuth 2.0 / SAML SSO integration

@@ -100,17 +100,11 @@ approvals badge.
 
 ## Testing
 
-`pnpm test` runs Vitest in jsdom mode and exercises:
+`pnpm test` runs Vitest in jsdom mode (**126** tests as of 2026-07-20), covering
+landing/demo entry, guided workspace, mobile navigation, memory UI, approvals,
+knowledge, leads, auth redirects, and provider-status summaries.
 
-- `LoginPage` renders the form and validates required fields.
-- `DashboardPage` renders metric cards and the provider mode card against
-  mocked `/health`, `/conversations`, `/documents`, `/leads`, `/approvals`,
-  and `/usage/summary` responses.
-- `WorkspacePage` submits a message against a mocked `/chat` and shows the
-  optimistic user bubble plus assistant citation.
-- `ApprovalsPage` renders the inbox with the high-risk badge for a pending
-  approval (with mocked `/me` and `/approvals`).
-- `LeadsPage` renders the table with status and urgency badges.
+Also run `pnpm lint`, `pnpm typecheck`, and `pnpm build` before opening a PR.
+Helpers in `src/test-utils/` mock `fetch`, Next.js navigation, and `next/link`.
 
-Tests use the helpers in `src/test-utils/` to mock `fetch`, the Next.js
-navigation hooks, and `next/link`.
+Public product docs and the live demo link live in the repository root `README.md`.
