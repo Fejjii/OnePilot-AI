@@ -103,6 +103,7 @@ Fixed-window limits per feature (raises `429 RATE_LIMIT_EXCEEDED`):
 | `POST /documents/upload` | 20 / minute | org + user |
 | `POST /auth/login` | 10 / minute | email (hashed in Redis keys) |
 | `POST /auth/register` | 5 / hour | client IP (hashed in Redis keys) |
+| `POST /demo/start` | 10 / hour | client IP (hashed in Redis keys) |
 
 **Backend selection**
 

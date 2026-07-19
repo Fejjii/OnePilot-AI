@@ -69,6 +69,15 @@ export interface TokenResponse {
   expires_at: string;
 }
 
+export interface DemoStartResponse {
+  access_token: string;
+  token_type: string;
+  expires_at: string;
+  organization_name: string;
+  demo_mode: boolean;
+  simulated_providers: boolean;
+}
+
 export interface ApiError {
   error: string;
   message: string;

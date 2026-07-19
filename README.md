@@ -258,7 +258,8 @@ This creates the demo user **`admin@onepilot.ai` / `Demo1234!`**, ingests **19 N
 ### 6. Open the app
 
 - Frontend: [http://localhost:3000](http://localhost:3000)
-- **Demo login:** `admin@onepilot.ai` / `Demo1234!`
+- **One-click demo:** set `PUBLIC_DEMO_ENABLED=true` in `backend/.env`, then use the **Try the demo** button on the login page — no credentials needed. The demo org is seeded automatically and Gmail/Calendar stay simulated.
+- **Demo login (manual):** `admin@onepilot.ai` / `Demo1234!`
 - Backend API docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 - Health check: [http://localhost:8000/health](http://localhost:8000/health)
 - Provider diagnostics: [http://localhost:8000/providers](http://localhost:8000/providers)

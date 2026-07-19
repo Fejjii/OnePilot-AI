@@ -59,6 +59,11 @@ Gmail and Calendar stay in **mock mode** for public demo. Do not connect persona
 
    Creates `admin@onepilot.ai` / `Demo1234!` when the org is empty.
 
+   With `PUBLIC_DEMO_ENABLED=true` this manual step is optional: the first
+   click on **Try the demo** calls `POST /demo/start`, which idempotently
+   seeds the same demo org and issues a short-lived session token — no
+   credentials shown or required.
+
 ---
 
 ## Phase 2: Qdrant Cloud (strongly recommended)

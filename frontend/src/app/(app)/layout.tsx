@@ -24,6 +24,7 @@ import {
 import { useAuth, isAdminRole } from "@/lib/auth";
 import { useHealth, useApprovals } from "@/lib/queries";
 import { PlanBadge } from "@/components/domain/plan-badge";
+import { DemoModeBanner } from "@/components/domain/demo-mode-banner";
 import { cn, initialsFromName } from "@/lib/utils";
 
 type NavItem = {
@@ -146,6 +147,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Main */}
       <div className="flex flex-1 flex-col overflow-hidden">
+        <DemoModeBanner />
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 lg:px-6">
           <div className="flex items-center gap-3">
             <button

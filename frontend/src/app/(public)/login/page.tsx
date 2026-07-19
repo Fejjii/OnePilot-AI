@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { ApiRequestError } from "@/lib/api-client";
 import { Input, Label, FieldError } from "@/components/ui/input";
@@ -17,9 +18,27 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>;
 
+function demoErrorMessage(err: unknown): string {
+  if (err instanceof ApiRequestError) {
+    if (err.status === 403) {
+      return "The public demo is not enabled on this server.";
+    }
+    if (err.status === 429) {
+      return "Too many demo sessions were started recently. Please try again in a few minutes.";
+    }
+    if (err.status === 503) {
+      return "The demo workspace could not be prepared. Please try again shortly.";
+    }
+    return err.message;
+  }
+  return "Could not start the demo. Please try again.";
+}
+
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, enterDemo } = useAuth();
   const [apiError, setApiError] = useState<string | null>(null);
+  const [demoError, setDemoError] = useState<string | null>(null);
+  const [demoLoading, setDemoLoading] = useState(false);
 
   const {
     register,
@@ -39,6 +58,18 @@ export default function LoginPage() {
       } else {
         setApiError("Something went wrong. Please try again.");
       }
+    }
+  }
+
+  async function onTryDemo() {
+    setDemoError(null);
+    setDemoLoading(true);
+    try {
+      await enterDemo();
+    } catch (err) {
+      setDemoError(demoErrorMessage(err));
+    } finally {
+      setDemoLoading(false);
     }
   }
 
@@ -97,16 +128,29 @@ export default function LoginPage() {
         </Link>
       </p>
 
-      <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-        <p className="text-xs font-medium text-slate-700">Demo credentials</p>
-        <p className="mt-1 font-mono text-[11px] text-slate-600">
-          admin@onepilot.ai / Demo1234!
+      <div className="mt-6 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-4">
+        <p className="text-xs font-semibold text-indigo-900">
+          Just looking around?
         </p>
-        <p className="mt-1.5 text-[10px] text-slate-500">
-          Run <span className="font-mono">python scripts/seed_demo.py</span> after
-          starting the backend to load 19 NovaEdge docs, leads, approvals, and usage
-          sample data.
+        <p className="mt-1 text-[11px] leading-relaxed text-indigo-700">
+          Explore a pre-loaded workspace with a knowledge base, leads, and
+          approvals — no account or credentials needed. Gmail and Calendar are
+          simulated; nothing external is ever sent.
         </p>
+        {demoError && (
+          <div className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-xs text-rose-700">
+            {demoError}
+          </div>
+        )}
+        <Button
+          type="button"
+          onClick={onTryDemo}
+          loading={demoLoading}
+          className="mt-3 w-full bg-indigo-600 hover:bg-indigo-700"
+        >
+          <Sparkles className="mr-2 h-4 w-4" />
+          {demoLoading ? "Preparing your demo…" : "Try the demo"}
+        </Button>
       </div>
     </div>
   );

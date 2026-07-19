@@ -91,6 +91,12 @@ class Settings(BaseSettings):
     # Safe default is false; local dev enables via .env (DEV_AUTH_ENABLED=true).
     DEV_AUTH_ENABLED: bool = False
 
+    # One-click public demo access (POST /demo/start). Safe default is false;
+    # the public-demo host enables it explicitly. In production this requires
+    # mock Gmail/Calendar providers (see validate_startup_config).
+    PUBLIC_DEMO_ENABLED: bool = False
+    PUBLIC_DEMO_SESSION_MINUTES: int = 60
+
     # Comma-separated frontend origins for production CORS (e.g. https://app.vercel.app).
     CORS_ORIGINS: str = ""
     DEV_ORG_ID: str = "org_demo_onepilot"
@@ -203,6 +209,22 @@ class Settings(BaseSettings):
                 "CORS_ORIGINS must list at least one frontend URL when APP_ENV=production "
                 "(comma-separated, e.g. https://your-app.vercel.app)."
             )
+
+        if self.PUBLIC_DEMO_ENABLED:
+            gmail_mode = (self.GMAIL_PROVIDER_MODE or "").strip().lower()
+            calendar_mode = (self.GOOGLE_CALENDAR_PROVIDER_MODE or "").strip().lower()
+            if gmail_mode != "mock" or calendar_mode != "mock":
+                raise RuntimeError(
+                    "PUBLIC_DEMO_ENABLED=true in production requires "
+                    "GMAIL_PROVIDER_MODE=mock and GOOGLE_CALENDAR_PROVIDER_MODE=mock. "
+                    "Public demo sessions must never reach live Google providers."
+                )
+            if self.GMAIL_SEND_ENABLED:
+                raise RuntimeError(
+                    "PUBLIC_DEMO_ENABLED=true in production requires "
+                    "GMAIL_SEND_ENABLED=false. Real email sending is not allowed "
+                    "on a public demo host."
+                )
 
         return warnings
 
