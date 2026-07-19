@@ -70,6 +70,7 @@ class GeneralChatTool(Tool):
         history: list[dict] | None = None,
         message_class: MessageClass | None = None,
         response_language: str = "en",
+        memory_block: str = "",
         **_: Any,
     ) -> ToolResult:
         lang = response_language
@@ -120,6 +121,8 @@ class GeneralChatTool(Tool):
             system_prompt = system_prompt + "\n\n" + CORRECTION_PROMPT
         elif message_class == MessageClass.CONVERSATIONAL:
             system_prompt = system_prompt + "\n\n" + CONVERSATIONAL_PROMPT
+        if memory_block:
+            system_prompt = system_prompt + "\n\n" + memory_block
 
         messages: list[dict] = [{"role": "system", "content": system_prompt}]
         for entry in (history or [])[-6:]:
@@ -127,6 +130,7 @@ class GeneralChatTool(Tool):
             content = entry.get("content")
             if role in {"user", "assistant"} and content:
                 messages.append({"role": role, "content": content})
+        # Current user message is always separate from stored memory.
         messages.append({"role": "user", "content": message})
 
         started = time.monotonic()

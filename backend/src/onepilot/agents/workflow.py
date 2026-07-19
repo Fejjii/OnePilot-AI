@@ -2,10 +2,13 @@
 
 Graph:
 
-    classify_message -> classify_intent -> route -> {branch} -> guardrail -> finalize_response
+    classify_message -> resolve_language -> classify_intent -> recall_memory
+        -> route -> {branch} -> guardrail -> persist_memory -> finalize_response
 
 Stage 1 (classify_message): Message classification into high-level classes
 Stage 2 (classify_intent): Intent classification based on message class
+``recall_memory`` loads bounded, relevant user/agent memories before generation.
+``persist_memory`` stores only explicit durable user facts (never secrets).
 Branches (selected by ``route``):
     - knowledge_search   -> RAG tool
     - email_assistant    -> EmailDraft tool
@@ -46,7 +49,13 @@ from onepilot.observability.tracing import TraceContext, sanitize_metadata
 from onepilot.schemas.agents import AgentState
 from onepilot.schemas.chat import Citation, ToolCallTrace, TraceStep
 from onepilot.security.auth import Principal
-from onepilot.services import approval_service, calendar_service, gmail_service
+from onepilot.services import (
+    agent_memory,
+    approval_service,
+    calendar_service,
+    gmail_service,
+    memory_service,
+)
 from onepilot.services.calendar_format import format_availability_response, format_suggestion_response
 from onepilot.tools import registry as _tools_bootstrap  # noqa: F401  ensures tool registration
 from onepilot.schemas.web_search import WebSearchCitation, WebSearchResponse
@@ -214,6 +223,41 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
                         f"response={response_lang.value} "
                         f"preference={state.language_preference.value}"
                     ),
+                    duration_ms=duration_ms,
+                ).model_dump()
+            ],
+        }
+
+    def recall_memory_node(state: AgentState) -> dict:
+        """Load bounded relevant memories before tool/LLM generation."""
+        started = time.monotonic()
+        enabled, reason = memory_service.agent_memory_enabled(
+            deps.session, principal=deps.principal, settings=deps.settings
+        )
+        items = (
+            memory_service.retrieve_relevant_memory(
+                deps.session,
+                principal=deps.principal,
+                query=state.message,
+                settings=deps.settings,
+            )
+            if enabled
+            else []
+        )
+        block = memory_service.format_memory_block(items)
+        duration_ms = int((time.monotonic() - started) * 1000)
+        detail = (
+            f"enabled={enabled} reason={reason} count={len(items)} chars={len(block)}"
+        )
+        return {
+            "memory_enabled": enabled,
+            "memory_item_count": len(items),
+            "memory_block": block,
+            "trace_steps": list(state.trace_steps)
+            + [
+                TraceStep(
+                    step="recall_memory",
+                    detail=detail,
                     duration_ms=duration_ms,
                 ).model_dump()
             ],
@@ -637,6 +681,7 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             history=state.history,
             message_class=state.message_class,
             response_language=state.response_language,
+            memory_block=state.memory_block,
         )
         _record_tool_call(update, result)
         update["draft_output"] = result.output.get("reply", "")
@@ -709,6 +754,27 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             + [TraceStep(step="guardrail", detail=",".join(flags)).model_dump()],
         }
 
+    def persist_memory_node(state: AgentState) -> dict:
+        """Persist explicit durable user facts after the response is drafted."""
+        started = time.monotonic()
+        written = agent_memory.maybe_persist_from_user_message(
+            deps.session,
+            principal=deps.principal,
+            settings=deps.settings,
+            message=state.message,
+        )
+        duration_ms = int((time.monotonic() - started) * 1000)
+        return {
+            "trace_steps": list(state.trace_steps)
+            + [
+                TraceStep(
+                    step="persist_memory",
+                    detail=f"written={written}",
+                    duration_ms=duration_ms,
+                ).model_dump()
+            ],
+        }
+
     def finalize_node(state: AgentState) -> dict:
         final = state.draft_output or "I don't have a response for that yet."
         if state.approval_required:
@@ -726,6 +792,7 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
     graph.add_node("classify_message", classify_message_node)
     graph.add_node("resolve_language", resolve_language_node)
     graph.add_node("classify_intent", classify_intent_node)
+    graph.add_node("recall_memory", recall_memory_node)
     graph.add_node("route", route_node)
     graph.add_node("knowledge_search", knowledge_search_node)
     graph.add_node("web_search", web_search_node)
@@ -739,12 +806,14 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
     graph.add_node("clarification", clarification_node)
     graph.add_node("out_of_scope", out_of_scope_node)
     graph.add_node("guardrail", guardrail_node)
+    graph.add_node("persist_memory", persist_memory_node)
     graph.add_node("finalize_response", finalize_node)
 
     graph.set_entry_point("classify_message")
     graph.add_edge("classify_message", "resolve_language")
     graph.add_edge("resolve_language", "classify_intent")
-    graph.add_edge("classify_intent", "route")
+    graph.add_edge("classify_intent", "recall_memory")
+    graph.add_edge("recall_memory", "route")
     graph.add_conditional_edges(
         "route",
         lambda s: branch_for(s.intent),
@@ -776,7 +845,8 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
         "out_of_scope",
     ):
         graph.add_edge(branch, "guardrail")
-    graph.add_edge("guardrail", "finalize_response")
+    graph.add_edge("guardrail", "persist_memory")
+    graph.add_edge("persist_memory", "finalize_response")
     graph.add_edge("finalize_response", END)
 
     return graph.compile()
