@@ -423,7 +423,9 @@ describe("WorkspacePage", () => {
       expect(screen.getByText(/no response yet/i)).toBeInTheDocument();
     });
     expect(screen.queryByText(/chat\.general/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/ready when you are/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/ask onepilot about this business/i),
+    ).toBeInTheDocument();
   });
 
   it("switching from general to knowledge conversation updates response details", async () => {
@@ -604,7 +606,9 @@ describe("WorkspacePage", () => {
 
     await waitFor(() => {
       expect(screen.getByText(/no response yet/i)).toBeInTheDocument();
-      expect(screen.getByText(/ready when you are/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/ask onepilot about this business/i),
+      ).toBeInTheDocument();
     });
     expect(screen.queryByText(/chat\.general/i)).not.toBeInTheDocument();
     expect(navigationMocks.replace).toHaveBeenCalledWith(

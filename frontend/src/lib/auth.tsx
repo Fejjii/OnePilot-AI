@@ -7,6 +7,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -35,6 +36,17 @@ export function clearToken(): void {
 export function getDemoModeFlag(): boolean {
   if (typeof window === "undefined") return false;
   return window.localStorage.getItem(DEMO_MODE_KEY) === "1";
+}
+
+const noopSubscribe = () => () => {};
+
+/**
+ * Hydration-safe read of the demo-mode flag for components that render
+ * outside `AuthProvider` state updates (server snapshot is always false;
+ * the flag only changes together with a full navigation).
+ */
+export function useDemoModeFlag(): boolean {
+  return useSyncExternalStore(noopSubscribe, getDemoModeFlag, () => false);
 }
 
 function setDemoModeFlag(): void {
