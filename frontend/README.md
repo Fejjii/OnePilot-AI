@@ -17,7 +17,7 @@ The backend FastAPI server must be running at `NEXT_PUBLIC_API_URL` (default
 `http://localhost:8000`). Spin it up from the repo root with
 `uvicorn onepilot.api.main:app --reload` (see root `README.md`).
 
-**Demo login:** `admin@onepilot.ai` / `Demo1234!` (after `python scripts/seed_demo.py`)
+**Demo entry:** use **Try the demo** on `/` or `/login` when `PUBLIC_DEMO_ENABLED=true`, or sign in after `python scripts/seed_demo.py` (demo email printed to terminal).
 
 ## Scripts
 

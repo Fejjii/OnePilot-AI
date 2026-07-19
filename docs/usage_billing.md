@@ -1,6 +1,6 @@
 # Usage-Based Billing & Monetization
 
-OnePilot AI records per-call usage events and estimates token costs for a SaaS monetization layer. **No real payments are collected** in the capstone build.
+OnePilot AI records per-call usage events and estimates token costs for a SaaS monetization layer. **No real payments are collected** — billing runs against a simulated Stripe integration.
 
 ## What Is Implemented
 

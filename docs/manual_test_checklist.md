@@ -3,7 +3,7 @@
 Final validation checklist before reviewer demo or push.
 
 **Setup:** `docker compose up -d --build` → `docker compose run --rm migrate` → `docker compose run --rm seed`  
-**Login:** `admin@onepilot.ai` / `Demo1234!`
+**Entry:** **Try the demo** on the landing page (with `PUBLIC_DEMO_ENABLED=true`), or sign in using the demo email printed by the seed script.
 
 ---
 

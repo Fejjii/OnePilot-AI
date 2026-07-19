@@ -58,13 +58,11 @@ No extra deployment steps are required. Users set **Response language** in the A
 - **Backend health:** http://localhost:8000/health
 - **Qdrant dashboard:** http://localhost:6333/dashboard
 
-### Demo Login
+### Demo access
 
-After seeding, use:
-- **Email:** `admin@onepilot.ai`
-- **Password:** `Demo1234!`
+**One-click demo (recommended):** set `PUBLIC_DEMO_ENABLED=true` in backend env, then use **Try the demo** on the landing page or login page. No credentials required; Gmail and Calendar stay simulated.
 
-Or use dev auth mode when `DEV_AUTH_ENABLED=true` in `.env` — access the app without credentials. **Never enable dev auth in public deployments.**
+**Manual sign-in (local):** after running the seed profile, use the demo email printed by `scripts/seed_demo.py`. Never enable `DEV_AUTH_ENABLED` in public deployments.
 
 Full pre-deploy checklist: [deployment_checklist.md](deployment_checklist.md)
 
@@ -73,9 +71,10 @@ Full pre-deploy checklist: [deployment_checklist.md](deployment_checklist.md)
 After deploying the backend, run:
 
 ```bash
-python scripts/smoke_test_public_demo.py --base-url https://your-api.example.com \
-  --demo-email admin@onepilot.ai --demo-password Demo1234!
+python scripts/smoke_test_public_demo.py --base-url https://your-api.example.com
 ```
+
+For optional authenticated checks after local seeding, pass `--demo-email` and `--demo-password` (values printed by the seed script). On the live public demo, verify **Try the demo** instead.
 
 This checks health, provider diagnostics, login, chat, prompt-injection blocking, and knowledge search without requiring live OpenAI, Gmail, or Calendar.
 
@@ -115,7 +114,7 @@ Do **not** connect personal Gmail or Calendar accounts to a public demo. Use moc
 1. Build from `backend/Dockerfile` (or use Docker Compose locally for validation).
 2. Set the minimum production env vars above.
 3. Run migrations before serving traffic: `alembic upgrade head` (or `docker compose run --rm migrate` locally).
-4. Seed demo data if needed: `python scripts/seed_demo.py` (creates `admin@onepilot.ai` / `Demo1234!`).
+4. Seed demo data if needed: `python scripts/seed_demo.py` (prints demo email to terminal). With `PUBLIC_DEMO_ENABLED=true`, one-click demo seeding is automatic.
 5. Expose port `8000` and verify `GET /health` returns `status: ok`.
 6. Run `scripts/smoke_test_public_demo.py` against the public URL.
 

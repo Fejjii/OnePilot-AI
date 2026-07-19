@@ -110,10 +110,10 @@ CORS_ORIGINS=https://onepilot-demo.vercel.app
 curl -s https://<YOUR_BACKEND_HOST>/health
 curl -s https://<YOUR_BACKEND_HOST>/providers
 
-python scripts/smoke_test_public_demo.py \
-  --base-url https://<YOUR_BACKEND_HOST> \
-  --demo-email admin@onepilot.ai \
-  --demo-password Demo1234!
+# Critical checks (no login required)
+python scripts/smoke_test_public_demo.py --base-url https://<YOUR_BACKEND_HOST>
 ```
+
+Verify the live landing page: open your Vercel URL, click **Try the demo**, and confirm the workspace loads with seeded documents, leads, and approvals. No credentials should be displayed.
 
 See [deployment_checklist.md](deployment_checklist.md) for the full checklist.

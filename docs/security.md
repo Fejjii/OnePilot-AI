@@ -21,7 +21,7 @@
 
 #### JWT Storage — Current Behavior and Known Risk
 
-Tokens are currently stored in **`localStorage`** in the browser. This is a deliberate simplification for the capstone project.
+Tokens are currently stored in **`localStorage`** in the browser. This is a deliberate simplification for the demo build.
 
 | Risk | Detail |
 |------|--------|
