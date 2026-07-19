@@ -6,7 +6,7 @@
 
 ## Philosophy
 
-These checks are for **capstone/demo quality**: they show how routing, RAG, and safety are tested without requiring RAGAS, LangSmith datasets, or OpenAI keys in CI. They are **not** a replacement for full production RAGAS scoring or human evaluation.
+These checks are for **demo-quality regression gating**: they show how routing, RAG, and safety are tested without requiring RAGAS, LangSmith datasets, or OpenAI keys in CI. They are **not** a replacement for full production RAGAS scoring or human evaluation.
 
 ---
 
@@ -141,7 +141,8 @@ When budget and stability allow:
 
 ## Related testing
 
-- **599** backend pytest cases (auth, RAG, agents, Serper, Gmail, Calendar, approvals, security)  
+- **690** backend pytest cases (3 skipped in CI) — auth, RAG, agents, Serper, Gmail, Calendar, approvals, security, demo entry
+- **86** frontend Vitest cases — pages, landing, demo flow, components
 - Golden RAG integration tests: `backend/tests/test_golden_rag.py`  
 - Security basics: `backend/tests/test_security_basics.py`  
 - Evaluation API: `backend/tests/test_evaluation_summary.py`  

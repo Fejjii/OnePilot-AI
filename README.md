@@ -2,9 +2,9 @@
 
 **OnePilot AI** is a production-style AI-powered business workspace for small and medium businesses. It combines a company knowledge base, retrieval-augmented generation (RAG), agentic workflow automation, email drafting, lead management, human approval gates, usage tracking, memory, and security guardrails in a single multi-tenant SaaS platform.
 
-> **Capstone project status:** All 8 phases complete. **641** backend tests passing. CI workflow validates backend, frontend, and evaluation suite. Full Docker stack validated locally.
+> **Project status:** Production-style AI operations platform with a live public demo. **690** backend tests and **86** frontend tests passing. CI validates backend, frontend, and the evaluation suite on every push/PR to `main`. Full Docker stack runs locally.
 
-**Public demo capable — not full production SaaS.** Suitable for a LinkedIn demo deployment (Vercel + Railway/Render) with managed Postgres, Qdrant, and Redis. Gmail, Calendar, HubSpot, and Stripe run in **mock mode** by default. Redis-backed rate limiting is implemented with in-memory fallback. Qdrant is **strongly recommended** for durable RAG. See [docs/deployment_checklist.md](docs/deployment_checklist.md).
+**Public demo is live** — frontend on **Vercel**, backend on **Railway**, sourced from the `deployment/public-demo` branch (identical to `main`). Reviewers open the landing page and click **Try the demo** — no account or credentials required. Gmail and Calendar actions are **simulated** in public-demo mode. See [docs/public_demo_deployment_steps.md](docs/public_demo_deployment_steps.md).
 
 ---
 
@@ -110,8 +110,8 @@ See [docs/security.md](docs/security.md).
 | Cache | Redis |
 | Vector DB | Qdrant |
 | Frontend | Next.js 16, TypeScript, Tailwind CSS, TanStack Query |
-| Testing | pytest (**599** tests), Ruff, Vitest |
-| Infra | Docker Compose |
+| Testing | pytest (**690** tests), Ruff, Vitest (**86** tests) |
+| Infra | Docker Compose; Vercel (frontend); Railway (public backend) |
 
 ---
 
@@ -253,13 +253,13 @@ cd backend
 python scripts/seed_demo.py
 ```
 
-This creates the demo user **`admin@onepilot.ai` / `Demo1234!`**, ingests **19 NovaEdge** knowledge documents, and seeds **12 leads**, **8 approvals** (with pending items), **40 usage events**, and **25 audit log** entries when the org is empty.
+This creates the seeded demo organization, ingests **19 NovaEdge** knowledge documents, and loads **12 leads**, **8 approvals** (with pending items), **40 usage events**, and **25 audit log** entries when the org is empty. The seed script prints the demo login email to the terminal for local sign-in testing.
 
 ### 6. Open the app
 
 - Frontend: [http://localhost:3000](http://localhost:3000) — the root URL serves a public landing page with product, safety, and architecture overviews
-- **One-click demo:** set `PUBLIC_DEMO_ENABLED=true` in `backend/.env`, then use the **Try the demo** button on the landing page (or the login page) — no credentials needed. The demo org is seeded automatically and Gmail/Calendar stay simulated.
-- **Demo login (manual):** `admin@onepilot.ai` / `Demo1234!`
+- **One-click demo (recommended):** set `PUBLIC_DEMO_ENABLED=true` in `backend/.env`, then use **Try the demo** on the landing page or login page — no credentials needed. The demo org is seeded automatically; Gmail and Calendar stay simulated.
+- **Manual sign-in (local only):** run the seed script above, then sign in with the demo email printed by the script.
 - Backend API docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 - Health check: [http://localhost:8000/health](http://localhost:8000/health)
 - Provider diagnostics: [http://localhost:8000/providers](http://localhost:8000/providers)
@@ -363,7 +363,7 @@ Provider keys are set via environment variables only. **No API keys are stored i
 
 ## Running Tests
 
-### Backend (641 tests)
+### Backend (690 tests, 3 skipped in CI)
 
 ```bash
 cd backend
@@ -380,7 +380,7 @@ ruff check src tests
 ruff format --check src tests
 ```
 
-### Frontend
+### Frontend (86 tests)
 
 ```bash
 cd frontend
@@ -399,7 +399,7 @@ make lint     # backend + frontend linters
 
 ### CI
 
-GitHub Actions (`.github/workflows/ci.yml`) runs on push/PR to `main`/`master`:
+GitHub Actions (`.github/workflows/ci.yml`) runs on push/PR to `main` and `deployment/**`:
 
 - Backend: install, full pytest, security tests, evaluation suite
 - Frontend: install, typecheck, Vitest, production build
@@ -408,12 +408,13 @@ Optional Docker smoke test job is documented as a future CI step in the workflow
 
 ### Pre-deploy smoke test
 
+Critical health and provider checks (no login required):
+
 ```bash
-python scripts/smoke_test_public_demo.py \
-  --base-url http://localhost:8000 \
-  --demo-email admin@onepilot.ai \
-  --demo-password Demo1234!
+python scripts/smoke_test_public_demo.py --base-url http://localhost:8000
 ```
+
+For optional authenticated checks after local seeding, pass `--demo-email` and `--demo-password` (values printed by `seed_demo.py`). On the live public demo, use **Try the demo** instead — no credentials are required.
 
 Full checklist: [docs/deployment_checklist.md](docs/deployment_checklist.md)
 
@@ -436,8 +437,9 @@ Then open **Evaluation** in the app or `GET /evaluation/summary`. See [docs/eval
 
 | Page | Path | Description |
 |------|------|-------------|
-| Login / Register | `/login`, `/register` | Auth with JWT, dev bypass available |
-| Dashboard | `/` | Usage summary, recent activity, quick actions |
+| Landing | `/` | Public product overview, safety model, architecture, and **Try the demo** |
+| Login / Register | `/login`, `/register` | Auth with JWT; one-click demo entry when enabled |
+| Dashboard | `/dashboard` | Usage summary, recent activity, quick actions |
 | AI Workspace | `/workspace` | Chat with the LangGraph agent, citations, speech-to-text, email drafting |
 | Knowledge Base | `/knowledge` | Upload documents, semantic search, grounded answers |
 | Leads | `/leads` | Lead table with qualification status (12 seeded) |
@@ -490,7 +492,7 @@ Full pre-push checklist: [docs/manual_test_checklist.md](docs/manual_test_checkl
 | 7 | Frontend pages & integration | ✅ Complete |
 | 8 | Docker, docs, finalization | ✅ Complete |
 
-**641 backend tests passing.** Frontend: typecheck, lint, build, and Vitest pass.
+**690 backend tests passing (3 skipped). 86 frontend tests passing.** Typecheck, lint, and production build are green in CI.
 
 ---
 
@@ -546,7 +548,7 @@ Transcription returns a detected `language` code. When preference is Auto, that 
 3. **No streaming** — Chat responses are synchronous (no Server-Sent Events or WebSocket yet).
 4. **Rate limiting** — Redis-backed when `REDIS_URL` is reachable (shared across workers). Without Redis, limits are in-memory per process and reset on restart.
 5. **No OAuth/SSO** — Username/password only.
-6. **Not full production SaaS** — Public demo deployment is supported (Vercel + Railway/Render) with documented gaps; no Kubernetes manifests, no HTTP-only cookies, no refresh tokens.
+6. **Not full production SaaS** — Public demo runs on Vercel + Railway with documented gaps; no Kubernetes manifests, no HTTP-only cookies, no refresh tokens.
 7. **Email Assistant** — No standalone page; email drafting runs inside AI Workspace.
 8. **Editable model selection** — Models are environment-driven; UI selection is planned for a future version.
 
@@ -564,4 +566,4 @@ See [docs/limitations_roadmap.md](docs/limitations_roadmap.md) for the full list
 
 ## License
 
-This project is part of an AI Engineering bootcamp capstone.
+See repository license terms. Built as a portfolio-grade AI operations platform.

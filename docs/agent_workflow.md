@@ -1,6 +1,6 @@
 # Agent Workflow
 
-> **Status:** Implemented. Memory, approvals, usage tracking, Serper web search, Gmail, Google Calendar, and compound workflows added in final capstone phase.
+> **Status:** Implemented. Memory, approvals, usage tracking, Serper web search, Gmail, Google Calendar, and compound workflows are integrated into the LangGraph agent.
 
 ## Overview
 
