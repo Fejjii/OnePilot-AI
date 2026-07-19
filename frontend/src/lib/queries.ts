@@ -27,8 +27,10 @@ import type {
   LeadCreate,
   LeadListResponse,
   LeadResponse,
+  MemoryClearResponse,
   MemoryItemResponse,
   MemoryListResponse,
+  MemoryStatusResponse,
   MemoryWriteRequest,
   AnswerResponse,
   BillingPlansResponse,
@@ -362,6 +364,34 @@ export function useMemoryDeleteMutation() {
   return useMutation({
     mutationFn: ({ scope, key }: { scope: string; key: string }) =>
       api.delete<void>(`/memory/${scope}/${encodeURIComponent(key)}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["memory"] });
+    },
+  });
+}
+
+export function useMemoryStatus() {
+  return useQuery({
+    queryKey: ["memory", "status"],
+    queryFn: () => api.get<MemoryStatusResponse>("/memory/status"),
+  });
+}
+
+export function useMemoryClearMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.delete<MemoryClearResponse>("/memory"),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["memory"] });
+    },
+  });
+}
+
+export function useMemoryPreferenceMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (disabled: boolean) =>
+      api.post<MemoryStatusResponse>("/memory/preferences", { disabled }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["memory"] });
     },

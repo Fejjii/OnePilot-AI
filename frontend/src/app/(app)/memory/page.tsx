@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Database, Plus, Trash2, Loader2 } from "lucide-react";
+import { Database, Plus, Trash2, Loader2, Eraser } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,8 +16,11 @@ import { Modal } from "@/components/ui/modal";
 import { Input, Label, Select, Textarea, FieldError } from "@/components/ui/input";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import {
+  useMemoryClearMutation,
   useMemoryDeleteMutation,
   useMemoryList,
+  useMemoryPreferenceMutation,
+  useMemoryStatus,
   useMemoryWriteMutation,
 } from "@/lib/queries";
 import { ApiRequestError } from "@/lib/api-client";
@@ -53,8 +56,14 @@ export default function MemoryPage() {
   const [scopeFilter, setScopeFilter] = useState<string>("");
   const [createOpen, setCreateOpen] = useState(false);
   const memory = useMemoryList(scopeFilter || undefined);
+  const status = useMemoryStatus();
   const remove = useMemoryDeleteMutation();
+  const clearAll = useMemoryClearMutation();
+  const preference = useMemoryPreferenceMutation();
   const items = memory.data?.items ?? [];
+  const agentEnabled = status.data?.agent_memory_enabled ?? true;
+  const sharedDemo = status.data?.shared_demo_tenant ?? false;
+  const userDisabled = status.data?.user_disabled ?? false;
 
   async function onDelete(scope: string, key: string) {
     if (!window.confirm(`Delete memory "${key}"?`)) return;
@@ -68,20 +77,101 @@ export default function MemoryPage() {
     }
   }
 
+  async function onClearAll() {
+    if (
+      !window.confirm(
+        "Clear all of your user and agent memories? This cannot be undone.",
+      )
+    ) {
+      return;
+    }
+    try {
+      const result = await clearAll.mutateAsync();
+      toast.success("Memory cleared", {
+        description: `${result.deleted_count} item(s) removed`,
+      });
+    } catch (err) {
+      const msg =
+        err instanceof ApiRequestError ? err.message : "Clear failed";
+      toast.error("Failed to clear memory", { description: msg });
+    }
+  }
+
+  async function onToggleDisabled() {
+    try {
+      const next = !userDisabled;
+      await preference.mutateAsync(next);
+      toast.success(next ? "Agent memory disabled" : "Agent memory enabled");
+    } catch (err) {
+      const msg =
+        err instanceof ApiRequestError ? err.message : "Update failed";
+      toast.error("Could not update preference", { description: msg });
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Memory"
-        description="Persistent agent memory scoped per user, organization, or agent. Optional TTL."
+        description="Durable facts the agent may recall across conversations. Secrets are rejected. Clear or disable anytime."
         actions={
-          <Button
-            leftIcon={<Plus className="h-4 w-4" />}
-            onClick={() => setCreateOpen(true)}
-          >
-            Write memory
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              leftIcon={<Eraser className="h-4 w-4" />}
+              onClick={() => void onClearAll()}
+              loading={clearAll.isPending}
+              disabled={items.length === 0}
+            >
+              Clear my memory
+            </Button>
+            <Button
+              leftIcon={<Plus className="h-4 w-4" />}
+              onClick={() => setCreateOpen(true)}
+            >
+              Write memory
+            </Button>
+          </div>
         }
       />
+
+      {status.data && (
+        <div
+          role="status"
+          className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700"
+        >
+          {sharedDemo ? (
+            <p>
+              Public demo uses a shared workspace. Agent memory recall and
+              auto-save are disabled so visitors cannot see each other&apos;s
+              notes. Manual entries are cleared when a new demo session starts.
+            </p>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p>
+                Agent memory is{" "}
+                <span className="font-semibold">
+                  {agentEnabled ? "enabled" : "disabled"}
+                </span>
+                {userDisabled ? " by your preference" : ""}.
+                {" "}
+                {status.data.item_count} visible item
+                {status.data.item_count === 1 ? "" : "s"}.
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => void onToggleDisabled()}
+                loading={preference.isPending}
+                aria-pressed={userDisabled}
+              >
+                {userDisabled ? "Enable agent memory" : "Disable agent memory"}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -108,7 +198,7 @@ export default function MemoryPage() {
             <EmptyState
               icon={Database}
               title="No memory yet"
-              description="Persist context the agent should remember across conversations: customer preferences, terminology, follow-ups."
+              description="Persist context the agent should remember across conversations: preferences, confirmed facts, and recurring goals."
             />
           ) : (
             <ul className="divide-y divide-slate-100">
@@ -147,8 +237,8 @@ export default function MemoryPage() {
                     <button
                       type="button"
                       onClick={() => onDelete(item.scope, item.key)}
-                      className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                      aria-label="Delete memory"
+                      className="min-h-[44px] min-w-[44px] rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                      aria-label={`Delete memory ${item.key}`}
                       disabled={isDeleting}
                     >
                       {isDeleting ? (
@@ -222,7 +312,7 @@ function CreateMemoryModal({ open, onClose }: CreateMemoryModalProps) {
         onClose();
       }}
       title="Write memory"
-      description="Stored under the current organization. TTL is optional."
+      description="Stored under the current organization and user. Secrets are rejected. TTL is optional."
       footer={
         <>
           <Button
@@ -255,7 +345,7 @@ function CreateMemoryModal({ open, onClose }: CreateMemoryModalProps) {
           <Label htmlFor="key">Key</Label>
           <Input
             id="key"
-            placeholder="preferred_tone, alert_email…"
+            placeholder="preferred_tone, timezone…"
             {...register("key")}
           />
           <FieldError message={errors.key?.message} />

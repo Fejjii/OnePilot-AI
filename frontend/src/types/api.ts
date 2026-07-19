@@ -436,6 +436,20 @@ export interface MemoryWriteRequest {
   ttl_seconds?: number | null;
 }
 
+export interface MemoryStatusResponse {
+  agent_memory_enabled: boolean;
+  reason: string;
+  user_disabled: boolean;
+  shared_demo_tenant: boolean;
+  item_count: number;
+  max_items: number;
+  max_chars: number;
+}
+
+export interface MemoryClearResponse {
+  deleted_count: number;
+}
+
 // Audit / Usage
 
 export interface AuditLogResponse {
