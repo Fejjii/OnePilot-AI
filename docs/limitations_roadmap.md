@@ -87,7 +87,7 @@ Despite the limitations above, the following components are designed and impleme
 - [ ] Real OpenAI streaming (Server-Sent Events)
 - [ ] Object storage for uploaded files (S3 / Cloudflare R2)
 - [ ] Background task queue (Celery + Redis or ARQ)
-- [ ] Workspace sample prompt chips and mock/live integration badges
+- [x] Workspace sample prompt chips and mock/live integration badges
 
 ### Medium-Term (3–6 months)
 - [ ] OAuth 2.0 / SAML SSO integration

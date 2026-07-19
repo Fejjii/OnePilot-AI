@@ -26,6 +26,8 @@ import { ChatMessage } from "@/components/domain/chat-message";
 import { CitationCard } from "@/components/domain/citation-card";
 import { ToolTracePanel } from "@/components/domain/tool-trace-panel";
 import { ApprovalBanner } from "@/components/domain/approval-banner";
+import { WorkspaceEmptyState } from "@/components/domain/workspace-empty-state";
+import { WorkspaceStatusBadges } from "@/components/domain/workspace-status-badges";
 import { WeakEvidenceWarning } from "@/components/domain/weak-evidence-warning";
 import { ConfidenceBadge } from "@/components/domain/confidence-badge";
 import { IntentBadge } from "@/components/domain/intent-badge";
@@ -41,6 +43,7 @@ import {
   useConversations,
 } from "@/lib/queries";
 import { ApiRequestError } from "@/lib/api-client";
+import { clearToken, useDemoModeFlag } from "@/lib/auth";
 import {
   cn,
   formatRelativeTime,
@@ -54,6 +57,15 @@ import type {
   ToolCallTrace,
   TraceStep,
 } from "@/types/api";
+
+/** Inline failure state for the last POST /chat attempt. */
+interface SendFailure {
+  /** "expired" when the API returned 401 (demo/session token no longer valid). */
+  kind: "expired" | "error";
+  /** The message text that failed, so the user can retry it. */
+  message: string;
+  description: string;
+}
 
 /** Ephemeral UI state for an in-flight POST /chat tied to one conversation target. */
 interface InFlightSend {
@@ -97,7 +109,9 @@ function WorkspaceInner() {
   const deleteConversation = useConversationDeleteMutation();
 
   const [inFlight, setInFlight] = useState<InFlightSend | null>(null);
+  const [sendFailure, setSendFailure] = useState<SendFailure | null>(null);
   const [viewEpoch, setViewEpoch] = useState(0);
+  const isDemo = useDemoModeFlag();
   const [languagePreference, setLanguagePreference] =
     useState<LanguagePreference>("auto");
   const [speechDetectedLanguage, setSpeechDetectedLanguage] = useState<
@@ -261,6 +275,7 @@ function WorkspaceInner() {
       setInFlight(null);
       chat.reset();
     }
+    setSendFailure(null);
 
     setNavigationOverride(id);
     setViewEpoch((e) => e + 1);
@@ -297,6 +312,7 @@ function WorkspaceInner() {
     if (!trimmed) return;
 
     const sendTargetId = activeConversationId;
+    setSendFailure(null);
     setInFlight({
       conversationId: sendTargetId,
       pendingUser: {
@@ -334,12 +350,37 @@ function WorkspaceInner() {
         });
       }
     } catch (err) {
-      const msg =
-        err instanceof ApiRequestError ? err.message : "Failed to send message";
-      toast.error("Could not send message", { description: msg });
       setInFlight(null);
+      if (err instanceof ApiRequestError && err.status === 401) {
+        setSendFailure({
+          kind: "expired",
+          message: trimmed,
+          description:
+            "Your session has expired. Sign in again or restart the demo to continue.",
+        });
+        return;
+      }
+      setSendFailure({
+        kind: "error",
+        message: trimmed,
+        description:
+          err instanceof ApiRequestError
+            ? err.message
+            : "The message could not be sent. Please try again.",
+      });
     }
   }
+
+  function handleSessionExpired() {
+    clearToken();
+    router.push("/login");
+  }
+
+  const emptyResult =
+    inFlightAppliesToView &&
+    !!inFlight?.response &&
+    !inFlight.response.final_response &&
+    !inFlight.response.approval_required;
 
   const viewKey = activeConversationId ?? "new";
 
@@ -358,6 +399,8 @@ function WorkspaceInner() {
           </Button>
         }
       />
+
+      <WorkspaceStatusBadges />
 
       <div className="grid flex-1 gap-4 lg:grid-cols-[280px_1fr_320px] lg:overflow-hidden">
         <ConversationsSidebar
@@ -389,6 +432,14 @@ function WorkspaceInner() {
           languagePreference={languagePreference}
           onLanguagePreferenceChange={setLanguagePreference}
           onSpeechLanguage={setSpeechDetectedLanguage}
+          isDemo={isDemo}
+          emptyResult={emptyResult}
+          sendFailure={sendFailure}
+          onDismissFailure={() => setSendFailure(null)}
+          onRetryFailure={() => {
+            if (sendFailure) void handleSend(sendFailure.message);
+          }}
+          onSessionExpired={handleSessionExpired}
         />
         <DetailsPanel
           key={`details-${viewKey}-${viewEpoch}`}
@@ -604,6 +655,12 @@ interface ChatColumnProps {
   languagePreference: LanguagePreference;
   onLanguagePreferenceChange: (pref: LanguagePreference) => void;
   onSpeechLanguage: (lang: string | null) => void;
+  isDemo: boolean;
+  emptyResult: boolean;
+  sendFailure: SendFailure | null;
+  onDismissFailure: () => void;
+  onRetryFailure: () => void;
+  onSessionExpired: () => void;
 }
 
 function ChatColumn({
@@ -619,6 +676,12 @@ function ChatColumn({
   languagePreference,
   onLanguagePreferenceChange,
   onSpeechLanguage,
+  isDemo,
+  emptyResult,
+  sendFailure,
+  onDismissFailure,
+  onRetryFailure,
+  onSessionExpired,
 }: ChatColumnProps) {
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -666,17 +729,34 @@ function ChatColumn({
           </div>
         ) : isError ? (
           <ErrorState onRetry={onRetry} />
-        ) : messages.length === 0 ? (
-          <EmptyState
-            icon={Sparkles}
-            title="Ready when you are"
-            description="Ask a question grounded in your knowledge base, ask the agent to draft an email, or capture a lead."
+        ) : messages.length === 0 && !sendFailure ? (
+          <WorkspaceEmptyState
+            isDemo={isDemo}
+            onPrompt={onSend}
+            disabled={isSending}
           />
         ) : (
           messages.map((m) => <ChatMessage key={m.id} message={m} />)
         )}
         {isSending && <AssistantTypingBubble />}
         {approvalRequired && <ApprovalBanner approvalId={approvalId} />}
+        {emptyResult && (
+          <div
+            role="status"
+            className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900"
+          >
+            The agent completed without a text answer. Try rephrasing or
+            narrowing your question.
+          </div>
+        )}
+        {sendFailure && (
+          <SendFailureNotice
+            failure={sendFailure}
+            onDismiss={onDismissFailure}
+            onRetry={onRetryFailure}
+            onSessionExpired={onSessionExpired}
+          />
+        )}
       </div>
       <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3">
         <LanguageSelector
@@ -723,6 +803,51 @@ function ChatColumn({
         </div>
       </div>
     </Card>
+  );
+}
+
+interface SendFailureNoticeProps {
+  failure: SendFailure;
+  onDismiss: () => void;
+  onRetry: () => void;
+  onSessionExpired: () => void;
+}
+
+/** Inline, recoverable failure state for the last send (replaces toast-only errors). */
+function SendFailureNotice({
+  failure,
+  onDismiss,
+  onRetry,
+  onSessionExpired,
+}: SendFailureNoticeProps) {
+  const expired = failure.kind === "expired";
+  return (
+    <div
+      role="alert"
+      className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs text-rose-800"
+    >
+      <p className="flex items-center gap-1.5 font-semibold">
+        <ShieldAlert className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        {expired ? "Session expired" : "Message not sent"}
+      </p>
+      <p className="mt-1">{failure.description}</p>
+      <div className="mt-2 flex gap-2">
+        {expired ? (
+          <Button size="sm" variant="outline" onClick={onSessionExpired}>
+            Go to sign-in
+          </Button>
+        ) : (
+          <>
+            <Button size="sm" variant="outline" onClick={onRetry}>
+              Try again
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onDismiss}>
+              Dismiss
+            </Button>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
