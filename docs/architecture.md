@@ -1,5 +1,35 @@
 # Architecture
 
+## Recruiter-friendly overview
+
+OnePilot AI is a **multi-tenant AI operations workspace**: a Next.js client talks to a FastAPI backend that runs a LangGraph agent, a RAG pipeline, and approval-gated provider adapters.
+
+| Piece | Role |
+|-------|------|
+| Frontend | Landing, guided workspace, knowledge, leads, approvals, memory, usage, settings |
+| API layer | Thin routers, JWT principal, validation |
+| Services | Business logic, quotas, audit, memory, RAG, approvals |
+| Agent | Two-stage routing → tools → structured response |
+| Providers | OpenAI / Serper / Gmail / Calendar / Stripe / HubSpot with mock or live modes |
+| Data | PostgreSQL (tenant-scoped), Redis (rate limits), Qdrant or in-memory vectors |
+
+**Public demo track:** Vercel frontend + Railway backend. Gmail and Calendar are **mock**. Shared-demo agent memory is disabled and cleared on demo start. See [capabilities.md](capabilities.md) and [safety_and_privacy.md](safety_and_privacy.md).
+
+```mermaid
+flowchart TB
+    User[Reviewer browser] --> Landing[Landing Try the demo]
+    Landing --> FE[Next.js app]
+    FE -->|JWT REST| API[FastAPI]
+    API --> Agent[LangGraph agent]
+    API --> RAG[RAG knowledge]
+    API --> HITL[Approvals]
+    Agent --> Tools[Tools]
+    Tools --> Adapters[Provider adapters]
+    Adapters --> MockGC[Mock Gmail Calendar on public demo]
+    Adapters --> Data[(Postgres Redis Qdrant/fallback)]
+    HITL --> Adapters
+```
+
 ## System Overview
 
 OnePilot AI follows a layered, multi-tenant SaaS architecture. Every layer has a single responsibility and communicates through well-defined interfaces.

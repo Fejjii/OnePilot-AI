@@ -141,7 +141,7 @@ When budget and stability allow:
 
 ## Related testing
 
-- **690** backend pytest cases (3 skipped in CI) — auth, RAG, agents, Serper, Gmail, Calendar, approvals, security, demo entry
+- Backend pytest suite in CI — auth, RAG, agents, Serper, Gmail, Calendar, approvals, memory isolation, security, demo entry (see root `README.md` for latest verified counts)
 - **86** frontend Vitest cases — pages, landing, demo flow, components
 - Golden RAG integration tests: `backend/tests/test_golden_rag.py`  
 - Security basics: `backend/tests/test_security_basics.py`  
