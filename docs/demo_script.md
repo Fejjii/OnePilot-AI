@@ -1,189 +1,156 @@
 # Demo Script — OnePilot AI
 
-**Duration:** 8–10 minutes  
+**Duration:** 8–10 minutes (or use the 3-minute cut in [portfolio/demo_narration_3min.md](portfolio/demo_narration_3min.md))  
 **Audience:** Recruiter, hiring manager, or technical reviewer  
-**Entry:** Open the public landing page and click **Try the demo** (no credentials required). For local Docker, use **Try the demo** with `PUBLIC_DEMO_ENABLED=true` or sign in after running the seed script.
+**Live entry:** https://one-pilot-ai.vercel.app → **Try the demo** (no credentials)
 
 ---
 
-## Prerequisites
+## Honesty preamble (say this once)
+
+On the **public demo**, Gmail and Calendar use **mock providers**. Approvals, RAG, leads, and audit flows are real. Agent memory persistence is **disabled** on the shared demo tenant so reviewers do not leak facts across sessions.
+
+---
+
+## Prerequisites (local optional)
 
 ```bash
-docker compose down
 docker compose up -d --build
 docker compose run --rm migrate
 docker compose run --rm seed
-cd backend && uv run python -m onepilot.evaluation.run_all_evals
+# Optional: PUBLIC_DEMO_ENABLED=true for one-click demo locally
 ```
 
 Verify: `http://localhost:3000` and `http://localhost:8000/health`
 
 ---
 
-## Reviewer Story (13 steps)
+## Guided walkthrough
 
-### 0 — Landing page (30 s)
+### 1 — Try the demo (30 s)
 
-Open the root URL (`/`).
+Open https://one-pilot-ai.vercel.app.
 
-**Show:** Product overview, human-in-the-loop safety model, architecture/tech stack, and **Try the demo** CTA. No credentials displayed.
+**Show:** Landing hero, safety/HITL messaging, architecture/tech stack, **Try the demo** CTA. No credentials on screen.
 
-**Say:** OnePilot is an AI operations platform for small businesses — grounded answers, workflow automation, and mandatory human approval before any external action.
+**Say:** OnePilot is an AI operations workspace — grounded answers, workflows, and mandatory human approval before external actions.
 
----
-
-### 1 — Dashboard (30 s)
-
-After **Try the demo**, open Dashboard.
-
-**Show:** SaaS overview, live vs mock provider banner, usage summary, pending approvals, recent activity.
-
-**Say:** One operational view for knowledge, pipeline, usage, and approval backlog.
+**Action:** Click **Try the demo** → land in the seeded workspace.
 
 ---
 
-### 2 — AI Workspace: general routing (30 s)
+### 2 — Guided workspace (45 s)
 
-**Prompt:** `What can you do for me?`
+Open **AI Workspace** if not already there.
 
-**Explain:** Routes to **general assistant** — no RAG, no web search. Capability overview only.
+**Show:**
+
+- Guided empty state (capabilities + human-approval note)
+- Provider-status badges (Demo mode, Gmail simulated, Calendar simulated, retrieval availability)
+- Suggested prompt chips
+
+**Action:** Click a chip (e.g. business summary) or ask: `What can you do for me?`
+
+**Say:** Chips submit real `POST /chat` requests — not canned UI strings.
 
 ---
 
-### 3 — Internal RAG (45 s)
+### 3 — Knowledge search (60 s)
 
 **Prompt:** `What services does NovaEdge Solutions offer and what integrations are supported?`
 
-**Explain:** Internal company knowledge via retrieval. Citations from uploaded NovaEdge docs. Confidence and weak-evidence guardrail when evidence is thin.
+**Show:** Grounded answer with **citations** from seeded NovaEdge docs.
+
+**Say:** Internal RAG only here — citations are document titles/sections from the company knowledge base. Weak evidence is called out instead of inventing facts.
+
+**Optional:** Open **Knowledge** and run the same question via search/answer UI.
 
 ---
 
-### 4 — Serper live web search (45 s)
-
-**Prompt:** `Find recent SMB automation trends.`
-
-**Explain:** External web intelligence via Serper (`external.web_search`). **External web evidence** section with URL citations — separate from internal KB.
-
-Settings → Serper shows **live** when `SERPER_API_KEY` is set.
-
----
-
-### 5 — Hybrid internal plus external (60 s)
-
-**Prompt:** `Find recent SMB automation trends and compare them with NovaEdge Solutions services.`
-
-**Explain:** `web_and_knowledge` intent runs **both** Serper and RAG. Answer sections: **Internal company knowledge**, **External web evidence**, **Recommendation**.
-
----
-
-### 6 — Gmail workflow (90 s)
+### 4 — Approvals path with simulated Gmail (90 s)
 
 **Prompt:** `Draft and send an email to a high priority lead about NovaEdge automation services.`
 
 **Explain:**
 
-- Agent generates draft in-app (`email.draft`) — no Gmail call yet
-- **Approval required** before any Gmail action
-- After approve on Approvals page → Gmail **draft** created (live or mock)
-- **Send disabled for safety** — `GMAIL_SEND_ENABLED=false` by default
-- On the **public demo**, Gmail is **simulated** (mock provider)
+1. Agent drafts email content in-app
+2. Gmail provider action requires **approval**
+3. On public demo, Gmail is **simulated** after approve
+4. Send remains disabled by default (`GMAIL_SEND_ENABLED=false`)
+
+Open **Approvals** → inspect payload/risk → **Approve** one item → note execution metadata / audit trail.
 
 ---
 
-### 7 — Calendar workflow (90 s)
+### 5 — Simulated Calendar (60 s)
 
-**Prompt 1:** `Am I free Friday at 11 am?`
+**Prompt 1:** `Am I free Friday at 11 am?`  
+**Prompt 2:** `Schedule a 30 minute meeting with a high priority lead next week.`
 
-**Explain:** Google Calendar across selected calendars (live when OAuth configured; **mock on public demo**). Busy/free only — **no private event titles** exposed in responses or diagnostics.
-
-**Prompt 2:** `Suggest three meeting slots next week.`
-
-**Explain:** Slot suggestion tool — no event created, no approval.
-
-**Prompt 3:** `Schedule a 30 minute meeting with a high priority lead next week.`
-
-**Explain:** Creates **approval request** only. Event appears in calendar **after** admin approves.
+**Explain:** Availability/slots are mock on public demo (busy/free style — no private titles). Event creation creates an approval first; after approve, the mock calendar provider records the event.
 
 ---
 
-### 8 — Compound workflow (60 s)
+### 6 — Leads / business insights (45 s)
 
-**Prompt:** `Find recent SMB automation trends, draft an email, and schedule a meeting with a high priority lead next week.`
+Open **Dashboard** and **Leads**.
 
-**Explain:** Multi-tool sequential workflow:
+**Show:** Seeded pipeline (12 leads), usage snapshot, pending approvals, recent activity.
 
-1. `external.web_search` — research
-2. `email.draft` + Gmail approval
-3. `calendar.create_event_request` + Calendar approval
-
-No external side effects until approvals are granted.
+**Say:** The agent sits inside an ops surface — not a naked chat box.
 
 ---
 
-### 9 — Approvals page (45 s)
+### 7 — Memory behavior (45 s)
 
-Open **Approvals**.
+Open **Memory**.
 
-**Show:** Pending Gmail and/or Calendar requests, proposed payload, risk level.
+**Show:** Memory UI (scopes, controls). Check status messaging for shared demo.
 
-**Action:** Approve one item → execution metadata (draft id or event id) on detail view.
-
-**Optional:** Reject or request more info.
+**Say (public demo):** Agent memory is **disabled** on the shared-demo tenant, and starting a new demo session **clears** prior memories so reviewers don’t inherit each other’s facts. Private tenants can use recall/persist in the LangGraph workflow.
 
 ---
 
-### 10 — Usage and Admin (30 s)
+### 8 — Mobile workspace (30 s)
 
-Open **Usage & Admin**.
+Resize to a phone width or open on a phone.
 
-**Show:** Token counts, estimated costs, quota progress, invoice preview (mock Stripe), audit log entries.
+**Show:** Bottom tabs (Chat / Approvals / Knowledge / Leads / More) and workspace **Chat | History | Details** segmented control with sticky composer.
 
-**Say:** Full observability for cost control and compliance — estimates only, no real charges.
-
----
-
-### 11 — Evaluation (30 s)
-
-Open **Evaluation**.
-
-**Show:** Deterministic offline eval results (routing, RAG golden set, safety/HITL).
-
-**Say:** Regression gates for demo quality — not a substitute for production RAGAS or human eval.
+**Say:** Same product flows; desktop keeps the three-column layout.
 
 ---
 
-### 12 — Settings / provider diagnostics (45 s)
+### 9 — Close on architecture & safety (45 s)
 
-Open **Settings**.
+Open **Settings → provider diagnostics** (no secrets).
 
-**Show provider diagnostics** (no secrets):
-
-| Provider | Expected mode (public demo) |
-|----------|----------------------------|
-| OpenAI | fallback (no key) or live |
-| Serper | optional or live |
+| Provider (public demo) | Expected |
+|------------------------|----------|
 | Gmail | **mock** |
 | Google Calendar | **mock** |
-| Qdrant | in-memory fallback or live |
-| Redis | live (Railway) or in-memory |
-| Postgres | live (required) |
-| LangSmith | local or live |
+| OpenAI | live or deterministic fallback |
+| Serper | live or optional mock |
+| Qdrant | live or in-memory fallback |
+| Postgres / Redis | live on Railway |
 
-**Close:** FastAPI + LangGraph + Postgres + Qdrant + Redis. Every external integration uses provider adapters. Multi-tenant isolation, audit logs, quotas, and mandatory HITL before Gmail drafts/events. Live public demo on Vercel + Railway with simulated Gmail/Calendar.
+**Close:** FastAPI + LangGraph + Postgres + Redis + Qdrant/fallback. Provider adapters. Tenant isolation. HITL before external side effects. Live on Vercel + Railway.
 
 ---
 
-## Offline / no-key demo
+## Optional deeper prompts
 
-- Without `OPENAI_API_KEY`: deterministic LLM fallback — routing and workflows still demonstrate
-- Without `SERPER_API_KEY`: mock web results with clear optional mode label
-- Without Google OAuth (public demo default): Gmail and Calendar use mock providers; approval flow unchanged
-- Re-run seed safely: `docker compose run --rm seed` (idempotent)
+| Goal | Prompt |
+|------|--------|
+| External web | `Find recent SMB automation trends.` |
+| Hybrid | `Find recent SMB automation trends and compare them with NovaEdge Solutions services.` |
+| Compound | `Find recent SMB automation trends, draft an email, and schedule a meeting with a high priority lead next week.` |
 
 ---
 
 ## Related docs
 
-- [architecture.md](architecture.md) — system and workflow diagrams
-- [manual_test_checklist.md](manual_test_checklist.md) — pre-push validation
-- [google_workspace_oauth_setup.md](google_workspace_oauth_setup.md) — Gmail + Calendar OAuth
+- [portfolio/demo_narration_3min.md](portfolio/demo_narration_3min.md) — timed narration
+- [capabilities.md](capabilities.md) — live vs mocked matrix
+- [safety_and_privacy.md](safety_and_privacy.md) — HITL and isolation
+- [screenshots/README.md](screenshots/README.md) — capture list
