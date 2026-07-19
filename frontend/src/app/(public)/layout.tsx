@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   BookOpen,
   ShieldCheck,
@@ -13,7 +14,7 @@ export default function PublicLayout({
     <div className="grid min-h-full lg:grid-cols-2">
       {/* Marketing pane */}
       <div className="relative hidden flex-col justify-between bg-slate-950 px-12 py-12 text-white lg:flex">
-        <div className="flex items-center gap-3">
+        <Link href="/" className="flex w-fit items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 text-lg font-bold">
             O
           </div>
@@ -23,7 +24,7 @@ export default function PublicLayout({
               AI operations for small businesses
             </p>
           </div>
-        </div>
+        </Link>
 
         <div className="max-w-md">
           <h2 className="text-3xl font-semibold leading-tight">
@@ -53,7 +54,8 @@ export default function PublicLayout({
         </div>
 
         <p className="text-[11px] text-slate-500">
-          © {new Date().getFullYear()} OnePilot AI. Capstone demo.
+          © {new Date().getFullYear()} OnePilot AI. Public demo actions are
+          simulated.
         </p>
       </div>
 
@@ -61,12 +63,14 @@ export default function PublicLayout({
       <div className="flex items-center justify-center bg-slate-50 px-4 py-12">
         <div className="w-full max-w-md">
           <div className="mb-8 text-center lg:hidden">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 text-white font-bold text-xl">
-              O
-            </div>
-            <h1 className="mt-4 text-2xl font-bold tracking-tight text-slate-900">
-              OnePilot AI
-            </h1>
+            <Link href="/" className="inline-block">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 text-white font-bold text-xl">
+                O
+              </div>
+              <h1 className="mt-4 text-2xl font-bold tracking-tight text-slate-900">
+                OnePilot AI
+              </h1>
+            </Link>
             <p className="mt-1 text-sm text-slate-500">
               AI operations for small businesses
             </p>

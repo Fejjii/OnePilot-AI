@@ -181,7 +181,7 @@ def test_provider_diagnostics_reasons_for_fallback(client: TestClient) -> None:
             "mock" in reason
             or "optional" in reason
             or "not set" in reason
-            or "capstone" in reason
+            or "demo" in reason
             or "missing" in reason
             or "provider issue" in reason
         )

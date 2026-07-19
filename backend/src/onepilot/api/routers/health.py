@@ -503,7 +503,7 @@ def provider_diagnostics(
         serper_reason = None
     elif serper_mode_str == "mock":
         serper_mode = ProviderMode.MOCK
-        serper_reason = "SERPER_API_KEY set but mock adapter active (capstone demo)"
+        serper_reason = "SERPER_API_KEY set but mock adapter active (demo-safe mode)"
     elif serper_mode_str == "missing":
         serper_mode = ProviderMode.OPTIONAL
         serper_reason = "SERPER_API_KEY not set; web search is optional, mock results in demos"
@@ -589,13 +589,13 @@ def provider_diagnostics(
         )
     )
     
-    # HubSpot (capstone-safe mock)
+    # HubSpot (demo-safe mock)
     hubspot_provider = get_crm_provider()
     hubspot_configured = bool(os.environ.get("HUBSPOT_API_KEY", ""))
     hubspot_is_mock = "Mock" in hubspot_provider.__class__.__name__
     hubspot_mode = ProviderMode.MOCK
     hubspot_reason = (
-        "Mock HubSpot adapter for capstone-safe demos"
+        "Mock HubSpot adapter for demo-safe operation"
         if hubspot_is_mock
         else "HubSpot API key configured; mock adapter still used in this version"
     )
@@ -618,10 +618,10 @@ def provider_diagnostics(
     
     diagnostics.append(_build_calendar_diagnostic(settings=settings, checked_at=now))
     
-    # Twilio (capstone-safe mock)
+    # Twilio (demo-safe mock)
     twilio_configured = bool(os.environ.get("TWILIO_API_KEY", ""))
     twilio_mode = ProviderMode.MOCK
-    twilio_reason = "Mock Twilio adapter for capstone-safe demos (SMS not wired live)"
+    twilio_reason = "Mock Twilio adapter for demo-safe operation (SMS not wired live)"
     
     diagnostics.append(
         ProviderDiagnostic(
@@ -639,13 +639,13 @@ def provider_diagnostics(
         )
     )
     
-    # Stripe (capstone-safe mock)
+    # Stripe (demo-safe mock)
     stripe_provider = get_billing_provider()
     stripe_configured = bool(os.environ.get("STRIPE_SECRET_KEY", ""))
     stripe_is_mock = "Mock" in stripe_provider.__class__.__name__
     stripe_mode = ProviderMode.MOCK
     stripe_reason = (
-        "Mock Stripe adapter for capstone-safe demos"
+        "Mock Stripe adapter for demo-safe operation"
         if stripe_is_mock
         else "Stripe secret configured; mock adapter still used in this version"
     )
