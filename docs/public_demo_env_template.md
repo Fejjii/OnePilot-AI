@@ -36,6 +36,13 @@ GMAIL_PROVIDER_MODE=mock
 GOOGLE_CALENDAR_PROVIDER_MODE=mock
 GMAIL_SEND_ENABLED=false
 
+# ── One-click demo access (OP-006) ───────────────────────
+# Enables POST /demo/start: reviewers enter a seeded demo workspace
+# without credentials. In production this REQUIRES the mock provider
+# modes above — the backend refuses to start otherwise.
+PUBLIC_DEMO_ENABLED=true
+PUBLIC_DEMO_SESSION_MINUTES=60
+
 # Leave Google OAuth empty for public demo (mock providers)
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
@@ -58,6 +65,8 @@ LANGSMITH_TRACING=false
 | `JWT_SECRET` | Generate with `openssl rand -hex 32` or your password manager. Must be ≥ 32 characters. Never use `change-me-in-production`. |
 | `CORS_ORIGINS` | Exact Vercel URL, no wildcards. Add preview URLs only if you need preview deployments. |
 | `DEV_AUTH_ENABLED` | Must be `false`. Backend startup fails if `true` when `APP_ENV=production`. |
+| `PUBLIC_DEMO_ENABLED` | Enables one-click demo entry (`POST /demo/start`, rate limited 10/hour/IP). With `APP_ENV=production`, startup fails unless `GMAIL_PROVIDER_MODE=mock`, `GOOGLE_CALENDAR_PROVIDER_MODE=mock`, and `GMAIL_SEND_ENABLED=false`. |
+| `PUBLIC_DEMO_SESSION_MINUTES` | Lifetime of tokens issued by `/demo/start` (default 60). Expired demo sessions return 401 and the UI falls back to the login page. |
 | `GMAIL_PROVIDER_MODE` | Use `mock` — do not connect personal Gmail. |
 | `GOOGLE_CALENDAR_PROVIDER_MODE` | Use `mock` — do not connect personal Calendar. |
 | `OPENAI_API_KEY` | Optional. App uses deterministic fallback without it. Set spend limits in OpenAI dashboard if enabled. |
