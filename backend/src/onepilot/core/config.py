@@ -53,7 +53,9 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str = "sqlite:///./onepilot_dev.db"
     REDIS_URL: str = ""
-    QDRANT_URL: str = "http://localhost:6333"
+    # Empty by default so production hosts without Qdrant correctly use the
+    # in-memory vector fallback. Local Docker Compose / .env set this explicitly.
+    QDRANT_URL: str = ""
     QDRANT_API_KEY: str = ""
 
     LANGSMITH_API_KEY: str = ""
@@ -134,7 +136,7 @@ class Settings(BaseSettings):
 
     @property
     def has_qdrant(self) -> bool:
-        return bool(self.QDRANT_URL)
+        return bool(self.QDRANT_URL.strip())
 
     @property
     def has_redis(self) -> bool:

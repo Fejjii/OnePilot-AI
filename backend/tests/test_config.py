@@ -33,6 +33,16 @@ class TestSettings:
         s = Settings()
         assert s.has_redis is False
 
+    def test_has_qdrant_false_when_unset(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Unset/blank QDRANT_URL must disable Qdrant so in-memory fallback is used."""
+        monkeypatch.delenv("QDRANT_URL", raising=False)
+        s = Settings()
+        assert s.QDRANT_URL == ""
+        assert s.has_qdrant is False
+        monkeypatch.setenv("QDRANT_URL", "   ")
+        s = Settings()
+        assert s.has_qdrant is False
+
     def test_dev_auth_defaults_false_without_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("DEV_AUTH_ENABLED", raising=False)
         s = Settings(APP_ENV="dev")
