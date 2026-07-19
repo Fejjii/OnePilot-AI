@@ -27,6 +27,10 @@ import { CitationCard } from "@/components/domain/citation-card";
 import { ToolTracePanel } from "@/components/domain/tool-trace-panel";
 import { ApprovalBanner } from "@/components/domain/approval-banner";
 import { WorkspaceEmptyState } from "@/components/domain/workspace-empty-state";
+import {
+  WorkspacePanelTabs,
+  type WorkspacePanelId,
+} from "@/components/domain/workspace-panel-tabs";
 import { WorkspaceStatusBadges } from "@/components/domain/workspace-status-badges";
 import { WeakEvidenceWarning } from "@/components/domain/weak-evidence-warning";
 import { ConfidenceBadge } from "@/components/domain/confidence-badge";
@@ -111,6 +115,7 @@ function WorkspaceInner() {
   const [inFlight, setInFlight] = useState<InFlightSend | null>(null);
   const [sendFailure, setSendFailure] = useState<SendFailure | null>(null);
   const [viewEpoch, setViewEpoch] = useState(0);
+  const [mobilePanel, setMobilePanel] = useState<WorkspacePanelId>("chat");
   const isDemo = useDemoModeFlag();
   const [languagePreference, setLanguagePreference] =
     useState<LanguagePreference>("auto");
@@ -383,9 +388,20 @@ function WorkspaceInner() {
     !inFlight.response.approval_required;
 
   const viewKey = activeConversationId ?? "new";
+  const conversationTotal = conversations.data?.total ?? 0;
+
+  function selectConversation(id: string | null) {
+    navigateToConversation(id);
+    setMobilePanel("chat");
+  }
+
+  function startNewConversation() {
+    navigateToConversation(null);
+    setMobilePanel("chat");
+  }
 
   return (
-    <div className="flex flex-col gap-4 lg:h-[calc(100vh-7rem)]">
+    <div className="flex min-h-0 flex-col gap-3 sm:gap-4 lg:h-[calc(100vh-7rem)] max-lg:h-[calc(100dvh-11rem)]">
       <PageHeader
         title="AI Workspace"
         description="Grounded chat with intent routing, citations, tool traces, and human approval gates."
@@ -393,59 +409,102 @@ function WorkspaceInner() {
           <Button
             variant="outline"
             leftIcon={<Plus className="h-4 w-4" />}
-            onClick={() => navigateToConversation(null)}
+            onClick={startNewConversation}
           >
-            New conversation
+            <span className="sm:hidden">New</span>
+            <span className="hidden sm:inline">New conversation</span>
           </Button>
         }
       />
 
       <WorkspaceStatusBadges />
 
-      <div className="grid flex-1 gap-4 lg:grid-cols-[280px_1fr_320px] lg:overflow-hidden">
-        <ConversationsSidebar
-          activeId={activeConversationId}
-          onSelect={navigateToConversation}
-          onDelete={handleDeleteConversation}
-          deletingId={
-            deleteConversation.isPending
-              ? (deleteConversation.variables ?? null)
-              : null
-          }
-          conversations={conversations}
-        />
-        <ChatColumn
-          key={`chat-${viewKey}-${viewEpoch}`}
-          activeId={activeConversationId}
-          messages={messages}
-          isSending={chat.isPending}
-          isLoading={
-            !!activeConversationId &&
-            conversationDetail.isFetching &&
-            !activeConversation
-          }
-          isError={conversationDetail.isError}
-          onRetry={() => conversationDetail.refetch()}
-          onSend={handleSend}
-          approvalRequired={approvalRequired}
-          approvalId={approvalId}
-          languagePreference={languagePreference}
-          onLanguagePreferenceChange={setLanguagePreference}
-          onSpeechLanguage={setSpeechDetectedLanguage}
-          isDemo={isDemo}
-          emptyResult={emptyResult}
-          sendFailure={sendFailure}
-          onDismissFailure={() => setSendFailure(null)}
-          onRetryFailure={() => {
-            if (sendFailure) void handleSend(sendFailure.message);
-          }}
-          onSessionExpired={handleSessionExpired}
-        />
-        <DetailsPanel
-          key={`details-${viewKey}-${viewEpoch}`}
-          data={panelData}
-          sending={chat.isPending && !panelData}
-        />
+      <WorkspacePanelTabs
+        active={mobilePanel}
+        onChange={setMobilePanel}
+        detailsAvailable={!!panelData}
+        conversationCount={conversationTotal}
+      />
+
+      <div className="grid min-h-0 flex-1 gap-4 overflow-hidden lg:grid-cols-[280px_1fr_320px]">
+        <div
+          id="workspace-panel-history"
+          role="tabpanel"
+          aria-labelledby="workspace-tab-history"
+          className={cn(
+            "min-h-0 overflow-hidden",
+            mobilePanel === "history" ? "flex flex-col" : "hidden",
+            "lg:flex",
+          )}
+        >
+          <ConversationsSidebar
+            activeId={activeConversationId}
+            onSelect={selectConversation}
+            onDelete={handleDeleteConversation}
+            deletingId={
+              deleteConversation.isPending
+                ? (deleteConversation.variables ?? null)
+                : null
+            }
+            conversations={conversations}
+          />
+        </div>
+        <div
+          id="workspace-panel-chat"
+          role="tabpanel"
+          aria-labelledby="workspace-tab-chat"
+          className={cn(
+            "min-h-0 overflow-hidden",
+            mobilePanel === "chat" ? "flex flex-col" : "hidden",
+            "lg:flex",
+          )}
+        >
+          <ChatColumn
+            key={`chat-${viewKey}-${viewEpoch}`}
+            activeId={activeConversationId}
+            messages={messages}
+            isSending={chat.isPending}
+            isLoading={
+              !!activeConversationId &&
+              conversationDetail.isFetching &&
+              !activeConversation
+            }
+            isError={conversationDetail.isError}
+            onRetry={() => conversationDetail.refetch()}
+            onSend={handleSend}
+            approvalRequired={approvalRequired}
+            approvalId={approvalId}
+            languagePreference={languagePreference}
+            onLanguagePreferenceChange={setLanguagePreference}
+            onSpeechLanguage={setSpeechDetectedLanguage}
+            isDemo={isDemo}
+            emptyResult={emptyResult}
+            sendFailure={sendFailure}
+            onDismissFailure={() => setSendFailure(null)}
+            onRetryFailure={() => {
+              if (sendFailure) void handleSend(sendFailure.message);
+            }}
+            onSessionExpired={handleSessionExpired}
+            onOpenDetails={() => setMobilePanel("details")}
+            hasDetails={!!panelData}
+          />
+        </div>
+        <div
+          id="workspace-panel-details"
+          role="tabpanel"
+          aria-labelledby="workspace-tab-details"
+          className={cn(
+            "min-h-0 overflow-hidden",
+            mobilePanel === "details" ? "flex flex-col" : "hidden",
+            "lg:flex",
+          )}
+        >
+          <DetailsPanel
+            key={`details-${viewKey}-${viewEpoch}`}
+            data={panelData}
+            sending={chat.isPending && !panelData}
+          />
+        </div>
       </div>
     </div>
   );
@@ -569,14 +628,14 @@ function ConversationsSidebar({
 }: ConversationsSidebarProps) {
   const items = conversations.data?.items ?? [];
   return (
-    <Card className="flex h-full flex-col overflow-hidden">
+    <Card className="flex h-full min-h-0 flex-col overflow-hidden">
       <CardHeader>
         <CardTitle>Conversations</CardTitle>
         <span className="text-[11px] text-slate-500">
           {conversations.data?.total ?? 0} total
         </span>
       </CardHeader>
-      <div className="flex-1 overflow-y-auto px-2 py-2 thin-scrollbar">
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2 py-2 thin-scrollbar">
         {conversations.isError ? (
           <ErrorState onRetry={() => conversations.refetch()} />
         ) : conversations.isLoading ? (
@@ -608,7 +667,7 @@ function ConversationsSidebar({
                     aria-label={conv.title}
                     aria-current={activeId === conv.id ? "true" : undefined}
                     onClick={() => onSelect(conv.id)}
-                    className="block min-w-0 flex-1 rounded-md px-2 py-2 text-left"
+                    className="block min-h-[44px] min-w-0 flex-1 rounded-md px-2 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                   >
                     <div className="flex items-center gap-1.5">
                       <p className="line-clamp-1 flex-1 text-xs font-medium">
@@ -661,6 +720,8 @@ interface ChatColumnProps {
   onDismissFailure: () => void;
   onRetryFailure: () => void;
   onSessionExpired: () => void;
+  onOpenDetails?: () => void;
+  hasDetails?: boolean;
 }
 
 function ChatColumn({
@@ -682,6 +743,8 @@ function ChatColumn({
   onDismissFailure,
   onRetryFailure,
   onSessionExpired,
+  onOpenDetails,
+  hasDetails = false,
 }: ChatColumnProps) {
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -706,20 +769,33 @@ function ChatColumn({
   }
 
   return (
-    <Card className="flex h-full min-h-[480px] flex-col overflow-hidden">
+    <Card className="flex h-full min-h-0 flex-col overflow-hidden">
       <CardHeader>
         <CardTitle>
           {activeId ? "Conversation" : "New conversation"}
         </CardTitle>
-        {isSending && (
-          <span className="flex items-center gap-1 text-[11px] text-slate-500">
-            <Loader2 className="h-3 w-3 animate-spin" /> Agent is thinking…
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {hasDetails && onOpenDetails && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="lg:hidden"
+              onClick={onOpenDetails}
+            >
+              Details
+            </Button>
+          )}
+          {isSending && (
+            <span className="flex items-center gap-1 text-[11px] text-slate-500">
+              <Loader2 className="h-3 w-3 animate-spin" /> Agent is thinking…
+            </span>
+          )}
+        </div>
       </CardHeader>
       <div
         ref={scrollRef}
-        className="flex-1 space-y-3 overflow-y-auto bg-slate-50/40 px-5 py-4 thin-scrollbar"
+        className="min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden bg-slate-50/40 px-3 py-3 sm:px-5 sm:py-4 thin-scrollbar"
       >
         {isLoading ? (
           <div className="space-y-3">
@@ -758,7 +834,7 @@ function ChatColumn({
           />
         )}
       </div>
-      <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3">
+      <div className="shrink-0 border-t border-slate-100 bg-white px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] sm:px-4">
         <LanguageSelector
           value={languagePreference}
           onChange={onLanguagePreferenceChange}
@@ -777,8 +853,9 @@ function ChatColumn({
               }
             }}
             rows={2}
-            placeholder="Ask the AI assistant… (Shift+Enter for newline)"
-            className="block w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            aria-label="Message"
+            placeholder="Ask the AI assistant…"
+            className="block max-h-40 min-h-[44px] w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
           />
           <MicrophoneInput
             onTranscript={(transcript, language) => {
@@ -796,9 +873,12 @@ function ChatColumn({
             onClick={submit}
             loading={isSending}
             disabled={!draft.trim()}
+            className="min-h-[44px] shrink-0"
             leftIcon={!isSending ? <Send className="h-4 w-4" /> : undefined}
+            aria-label="Send message"
           >
-            Send
+            <span className="sm:hidden">Send</span>
+            <span className="hidden sm:inline">Send</span>
           </Button>
         </div>
       </div>
@@ -893,14 +973,14 @@ interface DetailsPanelProps {
 
 function DetailsPanel({ data, sending }: DetailsPanelProps) {
   return (
-    <Card className="flex h-full flex-col overflow-hidden">
+    <Card className="flex h-full min-h-0 flex-col overflow-hidden">
       <CardHeader>
         <CardTitle>Response details</CardTitle>
         <span className="text-[11px] text-slate-500">
           AI transparency
         </span>
       </CardHeader>
-      <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4 thin-scrollbar">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-3 py-3 sm:px-5 sm:py-4 thin-scrollbar">
         {sending && !data ? (
           <div className="space-y-2">
             <Skeleton className="h-4 w-1/2" />
@@ -1024,10 +1104,11 @@ function WorkspaceSkeleton() {
   return (
     <div className="space-y-4">
       <Skeleton className="h-8 w-48" />
+      <Skeleton className="h-11 w-full lg:hidden" />
       <div className="grid gap-4 lg:grid-cols-[280px_1fr_320px]">
-        <Skeleton className="h-[480px]" />
-        <Skeleton className="h-[480px]" />
-        <Skeleton className="h-[480px]" />
+        <Skeleton className="hidden h-[480px] lg:block" />
+        <Skeleton className="h-[min(480px,60dvh)] lg:h-[480px]" />
+        <Skeleton className="hidden h-[480px] lg:block" />
       </div>
     </div>
   );
