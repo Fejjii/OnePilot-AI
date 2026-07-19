@@ -123,7 +123,7 @@ export default function KnowledgePage() {
         <CardHeader>
           <CardTitle>Ask a grounded question</CardTitle>
           <span className="text-[11px] text-slate-500">
-            Uses /knowledge/answer with citations
+            Answers include citations from your indexed documents
           </span>
         </CardHeader>
         <CardContent>
