@@ -17,6 +17,21 @@ export function normalizeProviderMode(mode: unknown): ProviderMode {
   return "unhealthy";
 }
 
+/**
+ * Resolve the mode recruiters/operators should see.
+ *
+ * Backend diagnostics often report optional infra as `mode=missing` with
+ * `fallback_used=true` (e.g. Qdrant unset → in-memory vectors). That is a
+ * working fallback, not an outage — surface it as `fallback`.
+ */
+export function resolveProviderMode(provider: ProviderDiagnostic): ProviderMode {
+  const mode = normalizeProviderMode(provider.mode);
+  if (provider.fallback_used && (mode === "missing" || mode === "unhealthy")) {
+    return "fallback";
+  }
+  return mode;
+}
+
 export function formatProviderDetailValue(value: unknown): string {
   if (value === null || value === undefined) {
     return "—";

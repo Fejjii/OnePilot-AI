@@ -4,6 +4,7 @@ import {
   getProviderDetailEntries,
   isProviderDiagnostic,
   normalizeProviderMode,
+  resolveProviderMode,
 } from "./provider-diagnostics";
 import type { ProviderDiagnostic } from "@/types/api";
 
@@ -44,6 +45,24 @@ describe("provider-diagnostics helpers", () => {
   it("falls back to unhealthy for unknown modes", () => {
     expect(normalizeProviderMode("experimental")).toBe("unhealthy");
     expect(normalizeProviderMode(null)).toBe("unhealthy");
+  });
+
+  it("resolves missing providers with active fallbacks as fallback", () => {
+    expect(
+      resolveProviderMode({
+        ...liveProvider,
+        name: "Qdrant",
+        category: "vector",
+        configured: false,
+        healthy: false,
+        active: false,
+        fallback_used: true,
+        mode: "missing",
+        details: { provider: "memory" },
+      }),
+    ).toBe("fallback");
+    expect(resolveProviderMode(liveProvider)).toBe("live");
+    expect(resolveProviderMode(unhealthyProvider)).toBe("unhealthy");
   });
 
   it("formats detail values safely", () => {
