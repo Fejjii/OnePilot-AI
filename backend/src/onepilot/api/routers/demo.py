@@ -1,4 +1,4 @@
-"""Demo seeding endpoints.
+"""Demo seeding and public demo-access endpoints.
 
 POST /demo/setup  — dev-only: upsert the deterministic demo org + user and
                    return a bearer token.  The seed script calls this so it
@@ -6,17 +6,31 @@ POST /demo/setup  — dev-only: upsert the deterministic demo org + user and
 
 POST /demo/seed   — seed NovaEdge knowledge-base docs into the caller's org.
                    Also accessible as /demo/seed_current_org for the UI.
+
+POST /demo/start  — one-click public demo entry (OP-006). Only available when
+                   PUBLIC_DEMO_ENABLED=true. Idempotently seeds the demo org
+                   and returns a short-lived bearer token, so reviewers never
+                   need credentials. Rate limited per client IP.
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from datetime import timedelta
+
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from onepilot.api.deps import CurrentPrincipal, DBSession, SettingsDep
+from onepilot.core.logging import get_logger
 from onepilot.demo_data import seed as seed_module
 from onepilot.security.auth import create_access_token
 from onepilot.security.permissions import require_admin
+from onepilot.security.rate_limit import (
+    FEATURE_DEMO_START,
+    enforce_rate_limit_for_client,
+)
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/demo", tags=["demo"])
 
@@ -44,7 +58,83 @@ class SeedResponse(BaseModel):
     operational_skipped: bool = False
 
 
+class DemoStartResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_at: str
+    organization_name: str
+    demo_mode: bool = True
+    simulated_providers: bool = True
+
+
+# ── Helpers ────────────────────────────────────────────────────────────────────
+
+def _client_ip(request: Request) -> str:
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    if request.client:
+        return request.client.host
+    return "unknown"
+
+
 # ── Endpoints ──────────────────────────────────────────────────────────────────
+
+@router.post("/start", response_model=DemoStartResponse)
+def start_public_demo(
+    request: Request,
+    session: DBSession,
+    settings: SettingsDep,
+) -> DemoStartResponse:
+    """One-click public demo entry (OP-006).
+
+    Gated by PUBLIC_DEMO_ENABLED so there is no unauthenticated token minting
+    outside explicit public-demo mode. Idempotently seeds the demo org
+    (knowledge base + operational data) and returns a short-lived token
+    scoped to that single shared tenant. No password is exposed or required.
+    """
+    if not settings.PUBLIC_DEMO_ENABLED:
+        raise HTTPException(
+            status_code=403,
+            detail="The public demo is not enabled on this server.",
+        )
+
+    enforce_rate_limit_for_client(
+        f"demo_start:{_client_ip(request)}",
+        FEATURE_DEMO_START,
+    )
+
+    principal = seed_module.ensure_demo_principal(session, settings=settings)
+
+    try:
+        seed_module.seed_knowledge_base(session, principal=principal, settings=settings)
+        seed_module.seed_operational_data(session, principal=principal)
+    except Exception:
+        # Never leak seeding internals to an unauthenticated caller.
+        logger.exception("demo_start_seed_failed")
+        raise HTTPException(
+            status_code=503,
+            detail="Demo workspace could not be prepared. Please try again shortly.",
+        ) from None
+
+    token, expires_at = create_access_token(
+        user_id=principal.user_id,
+        organization_id=principal.organization_id,
+        role=principal.role,
+        plan_code=principal.plan_code,
+        expires_delta=timedelta(minutes=settings.PUBLIC_DEMO_SESSION_MINUTES),
+    )
+    logger.info(
+        "demo_start_session_issued",
+        organization_id=principal.organization_id,
+        expires_at=expires_at.isoformat(),
+    )
+    return DemoStartResponse(
+        access_token=token,
+        expires_at=expires_at.isoformat(),
+        organization_name=seed_module.DEMO_ORG_NAME,
+    )
+
 
 @router.post("/setup", response_model=SetupResponse)
 def setup_demo(session: DBSession, settings: SettingsDep) -> SetupResponse:

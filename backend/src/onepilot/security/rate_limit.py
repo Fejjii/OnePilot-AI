@@ -16,6 +16,7 @@ FEATURE_CHAT = "chat"
 FEATURE_DOCUMENT_UPLOAD = "document_upload"
 FEATURE_AUTH_LOGIN = "auth_login"
 FEATURE_AUTH_REGISTER = "auth_register"
+FEATURE_DEMO_START = "demo_start"
 
 # Per-feature limits: (max requests, window seconds).
 _FEATURE_LIMITS: dict[str, tuple[int, int]] = {
@@ -23,6 +24,7 @@ _FEATURE_LIMITS: dict[str, tuple[int, int]] = {
     FEATURE_DOCUMENT_UPLOAD: (20, 60),
     FEATURE_AUTH_LOGIN: (10, 60),
     FEATURE_AUTH_REGISTER: (5, 3600),
+    FEATURE_DEMO_START: (10, 3600),
 }
 
 _KEY_PREFIX = "onepilot:rl:v1"
