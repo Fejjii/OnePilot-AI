@@ -99,6 +99,13 @@ class Settings(BaseSettings):
     PUBLIC_DEMO_ENABLED: bool = False
     PUBLIC_DEMO_SESSION_MINUTES: int = 60
 
+    # Agent memory (OP-012). Safe defaults bound prompt size; shared public-demo
+    # tenants disable agent recall/persist regardless of this flag.
+    AGENT_MEMORY_ENABLED: bool = True
+    AGENT_MEMORY_MAX_ITEMS: int = 8
+    AGENT_MEMORY_MAX_CHARS: int = 2000
+    AGENT_MEMORY_VALUE_MAX_CHARS: int = 500
+
     # Comma-separated frontend origins for production CORS (e.g. https://app.vercel.app).
     CORS_ORIGINS: str = ""
     DEV_ORG_ID: str = "org_demo_onepilot"

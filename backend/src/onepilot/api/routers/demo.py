@@ -117,6 +117,22 @@ def start_public_demo(
             detail="Demo workspace could not be prepared. Please try again shortly.",
         ) from None
 
+    # Shared demo tenant: wipe prior visitors' user/agent memories so nothing
+    # leaks across unrelated public-demo sessions (OP-012). Never roll back the
+    # seeded workspace if clearing fails.
+    try:
+        from onepilot.services import memory_service
+
+        deleted = memory_service.clear_user_memory(session, principal=principal)
+        session.commit()
+        logger.info(
+            "demo_start_memory_cleared",
+            organization_id=principal.organization_id,
+            deleted_count=deleted,
+        )
+    except Exception:
+        logger.exception("demo_start_memory_clear_failed")
+
     token, expires_at = create_access_token(
         user_id=principal.user_id,
         organization_id=principal.organization_id,

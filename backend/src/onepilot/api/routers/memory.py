@@ -4,10 +4,14 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from onepilot.api.deps import CurrentPrincipal, DBSession
+from onepilot.api.deps import CurrentPrincipal, DBSession, SettingsDep
+from onepilot.core.errors import NotFoundError
 from onepilot.schemas.memory import (
+    MemoryClearResponse,
     MemoryItemResponse,
     MemoryListResponse,
+    MemoryPreferenceRequest,
+    MemoryStatusResponse,
     MemoryWriteRequest,
 )
 from onepilot.security.permissions import require_member
@@ -38,11 +42,25 @@ def list_memory(
     )
 
 
+@router.get("/status", response_model=MemoryStatusResponse)
+def get_memory_status(
+    principal: CurrentPrincipal,
+    session: DBSession,
+    settings: SettingsDep,
+) -> MemoryStatusResponse:
+    require_member(principal)
+    status = memory_service.memory_status(
+        session, principal=principal, settings=settings
+    )
+    return MemoryStatusResponse.model_validate(status)
+
+
 @router.post("", response_model=MemoryItemResponse)
 def write_memory(
     body: MemoryWriteRequest,
     principal: CurrentPrincipal,
     session: DBSession,
+    settings: SettingsDep,
 ) -> MemoryItemResponse:
     require_member(principal)
     item = memory_service.write_memory(
@@ -52,9 +70,44 @@ def write_memory(
         key=body.key,
         value=body.value,
         ttl_seconds=body.ttl_seconds,
+        settings=settings,
     )
     session.commit()
     return MemoryItemResponse.model_validate(item)
+
+
+@router.post("/preferences", response_model=MemoryStatusResponse)
+def set_memory_preferences(
+    body: MemoryPreferenceRequest,
+    principal: CurrentPrincipal,
+    session: DBSession,
+    settings: SettingsDep,
+) -> MemoryStatusResponse:
+    """Enable or disable agent memory for the current user."""
+    require_member(principal)
+    memory_service.set_memory_disabled(
+        session,
+        principal=principal,
+        disabled=body.disabled,
+        settings=settings,
+    )
+    session.commit()
+    status = memory_service.memory_status(
+        session, principal=principal, settings=settings
+    )
+    return MemoryStatusResponse.model_validate(status)
+
+
+@router.delete("", response_model=MemoryClearResponse)
+def clear_memory(
+    principal: CurrentPrincipal,
+    session: DBSession,
+) -> MemoryClearResponse:
+    """Clear all user-owned memories (user + agent scopes)."""
+    require_member(principal)
+    deleted = memory_service.clear_user_memory(session, principal=principal)
+    session.commit()
+    return MemoryClearResponse(deleted_count=deleted)
 
 
 @router.get("/{scope}/{key}", response_model=MemoryItemResponse)
@@ -69,8 +122,6 @@ def read_memory(
         session, principal=principal, scope=scope, key=key
     )
     if item is None:
-        from onepilot.core.errors import NotFoundError
-
         raise NotFoundError(f"Memory item '{key}' not found")
     return MemoryItemResponse.model_validate(item)
 

@@ -60,3 +60,44 @@ class MemoryItemRepository(BaseRepository[MemoryItem]):
         )
         result = self._session.execute(stmt)
         return result.rowcount or 0
+
+    def delete_for_user(
+        self,
+        organization_id: str,
+        *,
+        user_id: str,
+        scopes: list[str] | None = None,
+    ) -> int:
+        """Delete memory rows owned by a user (user/agent scopes)."""
+        stmt = delete(MemoryItem).where(
+            MemoryItem.organization_id == organization_id,
+            MemoryItem.user_id == user_id,
+        )
+        if scopes:
+            stmt = stmt.where(MemoryItem.scope.in_(scopes))
+        result = self._session.execute(stmt)
+        return result.rowcount or 0
+
+    def list_for_agent_context(
+        self,
+        organization_id: str,
+        *,
+        user_id: str,
+        scopes: list[str] | None = None,
+        limit: int = 50,
+    ) -> list[MemoryItem]:
+        """List non-expired user/agent memories for prompt injection."""
+        now = datetime.now(UTC)
+        active_scopes = scopes or ["user", "agent"]
+        stmt = (
+            select(MemoryItem)
+            .where(
+                MemoryItem.organization_id == organization_id,
+                MemoryItem.user_id == user_id,
+                MemoryItem.scope.in_(active_scopes),
+                (MemoryItem.expires_at.is_(None) | (MemoryItem.expires_at > now)),
+            )
+            .order_by(MemoryItem.updated_at.desc())
+            .limit(limit)
+        )
+        return list(self._session.execute(stmt).scalars().all())

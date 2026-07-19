@@ -50,6 +50,11 @@ class AgentState(BaseModel):
     history: list[dict] = Field(default_factory=list)
     context: dict = Field(default_factory=dict)
 
+    # Recalled durable memory for prompt injection (never secrets; bounded).
+    memory_block: str = ""
+    memory_item_count: int = 0
+    memory_enabled: bool = True
+
     language_preference: LanguagePreference = LanguagePreference.AUTO
     detected_language: str = "en"
     response_language: str = "en"
