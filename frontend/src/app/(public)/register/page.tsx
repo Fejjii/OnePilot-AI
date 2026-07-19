@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth } from "@/lib/auth";
+import { useRedirectAuthenticated } from "@/lib/use-redirect-authenticated";
 import { ApiRequestError } from "@/lib/api-client";
 import { Input, Label, FieldError } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ type RegisterForm = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
   const { register: registerUser } = useAuth();
+  const { pending: authPending } = useRedirectAuthenticated();
   const [apiError, setApiError] = useState<string | null>(null);
 
   const {
@@ -30,6 +32,18 @@ export default function RegisterPage() {
   } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
   });
+
+  if (authPending) {
+    return (
+      <div className="flex min-h-[240px] items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+        <div
+          role="status"
+          aria-label="Checking session"
+          className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent"
+        />
+      </div>
+    );
+  }
 
   async function onSubmit(data: RegisterForm) {
     setApiError(null);

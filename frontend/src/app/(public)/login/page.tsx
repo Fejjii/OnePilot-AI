@@ -7,6 +7,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { useRedirectAuthenticated } from "@/lib/use-redirect-authenticated";
 import { ApiRequestError } from "@/lib/api-client";
 import { demoErrorMessage } from "@/lib/demo-errors";
 import { Input, Label, FieldError } from "@/components/ui/input";
@@ -21,6 +22,7 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const { login, enterDemo } = useAuth();
+  const { pending: authPending } = useRedirectAuthenticated();
   const [apiError, setApiError] = useState<string | null>(null);
   const [demoError, setDemoError] = useState<string | null>(null);
   const [demoLoading, setDemoLoading] = useState(false);
@@ -32,6 +34,18 @@ export default function LoginPage() {
   } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
   });
+
+  if (authPending) {
+    return (
+      <div className="flex min-h-[240px] items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+        <div
+          role="status"
+          aria-label="Checking session"
+          className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent"
+        />
+      </div>
+    );
+  }
 
   async function onSubmit(data: LoginForm) {
     setApiError(null);

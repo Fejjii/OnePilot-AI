@@ -22,7 +22,8 @@ import {
   CircleDashed,
 } from "lucide-react";
 import { useAuth, isAdminRole } from "@/lib/auth";
-import { useHealth, useApprovals } from "@/lib/queries";
+import { useApprovals, useHealth, useProviderDiagnostics } from "@/lib/queries";
+import { summarizeProviderStatus } from "@/lib/provider-status-summary";
 import { PlanBadge } from "@/components/domain/plan-badge";
 import { DemoModeBanner } from "@/components/domain/demo-mode-banner";
 import { cn, initialsFromName } from "@/lib/utils";
@@ -242,29 +243,55 @@ function PendingApprovalsDot() {
 }
 
 function ProviderStatusIndicator() {
-  const { data, isLoading } = useHealth();
-  if (isLoading) {
+  const health = useHealth();
+  const diagnostics = useProviderDiagnostics();
+
+  if (diagnostics.isLoading && !diagnostics.data) {
     return (
-      <div className="hidden items-center gap-1.5 text-xs text-slate-500 sm:flex">
-        <CircleDashed className="h-3.5 w-3.5 animate-spin" />
+      <div
+        role="status"
+        aria-label="Checking providers"
+        className="hidden items-center gap-1.5 text-xs text-slate-500 sm:flex"
+      >
+        <CircleDashed className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
         Checking providers…
       </div>
     );
   }
-  if (!data) return null;
-  const providers = data.providers;
-  const allOk = providers.database;
-  const hasOpenAI = providers.openai;
-  const Icon = allOk ? CheckCircle2 : AlertTriangle;
-  const color = allOk ? "text-emerald-600" : "text-amber-600";
-  const mode = hasOpenAI ? "Live providers" : "Deterministic fallback";
+
+  const summary = summarizeProviderStatus(
+    diagnostics.isError ? null : diagnostics.data?.providers,
+  );
+  const Icon =
+    summary.tone === "ok"
+      ? CheckCircle2
+      : summary.tone === "muted"
+        ? CircleDashed
+        : AlertTriangle;
+  const color =
+    summary.tone === "ok"
+      ? "text-emerald-600"
+      : summary.tone === "danger"
+        ? "text-rose-600"
+        : summary.tone === "muted"
+          ? "text-slate-400"
+          : "text-amber-600";
+
   return (
-    <div className="hidden items-center gap-2 sm:flex">
-      <Icon className={cn("h-4 w-4", color)} />
-      <div className="text-xs">
-        <p className="font-medium text-slate-900">{mode}</p>
-        <p className="text-[10px] text-slate-500">
-          env: {data.env} · v{data.version}
+    <div
+      role="status"
+      aria-label="Provider status"
+      className="hidden max-w-md items-center gap-2 sm:flex"
+      title={summary.detail}
+    >
+      <Icon className={cn("h-4 w-4 shrink-0", color)} aria-hidden="true" />
+      <div className="min-w-0 text-xs">
+        <p className="truncate font-medium text-slate-900">{summary.label}</p>
+        <p className="truncate text-[10px] text-slate-500">
+          {summary.detail}
+          {health.data
+            ? ` · env: ${health.data.env} · v${health.data.version}`
+            : ""}
         </p>
       </div>
     </div>

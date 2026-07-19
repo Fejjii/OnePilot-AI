@@ -50,7 +50,9 @@ describe("LoginPage", () => {
         <LoginPage />
       </AuthProvider>,
     );
-    expect(screen.getByRole("heading", { name: /sign in/i })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /sign in/i })).toBeInTheDocument();
+    });
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument();
@@ -64,6 +66,9 @@ describe("LoginPage", () => {
       </AuthProvider>,
     );
 
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument();
+    });
     await user.click(screen.getByRole("button", { name: /sign in/i }));
 
     await waitFor(() =>
@@ -72,16 +77,66 @@ describe("LoginPage", () => {
     expect(screen.getByText(/password is required/i)).toBeInTheDocument();
   });
 
-  it("renders the Try the demo action without credential hints", () => {
+  it("renders the Try the demo action without credential hints", async () => {
     renderWithProviders(
       <AuthProvider>
         <LoginPage />
       </AuthProvider>,
     );
-    expect(
-      screen.getByRole("button", { name: /try the demo/i }),
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /try the demo/i }),
+      ).toBeInTheDocument();
+    });
     expect(screen.queryByText(/Demo1234/)).not.toBeInTheDocument();
+  });
+
+  it("redirects authenticated users to the dashboard", async () => {
+    window.localStorage.setItem(TOKEN_KEY, "existing-token");
+    restoreFetch();
+    restoreFetch = installFetchMock([
+      { method: "GET", url: "/me", response: { body: ME_RESPONSE } },
+    ]);
+
+    renderWithProviders(
+      <AuthProvider>
+        <LoginPage />
+      </AuthProvider>,
+    );
+
+    await waitFor(() =>
+      expect(navigationMocks.replace).toHaveBeenCalledWith("/dashboard"),
+    );
+    expect(screen.queryByRole("heading", { name: /sign in/i })).not.toBeInTheDocument();
+  });
+
+  it("clears an expired session and shows the sign-in form", async () => {
+    window.localStorage.setItem(TOKEN_KEY, "expired-token");
+    window.localStorage.setItem("onepilot_demo_mode", "1");
+    restoreFetch();
+    restoreFetch = installFetchMock([
+      {
+        method: "GET",
+        url: "/me",
+        response: {
+          status: 401,
+          body: { error: "unauthorized", message: "Token expired" },
+        },
+      },
+    ]);
+
+    renderWithProviders(
+      <AuthProvider>
+        <LoginPage />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /sign in/i })).toBeInTheDocument();
+    });
+    expect(window.localStorage.getItem(TOKEN_KEY)).toBeNull();
+    expect(window.localStorage.getItem("onepilot_demo_mode")).toBeNull();
+    expect(navigationMocks.replace).not.toHaveBeenCalled();
   });
 
   it("enters a demo session with one click and navigates to the dashboard", async () => {
@@ -123,6 +178,9 @@ describe("LoginPage", () => {
       </AuthProvider>,
     );
 
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /try the demo/i })).toBeInTheDocument();
+    });
     await user.click(screen.getByRole("button", { name: /try the demo/i }));
 
     await waitFor(() =>
@@ -153,6 +211,9 @@ describe("LoginPage", () => {
       </AuthProvider>,
     );
 
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /try the demo/i })).toBeInTheDocument();
+    });
     await user.click(screen.getByRole("button", { name: /try the demo/i }));
 
     await waitFor(() =>
@@ -185,6 +246,9 @@ describe("LoginPage", () => {
       </AuthProvider>,
     );
 
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /try the demo/i })).toBeInTheDocument();
+    });
     await user.click(screen.getByRole("button", { name: /try the demo/i }));
 
     await waitFor(() =>

@@ -70,7 +70,7 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Organization</CardTitle>
-            <span className="text-[11px] text-slate-500">From /me</span>
+            <span className="text-[11px] text-slate-500">Your workspace</span>
           </CardHeader>
           <CardContent className="space-y-3">
             <Row icon={Building2} label="Name" value={user.organization.name} />
@@ -152,7 +152,7 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle>AI Model Configuration</CardTitle>
           <span className="text-[11px] text-slate-500">
-            Read-only · from environment variables via /runtime/config
+            Read-only · configured by the deployment environment
           </span>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -219,7 +219,7 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle>Runtime & Provider Diagnostics</CardTitle>
           <span className="text-[11px] text-slate-500">
-            Detailed provider status from /providers
+            Live health check for every configured integration
           </span>
         </CardHeader>
         <CardContent>
