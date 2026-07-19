@@ -334,22 +334,6 @@ export function useLeadCreateMutation() {
   });
 }
 
-export function useLeadUpdateMutation() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({
-      id,
-      data,
-    }: {
-      id: string;
-      data: Partial<LeadCreate>;
-    }) => api.patch<LeadResponse>(`/leads/${id}`, data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["leads"] });
-    },
-  });
-}
-
 // --- Memory -----------------------------------------------------------------
 
 export function useMemoryList(scope?: string | null) {

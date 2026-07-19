@@ -26,6 +26,7 @@ import {
   FieldError,
 } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { ErrorState } from "@/components/ui/error-state";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { ApiRequestError } from "@/lib/api-client";
@@ -161,15 +162,25 @@ export default function LeadsPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <DataTable<LeadResponse>
-            rows={filtered}
-            columns={columns}
-            getKey={(row) => row.id}
-            onRowClick={(row) => setSelected(row)}
-            isLoading={leads.isLoading}
-            emptyTitle="No leads yet"
-            emptyDescription="When the agent captures a lead, or you create one manually, it appears here."
-          />
+          {leads.isError ? (
+            <div className="p-4">
+              <ErrorState
+                title="Could not load leads"
+                description="The leads list is temporarily unavailable. Check your connection and try again."
+                onRetry={() => void leads.refetch()}
+              />
+            </div>
+          ) : (
+            <DataTable<LeadResponse>
+              rows={filtered}
+              columns={columns}
+              getKey={(row) => row.id}
+              onRowClick={(row) => setSelected(row)}
+              isLoading={leads.isLoading}
+              emptyTitle="No leads yet"
+              emptyDescription="When the agent captures a lead, or you create one manually, it appears here."
+            />
+          )}
         </CardContent>
       </Card>
 
