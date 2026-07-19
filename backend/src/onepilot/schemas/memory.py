@@ -30,3 +30,21 @@ class MemoryItemResponse(BaseModel):
 class MemoryListResponse(BaseModel):
     items: list[MemoryItemResponse]
     total: int
+
+
+class MemoryStatusResponse(BaseModel):
+    agent_memory_enabled: bool
+    reason: str
+    user_disabled: bool
+    shared_demo_tenant: bool
+    item_count: int
+    max_items: int
+    max_chars: int
+
+
+class MemoryPreferenceRequest(BaseModel):
+    disabled: bool
+
+
+class MemoryClearResponse(BaseModel):
+    deleted_count: int
