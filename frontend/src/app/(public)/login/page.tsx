@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { ApiRequestError } from "@/lib/api-client";
+import { demoErrorMessage } from "@/lib/demo-errors";
 import { Input, Label, FieldError } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -17,22 +18,6 @@ const loginSchema = z.object({
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
-
-function demoErrorMessage(err: unknown): string {
-  if (err instanceof ApiRequestError) {
-    if (err.status === 403) {
-      return "The public demo is not enabled on this server.";
-    }
-    if (err.status === 429) {
-      return "Too many demo sessions were started recently. Please try again in a few minutes.";
-    }
-    if (err.status === 503) {
-      return "The demo workspace could not be prepared. Please try again shortly.";
-    }
-    return err.message;
-  }
-  return "Could not start the demo. Please try again.";
-}
 
 export default function LoginPage() {
   const { login, enterDemo } = useAuth();
