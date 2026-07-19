@@ -80,7 +80,7 @@ export function WorkspaceStatusBadges() {
     <div
       role="status"
       aria-label="Workspace integration status"
-      className="flex flex-wrap items-center gap-2"
+      className="flex max-w-full flex-wrap items-center gap-1.5 overflow-x-hidden sm:gap-2"
     >
       {isDemo && (
         <Badge
