@@ -222,7 +222,7 @@ export function parseStructuredResponse(content: string): ParsedAssistantRespons
 
 export function parseSourceLine(line: string): SourceItem {
   const raw = line.trim();
-  let text = raw.replace(/^[-*•]\s*/, "").trim();
+  const text = raw.replace(/^[-*•]\s*/, "").trim();
 
   const boldMatch = text.match(
     /^\*\*(.+?)\*\*(?:\s*\(([^)]+)\))?(?::\s*(.+?))?(?:\s*\[published:\s*(.+?)\])?$/i,
