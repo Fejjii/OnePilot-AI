@@ -26,6 +26,7 @@ import { useApprovals, useHealth, useProviderDiagnostics } from "@/lib/queries";
 import { summarizeProviderStatus } from "@/lib/provider-status-summary";
 import { PlanBadge } from "@/components/domain/plan-badge";
 import { DemoModeBanner } from "@/components/domain/demo-mode-banner";
+import { MobileBottomNav } from "@/components/domain/mobile-bottom-nav";
 import { cn, initialsFromName } from "@/lib/utils";
 
 type NavItem = {
@@ -121,11 +122,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
                 className={cn(
-                  "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  "group flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400",
                   isActive
                     ? "bg-white/10 text-white"
                     : "text-slate-400 hover:bg-white/5 hover:text-white",
                 )}
+                aria-current={isActive ? "page" : undefined}
               >
                 <item.icon className="h-[18px] w-[18px] shrink-0" />
                 <span className="flex-1">{item.label}</span>
@@ -152,9 +154,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 lg:px-6">
           <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={() => setSidebarOpen(true)}
-              className="text-slate-500 hover:text-slate-900 lg:hidden"
-              aria-label="Open sidebar"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 lg:hidden"
+              aria-label="Open navigation menu"
             >
               <Menu className="h-5 w-5" />
             </button>
@@ -223,9 +226,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto bg-slate-50 px-4 py-6 lg:px-8 lg:py-8 thin-scrollbar">
+        <main className="flex-1 overflow-y-auto bg-slate-50 px-3 py-4 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] sm:px-4 sm:py-6 lg:px-8 lg:py-8 lg:pb-8 thin-scrollbar">
           {children}
         </main>
+        <MobileBottomNav onOpenMenu={() => setSidebarOpen(true)} />
       </div>
     </div>
   );
@@ -251,10 +255,10 @@ function ProviderStatusIndicator() {
       <div
         role="status"
         aria-label="Checking providers"
-        className="hidden items-center gap-1.5 text-xs text-slate-500 sm:flex"
+        className="flex items-center gap-1.5 text-xs text-slate-500"
       >
         <CircleDashed className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-        Checking providers…
+        <span className="hidden sm:inline">Checking providers…</span>
       </div>
     );
   }
@@ -281,13 +285,13 @@ function ProviderStatusIndicator() {
     <div
       role="status"
       aria-label="Provider status"
-      className="hidden max-w-md items-center gap-2 sm:flex"
+      className="flex max-w-[min(100%,20rem)] items-center gap-2 sm:max-w-md"
       title={summary.detail}
     >
       <Icon className={cn("h-4 w-4 shrink-0", color)} aria-hidden="true" />
       <div className="min-w-0 text-xs">
         <p className="truncate font-medium text-slate-900">{summary.label}</p>
-        <p className="truncate text-[10px] text-slate-500">
+        <p className="hidden truncate text-[10px] text-slate-500 sm:block">
           {summary.detail}
           {health.data
             ? ` · env: ${health.data.env} · v${health.data.version}`
