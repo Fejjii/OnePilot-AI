@@ -1,6 +1,6 @@
 """Configurable estimated pricing for usage-based billing.
 
-Prices are estimates for capstone demos. Verify against provider pricing
+Prices are estimates for demo purposes. Verify against provider pricing
 before production billing.
 """
 

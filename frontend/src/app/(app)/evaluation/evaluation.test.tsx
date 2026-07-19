@@ -16,7 +16,7 @@ const FULL_SUMMARY = {
   generated_at: "2026-01-01T12:00:00Z",
   run_command: "cd backend && uv run python -m onepilot.evaluation.run_all_evals",
   disclaimer:
-    "These are deterministic evaluation checks for capstone/demo quality. They are not a replacement for full production RAGAS or human evaluation.",
+    "These are deterministic evaluation checks for demo-quality gating. They are not a replacement for full production RAGAS or human evaluation.",
   metrics: {
     intent_accuracy: 1,
     routing_accuracy: 1,

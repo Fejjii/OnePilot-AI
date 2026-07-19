@@ -372,7 +372,7 @@ def seed_operational_data(
                 },
                 risk_level="high" if action_type in {"send_email", "external_action"} else "medium",
                 status=status,
-                reason="Seeded demo approval for capstone review",
+                reason="Seeded demo approval for reviewer walkthrough",
                 created_by=principal.user_id,
                 reviewed_by=principal.user_id if status != "pending" else None,
                 reviewed_at=item["decided_at"] if status != "pending" else None,

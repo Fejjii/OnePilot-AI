@@ -1,8 +1,8 @@
 # OnePilot AI — Evaluation & Quality Summary
 
-**Generated:** 2026-06-10T13:10:43.333397+00:00
+**Generated:** 2026-07-19T15:23:34.187073+00:00
 
-These are deterministic evaluation checks for capstone/demo quality. They are not a replacement for full production RAGAS or human evaluation.
+These are deterministic evaluation checks for demo-quality gating. They are not a replacement for full production RAGAS or human evaluation.
 
 ## Quality metrics
 
@@ -15,7 +15,7 @@ These are deterministic evaluation checks for capstone/demo quality. They are no
 | Source hit rate | 90.0% |
 | Weak-evidence correctness | 100.0% |
 | Safety guardrail pass rate | 100.0% |
-| Total cases | 63 |
+| Total cases | 68 |
 | Failed cases | 0 |
 
 ## How to regenerate
@@ -26,7 +26,7 @@ cd backend && uv run python -m onepilot.evaluation.run_all_evals
 
 ## Limitations
 
-- Small labeled datasets (demo/capstone scope, not statistically significant).
+- Small labeled datasets (demo scope, not statistically significant).
 - RAG eval uses deterministic keyword scoring over demo docs, not live vector search.
 - No automated RAGAS faithfulness or LangSmith dataset runs in this harness.
 - Multilingual RAG cases use offline heuristics; production quality needs human review.

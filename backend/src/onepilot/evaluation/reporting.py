@@ -86,7 +86,7 @@ def build_combined_summary(
         "status": "complete",
         "run_command": RUN_COMMAND,
         "disclaimer": (
-            "These are deterministic evaluation checks for capstone/demo quality. "
+            "These are deterministic evaluation checks for demo-quality gating. "
             "They are not a replacement for full production RAGAS or human evaluation."
         ),
         "metrics": {
@@ -107,7 +107,7 @@ def build_combined_summary(
         },
         "failed_cases": failed_cases,
         "limitations": [
-            "Small labeled datasets (demo/capstone scope, not statistically significant).",
+            "Small labeled datasets (demo scope, not statistically significant).",
             "RAG eval uses deterministic keyword scoring over demo docs, not live vector search.",
             "No automated RAGAS faithfulness or LangSmith dataset runs in this harness.",
             "Multilingual RAG cases use offline heuristics; production quality needs human review.",

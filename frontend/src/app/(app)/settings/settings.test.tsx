@@ -209,7 +209,7 @@ describe("SettingsPage", () => {
           .length,
       ).toBeGreaterThan(0);
       expect(
-        screen.getAllByText(/Mock providers are used for capstone safe demos/i).length,
+        screen.getAllByText(/Mock providers are used for safe demos/i).length,
       ).toBeGreaterThan(0);
     });
   });
@@ -262,7 +262,7 @@ describe("SettingsPage", () => {
       expect(
         screen.getByText(/Real provider configured and operational/i),
       ).toBeInTheDocument();
-      expect(screen.getByText(/Capstone-safe demo adapters/i)).toBeInTheDocument();
+      expect(screen.getByText(/Demo-safe simulated adapters/i)).toBeInTheDocument();
       expect(screen.getByText(/Deterministic in-process substitute/i)).toBeInTheDocument();
     });
   });

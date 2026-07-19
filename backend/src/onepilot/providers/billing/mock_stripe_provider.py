@@ -68,5 +68,5 @@ class MockStripeProvider(BillingProvider):
             "status": "draft",
             "mock": True,
             "provider": "mock_stripe",
-            "message": "Stripe integration mocked in this capstone",
+            "message": "Stripe integration runs in simulated mode; no real charges",
         }

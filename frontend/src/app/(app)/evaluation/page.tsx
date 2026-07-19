@@ -34,7 +34,7 @@ export default function EvaluationPage() {
       <div className="space-y-6">
         <PageHeader
           title="Evaluation & Quality"
-          description="Deterministic checks for routing, RAG, and safety — demo and capstone quality gates."
+          description="Deterministic checks for routing, RAG, and safety — automated quality gates."
         />
         <LoadingSkeleton lines={6} />
       </div>
@@ -56,7 +56,7 @@ export default function EvaluationPage() {
       <div className="space-y-6">
         <PageHeader
           title="Evaluation & Quality"
-          description="Deterministic checks for routing, RAG, and safety — demo and capstone quality gates."
+          description="Deterministic checks for routing, RAG, and safety — automated quality gates."
         />
         <EmptyState
           icon={ClipboardCheck}
@@ -83,7 +83,7 @@ export default function EvaluationPage() {
     <div className="space-y-8">
       <PageHeader
         title="Evaluation & Quality"
-        description="Deterministic checks for routing, RAG, and safety — demo and capstone quality gates."
+        description="Deterministic checks for routing, RAG, and safety — automated quality gates."
         badge={
           data.generated_at ? (
             <Badge tone="muted" className="text-xs font-normal">

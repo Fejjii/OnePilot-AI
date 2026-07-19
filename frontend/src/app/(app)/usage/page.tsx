@@ -94,7 +94,7 @@ export default function UsageAdminPage() {
       <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
         <p className="font-semibold">Billing ready mock mode</p>
         <p className="mt-1 text-xs text-amber-800">
-          Estimated cost — not a real charge. Stripe integration mocked in this capstone.
+          Estimated cost — not a real charge. Billing runs against a simulated Stripe integration.
           {billing.data?.mock_mode && (
             <span className="ml-1"> Provider: {billing.data.billing_provider_mode}.</span>
           )}

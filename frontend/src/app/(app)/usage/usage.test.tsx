@@ -196,7 +196,7 @@ describe("UsageAdminPage billing", () => {
     );
     await waitFor(() => {
       expect(screen.getByText(/Mock Stripe/)).toBeTruthy();
-      expect(screen.getByText(/Stripe integration mocked/)).toBeTruthy();
+      expect(screen.getByText(/simulated Stripe integration/)).toBeTruthy();
     });
   });
 

@@ -226,7 +226,7 @@ export default function SettingsPage() {
           <p className="mb-4 text-xs text-slate-600">
             Provider keys are configured through environment variables. No API
             keys are stored in the frontend. Mock providers are used for
-            capstone safe demos.
+            safe demos.
           </p>
           {diagnostics.isLoading ? (
             <div className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -268,7 +268,7 @@ export default function SettingsPage() {
                   </li>
                   <li>
                     <span className="font-semibold text-amber-600">Mock:</span>{" "}
-                    Capstone-safe demo adapters (Gmail, HubSpot, Calendar, Twilio,
+                    Demo-safe simulated adapters (Gmail, HubSpot, Calendar, Twilio,
                     Stripe)
                   </li>
                   <li>
@@ -341,7 +341,7 @@ export default function SettingsPage() {
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 text-amber-500" />
               Provider keys are configured through environment variables. No API
               keys are stored in the frontend. Mock providers are used for
-              capstone safe demos (Gmail, HubSpot, Calendar, Twilio, Stripe).
+              safe demos (Gmail, HubSpot, Calendar, Twilio, Stripe).
               Serper is optional; LangSmith supports live cloud tracing or local
               trace steps when the API key is absent.
             </li>
