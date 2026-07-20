@@ -478,6 +478,9 @@ def ensure_curated_demo_approvals(
             approval_repo.delete(row)
             removed += 1
     created = _insert_curated_approvals(approval_repo, principal=principal)
+    # Must commit here: get_session() closes without auto-commit, and
+    # seed_operational_data() skips its commit when leads already exist.
+    session.commit()
     logger.info(
         "curated_demo_approvals_refreshed",
         organization_id=principal.organization_id,
