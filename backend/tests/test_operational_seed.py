@@ -110,6 +110,25 @@ def test_ensure_curated_demo_approvals_replaces_seeded_rows(
             created_by=principal.user_id,
         )
     )
+    # Legacy Faker row with demo payload but a different reason string
+    approval_repo.create(
+        ApprovalRequest(
+            id=new_id("apv"),
+            organization_id=principal.organization_id,
+            action_type="send_email",
+            title="Possimus repudiandae recusandae officia inventore dolorem.",
+            description="legacy faker",
+            proposed_payload={
+                "demo": True,
+                "original_action": "send_email_reply",
+                "requester": "Ada",
+            },
+            risk_level="high",
+            status="pending",
+            reason="legacy seed",
+            created_by=principal.user_id,
+        )
+    )
     # Agent-created approval must survive refresh
     approval_repo.create(
         ApprovalRequest(
@@ -131,5 +150,6 @@ def test_ensure_curated_demo_approvals_replaces_seeded_rows(
     rows = approval_repo.list_for_org(principal.organization_id, limit=50)
     titles = {row.title for row in rows}
     assert "Skin name interview military mother purpose" not in titles
+    assert "Possimus repudiandae recusandae officia inventore dolorem." not in titles
     assert "Send follow-up email to Brightline Analytics" in titles
     assert "Agent drafted customer email" in titles

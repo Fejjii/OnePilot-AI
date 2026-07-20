@@ -459,10 +459,16 @@ def ensure_curated_demo_approvals(
     Returns the number of curated approvals inserted.
     """
     approval_repo = ApprovalRequestRepository(session)
-    existing = approval_repo.list_for_org(principal.organization_id, limit=200)
+    existing = approval_repo.list_for_org(principal.organization_id, limit=500)
     removed = 0
     for row in existing:
-        if row.reason == SEEDED_APPROVAL_REASON:
+        payload = row.proposed_payload if isinstance(row.proposed_payload, dict) else {}
+        is_seeded_reason = row.reason == SEEDED_APPROVAL_REASON
+        # Legacy Faker rows used demo=True without curated=True.
+        is_legacy_demo_seed = bool(payload.get("demo")) and not bool(
+            payload.get("curated")
+        )
+        if is_seeded_reason or is_legacy_demo_seed:
             approval_repo.delete(row)
             removed += 1
     created = _insert_curated_approvals(approval_repo, principal=principal)
