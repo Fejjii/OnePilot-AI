@@ -1,49 +1,51 @@
-# Screenshots — Capture Guide
+# Screenshots — Launch Asset Package
 
-PNG/JPG/WebP files in this folder are **gitignored**. Keep captures locally (or in private storage) and reference them from README / LinkedIn. This folder ships **placeholders + capture instructions** so the portfolio checklist is complete even before images are attached.
+PNG files in this folder are **gitignored**. Keep captures locally and in the iCloud
+Launch Assets folder for LinkedIn / portfolio sharing.
 
-## Target set (recruiter-facing)
+## Canonical launch set (verified public demo)
 
-| Placeholder | Capture | Viewport | What to show |
-|-------------|---------|----------|--------------|
-| `01-landing.md` → `01-landing.png` | Landing `/` | 1440×900 | Hero with **OnePilot AI** brand signal, **Try the demo** CTA, safety line about simulated Gmail/Calendar |
-| `02-workspace.md` → `02-workspace.png` | Workspace `/workspace` | 1440×900 | Guided empty state **or** cited answer; provider badges visible; prompt chips |
-| `03-approvals.md` → `03-approvals.png` | Approvals `/approvals` | 1440×900 | Pending queue with risk badge and payload preview |
-| `04-knowledge.md` → `04-knowledge.png` | Knowledge `/knowledge` | 1440×900 | Doc list (~19) + grounded answer with citations |
-| `05-memory.md` → `05-memory.png` | Memory `/memory` | 1440×900 | Memory UI; on public demo show shared-demo / agent-memory disabled state if visible |
-| `06-mobile.md` → `06-mobile.png` | Workspace mobile | 390×844 | Bottom tabs + Chat/History/Details; sticky composer |
+| File | Viewport | Subject |
+|------|----------|---------|
+| `01-landing.png` | 1440×900 | Landing hero + Try the demo |
+| `02-workspace.png` | 1440×900 | Guided workspace, prompt chips, provider badges |
+| `03-structured-response.png` | 1440×900 | Completed AI answer with structure/citations |
+| `04-approvals.png` | 1440×900 | HITL inbox with curated pending requests |
+| `05-knowledge.png` | 1440×900 | Knowledge base + grounded answer |
+| `06-leads.png` | 1440×900 | Leads table (seeded pipeline) |
+| `07-memory.png` | 1440×900 | Memory UI + shared-demo isolation messaging |
+| `08-mobile-workspace.png` | 390×844 | Mobile bottom nav + workspace panels |
 
-Optional extras (nice for case study):
+Compatibility aliases (older checklist names):
 
-| File | Page | Notes |
-|------|------|-------|
-| `07-dashboard.png` | Dashboard | Usage + pending approvals |
-| `08-leads.png` | Leads | 12 seeded leads |
-| `09-settings-providers.png` | Settings | Gmail/Calendar **mock** diagnostics (no secrets) |
+| Alias | Points to |
+|-------|-----------|
+| `03-approvals.png` | `04-approvals.png` |
+| `04-knowledge.png` | `05-knowledge.png` |
+| `05-memory.png` | `07-memory.png` |
+| `06-mobile.png` | `08-mobile-workspace.png` |
 
-## Capture procedure (public demo)
+## Capture rules
 
-1. Open https://one-pilot-ai.vercel.app in a clean browser profile.
-2. Click **Try the demo**.
-3. Walk [../demo_script.md](../demo_script.md) steps 2–8.
-4. Capture at the viewports above (Browser DevTools device mode for mobile).
-5. Redact any personal email if you signed in with a non-demo account (prefer demo entry).
-6. Save files as the `.png` names in the table (gitignored).
-7. Keep the matching `0x-*.md` placeholders as the checklist.
+1. Use **only** https://one-pilot-ai.vercel.app (public demo).
+2. Prefer **Try the demo** entry. Do not show credentials, tokens, DevTools, or env values.
+3. Confirm badges: Gmail/Calendar **Simulated**; Knowledge retrieval **Fallback ready** (not Unavailable).
+4. Approvals titles must be curated NovaEdge copy (Brightline, Northwind, …) — never Faker/lorem.
+5. Structured-response shot must wait until the assistant finishes (not “thinking…”).
 
 ## Quality bar
 
-- No secrets, tokens, or `.env` values in frame
-- Prefer light theme as shipped
-- Show **simulated** Gmail/Calendar messaging when those surfaces are visible
-- Avoid overlapping OS notifications
+- Professional, populated UI (no broken empty states for key surfaces)
+- No internal/dev-only wording as the main message
+- No secrets
+- Consistent dimensions as above
 
-## README embedding (after capture)
+## iCloud copy
 
-```markdown
-![Landing](docs/screenshots/01-landing.png)
-![Workspace](docs/screenshots/02-workspace.png)
-![Approvals](docs/screenshots/03-approvals.png)
+```bash
+LAUNCH="$HOME/Library/Mobile Documents/com~apple~CloudDocs/AI-Projects/OnePilot AI/Launch Assets"
+mkdir -p "$LAUNCH/screenshots" "$LAUNCH/docs"
+cp docs/screenshots/*.png "$LAUNCH/screenshots/"
+cp -R docs/portfolio "$LAUNCH/docs/"
+cp docs/demo_script.md README.md "$LAUNCH/docs/"
 ```
-
-Until PNGs exist, link reviewers to the live demo instead of broken image tags.
