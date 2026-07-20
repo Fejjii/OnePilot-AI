@@ -7,10 +7,16 @@ from sqlalchemy.orm import Session
 from onepilot.core.config import get_settings
 from onepilot.core.constants import PlanCode, Role
 from onepilot.core.ids import new_id
-from onepilot.demo_data.seed import ensure_demo_principal, seed_operational_data
+from onepilot.demo_data.seed import (
+    CURATED_DEMO_APPROVALS,
+    SEEDED_APPROVAL_REASON,
+    ensure_curated_demo_approvals,
+    ensure_demo_principal,
+    seed_operational_data,
+)
 from onepilot.repositories.approvals import ApprovalRequestRepository
 from onepilot.repositories.leads import LeadRepository
-from onepilot.repositories.models import Organization, Subscription
+from onepilot.repositories.models import ApprovalRequest, Organization, Subscription
 from onepilot.repositories.usage_events import UsageEventRepository
 from onepilot.security.auth import Principal
 
@@ -70,3 +76,60 @@ def test_demo_principal_uses_documented_credentials(db_session: Session) -> None
     principal = ensure_demo_principal(db_session, settings=settings)
     assert principal.organization_id == settings.DEV_ORG_ID
     assert principal.user_id == settings.DEV_USER_ID
+
+
+def test_operational_seed_uses_curated_approval_titles(db_session: Session) -> None:
+    principal = _setup_org(db_session)
+    seed_operational_data(db_session, principal=principal)
+    approval_repo = ApprovalRequestRepository(db_session)
+    titles = {
+        row.title for row in approval_repo.list_for_org(principal.organization_id, limit=50)
+    }
+    assert "Send follow-up email to Brightline Analytics" in titles
+    assert approval_repo.count_pending(principal.organization_id) >= 2
+    # No Faker-style noise in curated titles
+    assert not any("Possimus" in t or "Repellendus" in t for t in titles)
+
+
+def test_ensure_curated_demo_approvals_replaces_seeded_rows(
+    db_session: Session,
+) -> None:
+    principal = _setup_org(db_session)
+    approval_repo = ApprovalRequestRepository(db_session)
+    approval_repo.create(
+        ApprovalRequest(
+            id=new_id("apv"),
+            organization_id=principal.organization_id,
+            action_type="send_email",
+            title="Skin name interview military mother purpose",
+            description="faker leftover",
+            proposed_payload={"demo": True},
+            risk_level="high",
+            status="pending",
+            reason=SEEDED_APPROVAL_REASON,
+            created_by=principal.user_id,
+        )
+    )
+    # Agent-created approval must survive refresh
+    approval_repo.create(
+        ApprovalRequest(
+            id=new_id("apv"),
+            organization_id=principal.organization_id,
+            action_type="send_email",
+            title="Agent drafted customer email",
+            description="created during chat",
+            proposed_payload={"to": "customer@example.com"},
+            risk_level="high",
+            status="pending",
+            reason="Agent proposed gated action",
+            created_by=principal.user_id,
+        )
+    )
+
+    created = ensure_curated_demo_approvals(db_session, principal=principal)
+    assert created == len(CURATED_DEMO_APPROVALS)
+    rows = approval_repo.list_for_org(principal.organization_id, limit=50)
+    titles = {row.title for row in rows}
+    assert "Skin name interview military mother purpose" not in titles
+    assert "Send follow-up email to Brightline Analytics" in titles
+    assert "Agent drafted customer email" in titles

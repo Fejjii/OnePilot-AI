@@ -27,7 +27,6 @@ from onepilot.providers import get_embeddings_provider, get_vector_provider
 from onepilot.providers.embeddings.base import EmbeddingsProvider
 from onepilot.providers.vector.base import VectorProvider
 from onepilot.demo_data.generators import (
-    generate_approval_examples,
     generate_audit_logs,
     generate_usage_events,
 )
@@ -61,14 +60,6 @@ DEMO_ORG_NAME = "OnePilot AI"
 DEMO_ORG_SLUG = "onepilot-ai-demo"
 
 NOVAEDGE_DOCS_DIR: Path = Path(__file__).resolve().parent / "novaedge_docs"
-
-_APPROVAL_ACTION_MAP: dict[str, str] = {
-    "send_email_reply": "send_email",
-    "create_calendar_event": "schedule_meeting",
-    "issue_refund": "external_action",
-    "update_crm_deal": "update_crm",
-    "share_external_link": "external_action",
-}
 
 # Curated NovaEdge-style leads for reviewer-friendly demos (deterministic).
 CURATED_DEMO_LEADS: list[dict[str, str]] = [
@@ -218,6 +209,129 @@ CURATED_DEMO_LEADS: list[dict[str, str]] = [
     },
 ]
 
+SEEDED_APPROVAL_REASON = "Seeded demo approval for reviewer walkthrough"
+
+# Curated NovaEdge-style approvals (deterministic, recruiter-friendly copy).
+CURATED_DEMO_APPROVALS: list[dict] = [
+    {
+        "action_type": "send_email",
+        "title": "Send follow-up email to Brightline Analytics",
+        "description": (
+            "Draft a renewal follow-up to Sarah Chen summarizing NovaEdge Growth plan "
+            "pricing and next discovery-call options."
+        ),
+        "status": "pending",
+        "risk_level": "high",
+        "payload": {
+            "to": "sarah.chen@brightline.io",
+            "subject": "NovaEdge Growth plan — next steps for Brightline",
+            "body_preview": (
+                "Hi Sarah — following up on your demo request with Growth plan pricing "
+                "and two proposed discovery slots next week."
+            ),
+        },
+    },
+    {
+        "action_type": "schedule_meeting",
+        "title": "Schedule discovery call with Northwind Legal",
+        "description": (
+            "Propose a 30-minute discovery call with Marcus Webb to review approval gates "
+            "and grounded playbook answers."
+        ),
+        "status": "pending",
+        "risk_level": "medium",
+        "payload": {
+            "attendee": "marcus.webb@northwindlegal.com",
+            "duration_minutes": 30,
+            "purpose": "Discovery call — approvals + knowledge base walkthrough",
+        },
+    },
+    {
+        "action_type": "send_email",
+        "title": "Send proposal email to Atlas Health Clinics",
+        "description": (
+            "Share Business plan proposal emphasizing human approval before CRM/email actions "
+            "for compliance review."
+        ),
+        "status": "approved",
+        "risk_level": "high",
+        "payload": {
+            "to": "priya.nair@atlashealth.org",
+            "subject": "NovaEdge Business plan proposal — audit-ready HITL",
+            "body_preview": (
+                "Priya — attached is the Business plan proposal with approval gates and "
+                "audit logging called out for your compliance review."
+            ),
+        },
+    },
+    {
+        "action_type": "update_crm",
+        "title": "Update CRM stage for Helio Commerce",
+        "description": "Move Elena Rossi to Contacted after multilingual workspace demo.",
+        "status": "approved",
+        "risk_level": "medium",
+        "payload": {
+            "lead": "Elena Rossi",
+            "company": "Helio Commerce",
+            "new_status": "contacted",
+        },
+    },
+    {
+        "action_type": "schedule_meeting",
+        "title": "Book onboarding kickoff with Cedar Learning",
+        "description": "Schedule onboarding kickoff after Team plan close.",
+        "status": "approved",
+        "risk_level": "medium",
+        "payload": {
+            "attendee": "amira@cedarlearning.edu",
+            "duration_minutes": 45,
+            "purpose": "Onboarding kickoff",
+        },
+    },
+    {
+        "action_type": "send_email",
+        "title": "Nurture follow-up to PixelForge Studio",
+        "description": "Send case-study nurture email after Q2 budget postpone.",
+        "status": "rejected",
+        "risk_level": "high",
+        "payload": {
+            "to": "daniel@pixelforge.studio",
+            "subject": "Case study: AI ops for creative studios",
+            "body_preview": "Daniel — sharing a short case study for when budget reopens.",
+        },
+    },
+    {
+        "action_type": "external_action",
+        "title": "Share escalation policy excerpt with BluePeak",
+        "description": (
+            "Share a grounded escalation-policy excerpt from the knowledge base with "
+            "Ryan O'Connor before the logistics incident review."
+        ),
+        "status": "needs_more_info",
+        "risk_level": "medium",
+        "payload": {
+            "recipient": "ryan.oconnor@bluepeaklogistics.com",
+            "document": "escalation_policy.md",
+            "note": "Confirm which sections may leave the workspace",
+        },
+    },
+    {
+        "action_type": "send_email",
+        "title": "Usage & quota walkthrough invite for NovaStack",
+        "description": (
+            "Invite Kevin Park to a walkthrough of Usage & Admin dashboards and quota "
+            "enforcement."
+        ),
+        "status": "needs_more_info",
+        "risk_level": "high",
+        "payload": {
+            "to": "kevin.park@novastack.dev",
+            "subject": "NovaEdge usage visibility walkthrough",
+            "body_preview": "Kevin — proposing two slots to review usage events and quotas.",
+        },
+    },
+]
+
 
 def ensure_demo_principal(session: Session, *, settings: Settings) -> Principal:
     """Upsert the demo org and user with deterministic IDs from settings.
@@ -301,6 +415,66 @@ class OperationalSeedResult:
     skipped: bool
 
 
+def _insert_curated_approvals(
+    approval_repo: ApprovalRequestRepository,
+    *,
+    principal: Principal,
+) -> int:
+    """Insert the curated NovaEdge approval set. Returns created count."""
+    created = 0
+    for item in CURATED_DEMO_APPROVALS:
+        status = item["status"]
+        approval_repo.create(
+            ApprovalRequest(
+                id=new_id("apv"),
+                organization_id=principal.organization_id,
+                action_type=item["action_type"],
+                title=item["title"][:255],
+                description=item["description"],
+                proposed_payload={
+                    "demo": True,
+                    "curated": True,
+                    **item["payload"],
+                },
+                risk_level=item["risk_level"],
+                status=status,
+                reason=SEEDED_APPROVAL_REASON,
+                created_by=principal.user_id,
+                reviewed_by=principal.user_id if status != "pending" else None,
+            )
+        )
+        created += 1
+    return created
+
+
+def ensure_curated_demo_approvals(
+    session: Session,
+    *,
+    principal: Principal,
+) -> int:
+    """Replace seeded demo approvals with curated recruiter-friendly copy.
+
+    Safe for the shared public-demo org: only rows tagged with
+    ``SEEDED_APPROVAL_REASON`` are removed. Agent-created approvals are kept.
+    Returns the number of curated approvals inserted.
+    """
+    approval_repo = ApprovalRequestRepository(session)
+    existing = approval_repo.list_for_org(principal.organization_id, limit=200)
+    removed = 0
+    for row in existing:
+        if row.reason == SEEDED_APPROVAL_REASON:
+            approval_repo.delete(row)
+            removed += 1
+    created = _insert_curated_approvals(approval_repo, principal=principal)
+    logger.info(
+        "curated_demo_approvals_refreshed",
+        organization_id=principal.organization_id,
+        removed=removed,
+        created=created,
+    )
+    return created
+
+
 def seed_operational_data(
     session: Session,
     *,
@@ -348,38 +522,10 @@ def seed_operational_data(
         )
         leads_created += 1
 
-    approvals_created = 0
-    for item in generate_approval_examples(
-        8,
-        seed=seed,
-        organization_id=principal.organization_id,
-    ):
-        action_type = _APPROVAL_ACTION_MAP.get(item["action_type"], "external_action")
-        status = item["status"]
-        if status == "needs_more_info":
-            status = "needs_more_info"
-        approval_repo.create(
-            ApprovalRequest(
-                id=new_id("apv"),
-                organization_id=principal.organization_id,
-                action_type=action_type,
-                title=item["summary"][:255],
-                description=item["summary"],
-                proposed_payload={
-                    "demo": True,
-                    "original_action": item["action_type"],
-                    "requester": item["requester"],
-                },
-                risk_level="high" if action_type in {"send_email", "external_action"} else "medium",
-                status=status,
-                reason="Seeded demo approval for reviewer walkthrough",
-                created_by=principal.user_id,
-                reviewed_by=principal.user_id if status != "pending" else None,
-                reviewed_at=item["decided_at"] if status != "pending" else None,
-                created_at=item["requested_at"],
-            )
-        )
-        approvals_created += 1
+    approvals_created = _insert_curated_approvals(
+        approval_repo,
+        principal=principal,
+    )
 
     usage_created = 0
     for item in generate_usage_events(
