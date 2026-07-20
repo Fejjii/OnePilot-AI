@@ -1,4 +1,4 @@
-import { normalizeProviderMode } from "@/lib/provider-diagnostics";
+import { resolveProviderMode } from "@/lib/provider-diagnostics";
 import type { ProviderDiagnostic, ProviderMode } from "@/types/api";
 
 export type ProviderStatusTone = "ok" | "warn" | "danger" | "muted";
@@ -37,7 +37,7 @@ function findByCategory(
 
 function modeOf(provider: ProviderDiagnostic | undefined): ProviderMode {
   if (!provider) return "missing";
-  return normalizeProviderMode(provider.mode);
+  return resolveProviderMode(provider);
 }
 
 function isLive(mode: ProviderMode): boolean {

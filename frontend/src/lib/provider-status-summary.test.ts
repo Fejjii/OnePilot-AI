@@ -83,4 +83,28 @@ describe("summarizeProviderStatus", () => {
     expect(summary.detail).toContain("Gmail: Unavailable");
     expect(summary.tone).toBe("danger");
   });
+
+  it("treats missing Qdrant with fallback_used as Fallback, not Unavailable", () => {
+    const summary = summarizeProviderStatus([
+      provider("Gmail", "email", "mock"),
+      provider("Google Calendar", "calendar", "mock"),
+      {
+        ...provider("Qdrant", "vector", "missing", false),
+        configured: false,
+        active: false,
+        fallback_used: true,
+        details: { provider: "memory" },
+      },
+      {
+        ...provider("OpenAI LLM", "llm", "missing", false),
+        configured: false,
+        active: false,
+        fallback_used: true,
+      },
+      provider("Postgres", "database", "live"),
+    ]);
+    expect(summary.label).toBe("Simulated integrations");
+    expect(summary.detail).toContain("Retrieval: Fallback");
+    expect(summary.detail).not.toContain("Retrieval: Unavailable");
+  });
 });

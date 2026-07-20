@@ -208,6 +208,42 @@ describe("WorkspacePage guided experience", () => {
     ).toBeInTheDocument();
   });
 
+  it("labels missing Qdrant with in-memory fallback as Fallback ready", async () => {
+    restoreFetch = installFetchMock([
+      EMPTY_CONVERSATIONS,
+      {
+        method: "GET",
+        url: "/providers",
+        response: {
+          body: {
+            providers: [
+              providerDiagnostic("Gmail", "email", "mock"),
+              providerDiagnostic("Google Calendar", "calendar", "mock"),
+              {
+                ...providerDiagnostic("Qdrant", "vector", "missing", false),
+                configured: false,
+                active: false,
+                fallback_used: true,
+                details: { provider: "memory" },
+              },
+            ],
+            checked_at: "2026-07-19T00:00:00Z",
+          },
+        },
+      },
+    ]);
+    renderWithProviders(<WorkspacePage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Knowledge retrieval: Fallback ready"),
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByText("Knowledge retrieval: Unavailable"),
+    ).not.toBeInTheDocument();
+  });
+
   it("labels live integrations as Live", async () => {
     restoreFetch = installFetchMock([
       EMPTY_CONVERSATIONS,

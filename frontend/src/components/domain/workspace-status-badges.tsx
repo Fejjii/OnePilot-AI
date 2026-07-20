@@ -3,7 +3,7 @@
 import { FlaskConical } from "lucide-react";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { useDemoModeFlag } from "@/lib/auth";
-import { normalizeProviderMode } from "@/lib/provider-diagnostics";
+import { resolveProviderMode } from "@/lib/provider-diagnostics";
 import { useProviderDiagnostics } from "@/lib/queries";
 import type { ProviderDiagnostic, ProviderMode } from "@/types/api";
 
@@ -31,14 +31,17 @@ function retrievalLabel(provider: ProviderDiagnostic): {
   label: string;
   tone: BadgeTone;
 } {
-  const mode = normalizeProviderMode(provider.mode);
-  if (!provider.healthy || mode === "unhealthy") {
-    return { label: "Unavailable", tone: "danger" };
-  }
+  const mode = resolveProviderMode(provider);
   if (mode === "live") {
     return { label: "Vector search", tone: "success" };
   }
-  // local / fallback = documented in-memory or deterministic fallback retrieval
+  if (mode === "fallback" || mode === "local") {
+    // In-memory / deterministic retrieval — working, not an outage
+    return { label: "Fallback ready", tone: "info" };
+  }
+  if (!provider.healthy || mode === "unhealthy" || mode === "missing") {
+    return { label: "Unavailable", tone: "danger" };
+  }
   return { label: "Fallback ready", tone: "info" };
 }
 
@@ -49,7 +52,7 @@ function IntegrationBadge({
   label: string;
   provider: ProviderDiagnostic;
 }) {
-  const mode = normalizeProviderMode(provider.mode);
+  const mode = resolveProviderMode(provider);
   return (
     <Badge tone={INTEGRATION_TONES[mode]}>
       {label}: {INTEGRATION_LABELS[mode]}
