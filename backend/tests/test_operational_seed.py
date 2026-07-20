@@ -110,7 +110,7 @@ def test_ensure_curated_demo_approvals_replaces_seeded_rows(
             created_by=principal.user_id,
         )
     )
-    # Legacy Faker row with demo payload but a different reason string
+    # Legacy Faker row still present on the public demo DB (capstone reason wording)
     approval_repo.create(
         ApprovalRequest(
             id=new_id("apv"),
@@ -125,7 +125,7 @@ def test_ensure_curated_demo_approvals_replaces_seeded_rows(
             },
             risk_level="high",
             status="pending",
-            reason="legacy seed",
+            reason="Seeded demo approval for capstone review",
             created_by=principal.user_id,
         )
     )

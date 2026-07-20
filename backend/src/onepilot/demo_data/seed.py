@@ -210,6 +210,8 @@ CURATED_DEMO_LEADS: list[dict[str, str]] = [
 ]
 
 SEEDED_APPROVAL_REASON = "Seeded demo approval for reviewer walkthrough"
+# Historical seed wording still present on the shared public-demo database.
+LEGACY_SEEDED_APPROVAL_REASON = "Seeded demo approval for capstone review"
 
 # Curated NovaEdge-style approvals (deterministic, recruiter-friendly copy).
 CURATED_DEMO_APPROVALS: list[dict] = [
@@ -463,7 +465,11 @@ def ensure_curated_demo_approvals(
     removed = 0
     for row in existing:
         payload = row.proposed_payload if isinstance(row.proposed_payload, dict) else {}
-        is_seeded_reason = row.reason == SEEDED_APPROVAL_REASON
+        reason = row.reason or ""
+        is_seeded_reason = reason in {
+            SEEDED_APPROVAL_REASON,
+            LEGACY_SEEDED_APPROVAL_REASON,
+        } or reason.startswith("Seeded demo approval")
         # Legacy Faker rows used demo=True without curated=True.
         is_legacy_demo_seed = bool(payload.get("demo")) and not bool(
             payload.get("curated")
