@@ -196,6 +196,12 @@ def _seed_response(
         session,
         principal=principal,
     )
+    # Refresh seeded approvals even when operational seed was skipped (idempotent
+    # lead short-circuit). Keeps the shared demo inbox recruiter-ready.
+    approvals_refreshed = seed_module.ensure_curated_demo_approvals(
+        session,
+        principal=principal,
+    )
     return SeedResponse(
         documents_created=result.documents_created,
         documents_skipped=result.documents_skipped,
@@ -203,7 +209,7 @@ def _seed_response(
         total_chunks=result.total_chunks,
         vector_upsert_count=result.vector_upsert_count,
         leads_created=operational.leads_created,
-        approvals_created=operational.approvals_created,
+        approvals_created=max(operational.approvals_created, approvals_refreshed),
         usage_events_created=operational.usage_events_created,
         audit_logs_created=operational.audit_logs_created,
         operational_skipped=operational.skipped,
