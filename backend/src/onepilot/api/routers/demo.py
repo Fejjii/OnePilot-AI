@@ -109,6 +109,9 @@ def start_public_demo(
     try:
         seed_module.seed_knowledge_base(session, principal=principal, settings=settings)
         seed_module.seed_operational_data(session, principal=principal)
+        # Always refresh seeded approvals to curated NovaEdge copy so the shared
+        # public-demo org never serves leftover Faker/lorem titles (launch UX).
+        seed_module.ensure_curated_demo_approvals(session, principal=principal)
     except Exception:
         # Never leak seeding internals to an unauthenticated caller.
         logger.exception("demo_start_seed_failed")
