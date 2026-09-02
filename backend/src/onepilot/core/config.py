@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = "gpt-4o-mini"
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
     OPENAI_SPEECH_MODEL: str = "whisper-1"
+    OPENAI_TIMEOUT_SECONDS: float = 30.0
+    OPENAI_MAX_RETRIES: int = 2
+    OPENAI_MAX_OUTPUT_TOKENS: int = 1024
 
     DATABASE_URL: str = "sqlite:///./onepilot_dev.db"
     REDIS_URL: str = ""
@@ -98,6 +101,12 @@ class Settings(BaseSettings):
     # mock Gmail/Calendar providers (see validate_startup_config).
     PUBLIC_DEMO_ENABLED: bool = False
     PUBLIC_DEMO_SESSION_MINUTES: int = 60
+    PUBLIC_DEMO_CHAT_PER_IP_PER_MINUTE: int = 20
+    PUBLIC_DEMO_CHAT_PER_IP_PER_DAY: int = 200
+    PUBLIC_DEMO_WEB_SEARCH_PER_IP_PER_MINUTE: int = 5
+    PUBLIC_DEMO_WEB_SEARCH_PER_DAY: int = 300
+    PUBLIC_DEMO_DAILY_TOKEN_BUDGET: int = 250_000
+    PUBLIC_DEMO_WARM_REINDEX: bool = True
 
     # Agent memory (OP-012). Safe defaults bound prompt size; shared public-demo
     # tenants disable agent recall/persist regardless of this flag.

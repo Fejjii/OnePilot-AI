@@ -3,10 +3,14 @@ from __future__ import annotations
 from openai import OpenAI
 
 from onepilot.core.errors import ProviderUnavailableError
+from onepilot.core.logging import get_logger
 from onepilot.providers.embeddings.base import EmbeddingsProvider
+from onepilot.security.redaction import redact_sensitive
 
+log = get_logger(__name__)
 
 OPENAI_EMBEDDINGS_IMPLEMENTED = True
+_GENERIC_FAILURE = "Embeddings are temporarily unavailable. Please try again shortly."
 
 
 class OpenAIEmbeddingsProvider(EmbeddingsProvider):
@@ -17,13 +21,20 @@ class OpenAIEmbeddingsProvider(EmbeddingsProvider):
         api_key: str,
         default_model: str = "text-embedding-3-small",
         dim: int = 1536,
+        *,
+        timeout_seconds: float = 30.0,
+        max_retries: int = 2,
     ) -> None:
         if not api_key:
             raise ProviderUnavailableError("OpenAI API key not configured")
         self._api_key = api_key
         self._default_model = default_model
         self._dimension = dim
-        self._client = OpenAI(api_key=api_key)
+        self._client = OpenAI(
+            api_key=api_key,
+            timeout=float(timeout_seconds),
+            max_retries=max(0, int(max_retries)),
+        )
 
     @property
     def dimension(self) -> int:
@@ -60,7 +71,10 @@ class OpenAIEmbeddingsProvider(EmbeddingsProvider):
             embeddings = sorted(response.data, key=lambda e: e.index)
             return [e.embedding for e in embeddings]
         except Exception as exc:
-            raise ProviderUnavailableError(f"OpenAI embeddings API call failed: {exc}") from exc
+            log.warning(
+                "openai_embeddings_failed", error=redact_sensitive(str(exc))
+            )
+            raise ProviderUnavailableError(_GENERIC_FAILURE) from exc
 
     def embed_query(self, text: str, model: str | None = None) -> list[float]:
         """Generate embedding for a single query text.

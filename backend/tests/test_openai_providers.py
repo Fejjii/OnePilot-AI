@@ -52,6 +52,10 @@ class TestOpenAILLMProvider:
             )
             
             # Verify API was called correctly
+            mock_openai_cls.assert_called_once()
+            client_kwargs = mock_openai_cls.call_args.kwargs
+            assert client_kwargs["timeout"] == 30.0
+            assert client_kwargs["max_retries"] == 2
             mock_client.chat.completions.create.assert_called_once()
             call_kwargs = mock_client.chat.completions.create.call_args[1]
             assert call_kwargs["model"] == "gpt-4o-mini"
@@ -73,8 +77,65 @@ class TestOpenAILLMProvider:
             
             provider = OpenAILLMProvider(api_key="test-key")
             
-            with pytest.raises(ProviderUnavailableError, match="API Error"):
+            with pytest.raises(ProviderUnavailableError, match="temporarily unavailable"):
                 provider.chat([{"role": "user", "content": "Hello"}])
+
+    def test_chat_error_does_not_echo_upstream_key_material(self):
+        with patch("onepilot.providers.llm.openai_provider.OpenAI") as mock_openai_cls:
+            mock_client = MagicMock()
+            mock_openai_cls.return_value = mock_client
+            mock_client.chat.completions.create.side_effect = Exception(
+                "upstream failed with sk-proj-abc_DEF-1234567890abcdefghijklmnop"
+            )
+            provider = OpenAILLMProvider(api_key="test-key")
+            with pytest.raises(ProviderUnavailableError) as exc_info:
+                provider.chat([{"role": "user", "content": "Hello"}])
+            assert "sk-proj-" not in str(exc_info.value)
+            assert "temporarily unavailable" in str(exc_info.value)
+
+    def test_chat_caps_output_tokens(self):
+        with patch("onepilot.providers.llm.openai_provider.OpenAI") as mock_openai_cls:
+            mock_client = MagicMock()
+            mock_openai_cls.return_value = mock_client
+            mock_response = MagicMock()
+            mock_response.model = "gpt-4o-mini"
+            mock_response.choices = [MagicMock()]
+            mock_response.choices[0].message.content = "ok"
+            mock_response.choices[0].finish_reason = "stop"
+            mock_response.usage.prompt_tokens = 1
+            mock_response.usage.completion_tokens = 1
+            mock_client.chat.completions.create.return_value = mock_response
+            provider = OpenAILLMProvider(
+                api_key="test-key", max_output_tokens=50
+            )
+            provider.chat([{"role": "user", "content": "Hello"}], max_tokens=9999)
+            call_kwargs = mock_client.chat.completions.create.call_args[1]
+            assert call_kwargs["max_tokens"] == 50
+
+    def test_chat_uses_max_completion_tokens_for_gpt5(self):
+        with patch("onepilot.providers.llm.openai_provider.OpenAI") as mock_openai_cls:
+            mock_client = MagicMock()
+            mock_openai_cls.return_value = mock_client
+            mock_response = MagicMock()
+            mock_response.model = "gpt-5-mini"
+            mock_response.choices = [MagicMock()]
+            mock_response.choices[0].message.content = "ok"
+            mock_response.choices[0].finish_reason = "stop"
+            mock_response.usage.prompt_tokens = 1
+            mock_response.usage.completion_tokens = 1
+            mock_client.chat.completions.create.return_value = mock_response
+            provider = OpenAILLMProvider(
+                api_key="test-key", default_model="gpt-5-mini"
+            )
+            provider.chat(
+                [{"role": "user", "content": "Hello"}],
+                temperature=0.7,
+                max_tokens=200,
+            )
+            call_kwargs = mock_client.chat.completions.create.call_args[1]
+            assert call_kwargs["max_completion_tokens"] == 200
+            assert "max_tokens" not in call_kwargs
+            assert "temperature" not in call_kwargs
     
     def test_chat_structured_uses_json_mode(self):
         """Test that structured chat uses JSON response format."""
@@ -176,7 +237,7 @@ class TestOpenAIEmbeddingsProvider:
             
             provider = OpenAIEmbeddingsProvider(api_key="test-key")
             
-            with pytest.raises(ProviderUnavailableError, match="API Error"):
+            with pytest.raises(ProviderUnavailableError, match="temporarily unavailable"):
                 provider.embed(["text"])
 
 

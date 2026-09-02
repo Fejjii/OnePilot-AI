@@ -14,7 +14,7 @@ _REDACTION_RULES: list[tuple[re.Pattern[str], str]] = [
         "Bearer [REDACTED]",
     ),
     (
-        re.compile(r"\b(sk-[A-Za-z0-9]{20,})\b"),
+        re.compile(r"\b(sk-[A-Za-z0-9_\-]{16,})\b"),
         "[API_KEY_REDACTED]",
     ),
     (
