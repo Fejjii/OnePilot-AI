@@ -128,7 +128,16 @@ _EXTERNAL_RESEARCH_PATTERNS = [
         ),
         3.5,
     ),
-    (re.compile(r"\b(recent|latest|current|up[- ]?to[- ]?date)\b", re.IGNORECASE), 2.5),
+    (
+        re.compile(
+            r"\b(recent|latest|current|up[- ]?to[- ]?date)\b.{0,50}"
+            r"\b(news|trends?|market|prices?|headlines?|research)\b"
+            r"|\b(news|trends?|market|prices?|headlines?|research)\b.{0,50}"
+            r"\b(recent|latest|current|up[- ]?to[- ]?date)\b",
+            re.IGNORECASE,
+        ),
+        2.5,
+    ),
     (re.compile(r"\b(news|headline|press release)\b", re.IGNORECASE), 2.5),
     (
         re.compile(
@@ -242,6 +251,40 @@ _BUSINESS_KNOWLEDGE_PATTERNS = [
     ),
 ]
 
+# Workspace CRM / approvals / activity (internal operational data, not the KB)
+_WORKSPACE_INSIGHTS_PATTERNS = [
+    (
+        re.compile(
+            r"\b(summarize|summary of|overview of)\b.{0,80}"
+            r"\b(business activity|leads|approvals|conversations)\b",
+            re.IGNORECASE,
+        ),
+        4.0,
+    ),
+    (
+        re.compile(
+            r"\b(pending approvals?|which approvals|approvals are (currently )?pending)\b",
+            re.IGNORECASE,
+        ),
+        4.0,
+    ),
+    (
+        re.compile(
+            r"\b(analyze|prioritize|promising|highlight).{0,60}\b(leads?)\b"
+            r"|\b(leads?).{0,40}\b(promising|prioritize|analyze)\b",
+            re.IGNORECASE,
+        ),
+        4.0,
+    ),
+    (
+        re.compile(
+            r"\bacross\b.{0,40}\b(leads|approvals|conversations)\b",
+            re.IGNORECASE,
+        ),
+        3.0,
+    ),
+]
+
 # Workflow/action indicators
 _WORKFLOW_PATTERNS = [
     # Action verbs
@@ -278,8 +321,11 @@ _WORKFLOW_PATTERNS = [
             r"|\b(schedule|book|set up).*(meeting|appointment|call)"
             r"|\b(approve|reject).*(request|action|proposal)"
             r"|\b(summarize|key points).*(document|report|this)"
-            r"|\b(am i free|are we free|check (my )?availability|free tomorrow|busy tomorrow)"
-            r"|\b(suggest|propose|offer|recommend).*(slot|time|times|meeting)\b",
+            r"|\b(am i free|are we free|check (my )?(calendar )?availability"
+            r"|free tomorrow|busy tomorrow)"
+            r"|\b(suggest|propose|offer|recommend).*(slot|time|times|meeting)\b"
+            r"|\b(on the calendar|calendar this week|what meetings|check my calendar"
+            r"|meetings (are |on ))\b",
             re.IGNORECASE,
         ),
         3.0,
@@ -462,7 +508,8 @@ def classify_message(message: str) -> MessageClassResult:
         MessageClass.CONVERSATIONAL: _score_patterns(cleaned, _CONVERSATIONAL_PATTERNS),
         MessageClass.CAPABILITY_OR_HELP: _score_patterns(cleaned, _CAPABILITY_PATTERNS),
         MessageClass.EXTERNAL_RESEARCH: _score_patterns(cleaned, _EXTERNAL_RESEARCH_PATTERNS),
-        MessageClass.WORKFLOW_REQUEST: _score_patterns(cleaned, _WORKFLOW_PATTERNS),
+        MessageClass.WORKFLOW_REQUEST: _score_patterns(cleaned, _WORKFLOW_PATTERNS)
+        + _score_patterns(cleaned, _WORKSPACE_INSIGHTS_PATTERNS),
         MessageClass.BUSINESS_KNOWLEDGE: _score_patterns(cleaned, _BUSINESS_KNOWLEDGE_PATTERNS),
     }
 
@@ -500,6 +547,17 @@ def classify_message(message: str) -> MessageClassResult:
             message_class=MessageClass.WORKFLOW_REQUEST,
             confidence=0.9,
             reason="compound_workflow_indicators",
+            scores=scores,
+        )
+
+    workspace_score = _score_patterns(cleaned, _WORKSPACE_INSIGHTS_PATTERNS)
+    if workspace_score >= _SCORE_THRESHOLD_MEDIUM and not _EMAIL_DRAFT_WORKFLOW.search(
+        cleaned
+    ):
+        return MessageClassResult(
+            message_class=MessageClass.WORKFLOW_REQUEST,
+            confidence=_score_to_confidence(workspace_score),
+            reason="workspace_insights_indicators",
             scores=scores,
         )
 

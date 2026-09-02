@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import secrets
 
 from sqlalchemy.orm import Session
 
@@ -395,6 +396,43 @@ def ensure_demo_principal(session: Session, *, settings: Settings) -> Principal:
         user_id=user_id,
         organization_id=org_id,
         role=Role.OWNER,
+        plan_code=PlanCode.BUSINESS,
+    )
+
+
+def create_demo_visitor_principal(session: Session, *, settings: Settings) -> Principal:
+    """Create a unique visitor user in the shared demo org (conversation isolation)."""
+    owner = ensure_demo_principal(session, settings=settings)
+    visitor_id = new_id("usr_demo")
+    email = f"{visitor_id.lower()}@demo.onepilot.local"
+    user_repo = UserRepository(session)
+    user_repo.create(
+        User(
+            id=visitor_id,
+            email=email,
+            hashed_password=hash_password(secrets.token_urlsafe(24)),
+            full_name="Demo Visitor",
+        )
+    )
+    member_repo = OrganizationMemberRepository(session)
+    member_repo.create(
+        OrganizationMember(
+            id=new_id("mem"),
+            organization_id=owner.organization_id,
+            user_id=visitor_id,
+            role=Role.ADMIN,
+        )
+    )
+    session.flush()
+    logger.info(
+        "demo_visitor_created",
+        organization_id=owner.organization_id,
+        user_id=visitor_id,
+    )
+    return Principal(
+        user_id=visitor_id,
+        organization_id=owner.organization_id,
+        role=Role.ADMIN,
         plan_code=PlanCode.BUSINESS,
     )
 

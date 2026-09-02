@@ -60,6 +60,8 @@ class TestBranchSelection:
         assert branch_for(Intent.CALENDAR_AVAILABILITY) == "calendar_assistant"
         assert branch_for(Intent.CALENDAR_SCHEDULING) == "calendar_assistant"
         assert branch_for(Intent.CALENDAR_AND_EMAIL) == "calendar_and_email"
+        assert branch_for(Intent.COMPOUND_WORKFLOW) == "compound_workflow"
+        assert branch_for(Intent.WORKSPACE_INSIGHTS) == "workspace_insights"
         assert branch_for(Intent.LEAD_SUPPORT) == "lead_assistant"
         assert branch_for(Intent.WORKFLOW_ACTION) == "lead_assistant"
         assert branch_for(Intent.GENERAL_ASSISTANT) == "general_chat"

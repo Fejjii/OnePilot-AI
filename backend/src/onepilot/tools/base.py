@@ -29,6 +29,7 @@ class ToolContext:
     session: Session
     principal: Principal
     settings: Settings
+    client_ip: str | None = None
 
 
 @dataclass(slots=True)

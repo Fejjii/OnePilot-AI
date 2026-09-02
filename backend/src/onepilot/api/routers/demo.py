@@ -109,38 +109,22 @@ def start_public_demo(
     try:
         seed_module.seed_knowledge_base(session, principal=principal, settings=settings)
         seed_module.seed_operational_data(session, principal=principal)
-        # Always refresh seeded approvals to curated NovaEdge copy so the shared
-        # public-demo org never serves leftover Faker/lorem titles (launch UX).
         seed_module.ensure_curated_demo_approvals(session, principal=principal)
     except Exception:
-        # Never leak seeding internals to an unauthenticated caller.
         logger.exception("demo_start_seed_failed")
         raise HTTPException(
             status_code=503,
             detail="Demo workspace could not be prepared. Please try again shortly.",
         ) from None
 
-    # Shared demo tenant: wipe prior visitors' user/agent memories so nothing
-    # leaks across unrelated public-demo sessions (OP-012). Never roll back the
-    # seeded workspace if clearing fails.
-    try:
-        from onepilot.services import memory_service
-
-        deleted = memory_service.clear_user_memory(session, principal=principal)
-        session.commit()
-        logger.info(
-            "demo_start_memory_cleared",
-            organization_id=principal.organization_id,
-            deleted_count=deleted,
-        )
-    except Exception:
-        logger.exception("demo_start_memory_clear_failed")
+    visitor = seed_module.create_demo_visitor_principal(session, settings=settings)
+    session.commit()
 
     token, expires_at = create_access_token(
-        user_id=principal.user_id,
-        organization_id=principal.organization_id,
-        role=principal.role,
-        plan_code=principal.plan_code,
+        user_id=visitor.user_id,
+        organization_id=visitor.organization_id,
+        role=visitor.role,
+        plan_code=visitor.plan_code,
         expires_delta=timedelta(minutes=settings.PUBLIC_DEMO_SESSION_MINUTES),
     )
     logger.info(

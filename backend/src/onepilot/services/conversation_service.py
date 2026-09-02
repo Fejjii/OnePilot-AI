@@ -126,7 +126,7 @@ def list_conversations(
     items = repo.list_for_user(
         organization_id, user_id, offset=offset, limit=min(limit, 100)
     )
-    total = repo.count(organization_id=organization_id)
+    total = repo.count_for_user(organization_id, user_id)
     return items, total
 
 

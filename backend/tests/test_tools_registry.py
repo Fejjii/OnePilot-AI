@@ -65,6 +65,7 @@ class TestRegistry:
             "calendar.suggest_slots",
             "calendar.create_event_request",
             "lead.support",
+            "workspace.insights",
             "chat.general",
         }.issubset(set(registry.names()))
 

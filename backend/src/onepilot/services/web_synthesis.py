@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from onepilot.schemas.web_search import WebSearchCitation, WebSearchResponse
 
 
@@ -194,3 +196,62 @@ def _combined_next_action(
             f"Configure SERPER_API_KEY to enrich market research for '{query[:60]}'."
         )
     return "Align external trend signals with NovaEdge offerings where they strengthen positioning."
+
+
+@dataclass(frozen=True, slots=True)
+class PolishResult:
+    """Polished draft plus token usage so spend controls can account for the call."""
+
+    text: str
+    input_tokens: int = 0
+    output_tokens: int = 0
+    model: str | None = None
+
+
+def maybe_llm_polish(
+    *,
+    query: str,
+    draft: str,
+    settings: object,
+    max_tokens: int = 300,
+) -> PolishResult:
+    """Optionally rewrite a deterministic web synthesis with a bounded LLM call."""
+    if settings is None or not getattr(settings, "has_openai", False):
+        return PolishResult(text=draft)
+    if not draft.strip():
+        return PolishResult(text=draft)
+    try:
+        from onepilot.providers import get_llm_provider
+        from onepilot.providers.llm.fallback_provider import FallbackLLMProvider
+
+        llm = get_llm_provider(settings)  # type: ignore[arg-type]
+        if isinstance(llm, FallbackLLMProvider):
+            return PolishResult(text=draft)
+        response = llm.chat(
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Rewrite the research brief below. Keep the same markdown "
+                        "section headings (Summary, Key points, Evidence or sources, "
+                        "Suggested next action). Do not invent sources. Stay under "
+                        "220 words."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"Query: {query[:400]}\n\nBrief:\n{draft[:4000]}",
+                },
+            ],
+            temperature=0.2,
+            max_tokens=max_tokens,
+        )
+        polished = (response.content or "").strip() or draft
+        return PolishResult(
+            text=polished,
+            input_tokens=int(response.input_tokens or 0),
+            output_tokens=int(response.output_tokens or 0),
+            model=response.model or None,
+        )
+    except Exception:
+        return PolishResult(text=draft)

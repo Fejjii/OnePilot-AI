@@ -92,9 +92,41 @@ _WORKFLOW_ACTION_PATTERNS = [
     ),
 ]
 
+_WORKSPACE_INSIGHTS_PATTERNS = [
+    re.compile(
+        r"\b(summarize|summary of|overview of)\b.{0,80}"
+        r"\b(business activity|leads|approvals|conversations)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(pending approvals?|which approvals|approvals are (currently )?pending)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(analyze|prioritize|promising|highlight).{0,60}\b(leads?)\b"
+        r"|\b(leads?).{0,40}\b(promising|prioritize|analyze)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bacross\b.{0,40}\b(leads|approvals|conversations)\b",
+        re.IGNORECASE,
+    ),
+]
+
+_EMAIL_DRAFT_BLOCK = re.compile(
+    r"\b(draft|write|compose|reply to|send)\b.{0,160}\b(email|message|mail)\b",
+    re.IGNORECASE | re.DOTALL,
+)
+
 _CALENDAR_AVAILABILITY_PATTERNS = [
     re.compile(
-        r"\b(am i free|are we free|check (my )?availability|availability|busy tomorrow|free tomorrow|free next)\b",
+        r"\b(am i free|are we free|check (my )?(calendar )?availability|availability|"
+        r"busy tomorrow|free tomorrow|free next)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(on the calendar|calendar this week|what meetings|check my calendar|"
+        r"meetings (are |on )|what's on (my |the )?calendar)\b",
         re.IGNORECASE,
     ),
 ]
@@ -205,6 +237,31 @@ def _classify_from_message_class(message: str, message_class: MessageClass) -> I
     Returns:
         IntentResult with mapped intent
     """
+    # Workspace insights (internal CRM / approvals / activity) before 1:1 mappings
+    if message_class != MessageClass.OUT_OF_SCOPE and not _EMAIL_DRAFT_BLOCK.search(
+        message
+    ):
+        for pattern in _WORKSPACE_INSIGHTS_PATTERNS:
+            if pattern.search(message):
+                return IntentResult(
+                    intent=Intent.WORKSPACE_INSIGHTS,
+                    confidence=0.88,
+                    source="rules",
+                    reason="workspace_insights",
+                )
+
+    if message_class != MessageClass.OUT_OF_SCOPE:
+        for pattern in _CALENDAR_AVAILABILITY_PATTERNS:
+            if pattern.search(message) and not any(
+                p.search(message) for p in _CALENDAR_SCHEDULING_PATTERNS
+            ):
+                return IntentResult(
+                    intent=Intent.CALENDAR_AVAILABILITY,
+                    confidence=0.84,
+                    source="rules",
+                    reason="calendar_availability",
+                )
+
     # Direct mappings (most message classes map 1:1 to intents)
     if message_class in _MESSAGE_CLASS_TO_INTENT:
         intent = _MESSAGE_CLASS_TO_INTENT[message_class]
@@ -266,6 +323,15 @@ def _classify_workflow_intent(message: str) -> IntentResult:
                 confidence=0.88,
                 source="rules",
                 reason="workflow:compound_research_email_calendar",
+            )
+
+    for pattern in _WORKSPACE_INSIGHTS_PATTERNS:
+        if pattern.search(message) and not _EMAIL_DRAFT_BLOCK.search(message):
+            return IntentResult(
+                intent=Intent.WORKSPACE_INSIGHTS,
+                confidence=0.88,
+                source="rules",
+                reason="workflow:workspace_insights",
             )
 
     # Check for combined email + calendar workflow

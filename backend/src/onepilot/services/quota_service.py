@@ -11,6 +11,7 @@ from onepilot.core.ids import new_id
 from onepilot.repositories.models import UsageQuota
 from onepilot.repositories.plans import PlanRepository, SubscriptionRepository
 from onepilot.repositories.usage import UsageQuotaRepository
+from onepilot.repositories.usage_events import UsageEventRepository
 
 
 def _current_period() -> tuple[datetime, datetime]:
@@ -35,7 +36,16 @@ def _get_limit(session: Session, organization_id: str, feature: str) -> int:
         raise NotFoundError("Plan not found")
 
     limits: dict = plan.limits or {}
-    return limits.get(feature, 0)
+    feature_str = str(feature)
+    if feature_str not in limits:
+        settings = get_settings()
+        if (
+            settings.PUBLIC_DEMO_ENABLED
+            and organization_id == settings.DEV_ORG_ID
+            and feature_str == UsageFeature.WEB_SEARCH.value
+        ):
+            return int(settings.PUBLIC_DEMO_WEB_SEARCH_PER_DAY)
+    return int(limits.get(feature_str, 0) or 0)
 
 
 def check(session: Session, organization_id: str, feature: str | UsageFeature) -> bool:
@@ -54,6 +64,27 @@ def check(session: Session, organization_id: str, feature: str | UsageFeature) -
 
     used = quota.used if quota else 0
     return used < limit
+
+
+def check_daily_token_budget(
+    session: Session, organization_id: str, *, settings=None
+) -> None:
+    """Raise QuotaExceededError when public-demo daily token budget is exhausted."""
+    settings = settings or get_settings()
+    if not settings.PUBLIC_DEMO_ENABLED:
+        return
+    if organization_id != settings.DEV_ORG_ID:
+        return
+    budget = int(settings.PUBLIC_DEMO_DAILY_TOKEN_BUDGET)
+    if budget <= 0:
+        return
+    now = datetime.now(UTC)
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    used = UsageEventRepository(session).sum_tokens_since(organization_id, day_start)
+    if used >= budget:
+        raise QuotaExceededError(
+            "Daily demo usage budget reached. Please try again tomorrow."
+        )
 
 
 def increment(
