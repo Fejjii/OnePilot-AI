@@ -147,12 +147,24 @@ def draft_email(
             temperature=0.3,
             max_tokens=600,
         )
-        subject, body = _parse_subject_body(response.content)
+        subject, body = _parse_subject_body(response.content or "")
+        if not body.strip():
+            logger.warning(
+                "email_empty_llm_content",
+                organization_id=principal.organization_id,
+                model=response.model,
+                finish_reason=response.finish_reason,
+                output_tokens=response.output_tokens,
+            )
+            subject, body = _fallback_draft(context, tone, recipient_name)
         model_name = response.model
         input_tokens = response.input_tokens
         output_tokens = response.output_tokens
 
     latency_ms = int((time.monotonic() - started) * 1000)
+
+    if not body.strip():
+        subject, body = _fallback_draft(context, tone, recipient_name)
 
     draft = EmailDraft(
         subject=subject,

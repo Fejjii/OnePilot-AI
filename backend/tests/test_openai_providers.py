@@ -12,7 +12,11 @@ from onepilot.providers import get_embeddings_provider, get_llm_provider, reset_
 from onepilot.providers.embeddings.fallback_embeddings import FallbackEmbeddingsProvider
 from onepilot.providers.embeddings.openai_embeddings import OpenAIEmbeddingsProvider
 from onepilot.providers.llm.fallback_provider import FallbackLLMProvider
-from onepilot.providers.llm.openai_provider import OpenAILLMProvider
+from onepilot.providers.llm.openai_provider import (
+    OpenAILLMProvider,
+    reasoning_effort_for_model,
+    uses_max_completion_tokens,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -134,8 +138,106 @@ class TestOpenAILLMProvider:
             )
             call_kwargs = mock_client.chat.completions.create.call_args[1]
             assert call_kwargs["max_completion_tokens"] == 200
+            assert call_kwargs["reasoning_effort"] == "minimal"
             assert "max_tokens" not in call_kwargs
             assert "temperature" not in call_kwargs
+
+    def test_chat_sends_minimal_reasoning_effort_for_gpt5_nano(self):
+        with patch("onepilot.providers.llm.openai_provider.OpenAI") as mock_openai_cls:
+            mock_client = MagicMock()
+            mock_openai_cls.return_value = mock_client
+            mock_response = MagicMock()
+            mock_response.model = "gpt-5-nano-2025-08-07"
+            mock_response.choices = [MagicMock()]
+            mock_response.choices[0].message.content = "ok"
+            mock_response.choices[0].finish_reason = "stop"
+            mock_response.usage.prompt_tokens = 1
+            mock_response.usage.completion_tokens = 1
+            mock_response.usage.completion_tokens_details = None
+            mock_client.chat.completions.create.return_value = mock_response
+            provider = OpenAILLMProvider(
+                api_key="test-key", default_model="gpt-5-nano"
+            )
+            provider.chat([{"role": "user", "content": "Hello"}], max_tokens=512)
+            call_kwargs = mock_client.chat.completions.create.call_args[1]
+            assert call_kwargs["reasoning_effort"] == "minimal"
+            assert call_kwargs["max_completion_tokens"] == 512
+
+    def test_chat_does_not_send_reasoning_effort_for_gpt4o(self):
+        with patch("onepilot.providers.llm.openai_provider.OpenAI") as mock_openai_cls:
+            mock_client = MagicMock()
+            mock_openai_cls.return_value = mock_client
+            mock_response = MagicMock()
+            mock_response.model = "gpt-4o-mini"
+            mock_response.choices = [MagicMock()]
+            mock_response.choices[0].message.content = "ok"
+            mock_response.choices[0].finish_reason = "stop"
+            mock_response.usage.prompt_tokens = 1
+            mock_response.usage.completion_tokens = 1
+            mock_response.usage.completion_tokens_details = None
+            mock_client.chat.completions.create.return_value = mock_response
+            provider = OpenAILLMProvider(
+                api_key="test-key", default_model="gpt-4o-mini"
+            )
+            provider.chat([{"role": "user", "content": "Hello"}], max_tokens=100)
+            call_kwargs = mock_client.chat.completions.create.call_args[1]
+            assert "reasoning_effort" not in call_kwargs
+
+    def test_chat_omits_reasoning_effort_for_gpt51(self):
+        with patch("onepilot.providers.llm.openai_provider.OpenAI") as mock_openai_cls:
+            mock_client = MagicMock()
+            mock_openai_cls.return_value = mock_client
+            mock_response = MagicMock()
+            mock_response.model = "gpt-5.1"
+            mock_response.choices = [MagicMock()]
+            mock_response.choices[0].message.content = "ok"
+            mock_response.choices[0].finish_reason = "stop"
+            mock_response.usage.prompt_tokens = 1
+            mock_response.usage.completion_tokens = 1
+            mock_response.usage.completion_tokens_details = None
+            mock_client.chat.completions.create.return_value = mock_response
+            provider = OpenAILLMProvider(
+                api_key="test-key", default_model="gpt-5.1"
+            )
+            provider.chat([{"role": "user", "content": "Hello"}], max_tokens=200)
+            call_kwargs = mock_client.chat.completions.create.call_args[1]
+            assert "reasoning_effort" not in call_kwargs
+            assert call_kwargs["max_completion_tokens"] == 200
+
+    def test_chat_returns_empty_content_without_raising(self):
+        with patch("onepilot.providers.llm.openai_provider.OpenAI") as mock_openai_cls:
+            mock_client = MagicMock()
+            mock_openai_cls.return_value = mock_client
+            mock_response = MagicMock()
+            mock_response.model = "gpt-5-nano-2025-08-07"
+            mock_response.choices = [MagicMock()]
+            mock_response.choices[0].message.content = ""
+            mock_response.choices[0].finish_reason = "length"
+            mock_response.usage.prompt_tokens = 120
+            mock_response.usage.completion_tokens = 512
+            details = MagicMock()
+            details.reasoning_tokens = 512
+            mock_response.usage.completion_tokens_details = details
+            mock_client.chat.completions.create.return_value = mock_response
+            provider = OpenAILLMProvider(
+                api_key="test-key", default_model="gpt-5-nano"
+            )
+            result = provider.chat([{"role": "user", "content": "Hello"}])
+            assert result.content == ""
+            assert result.finish_reason == "length"
+            assert result.output_tokens == 512
+            assert result.model == "gpt-5-nano-2025-08-07"
+
+    def test_reasoning_effort_for_model_matrix(self):
+        assert reasoning_effort_for_model("gpt-5-nano") == "minimal"
+        assert reasoning_effort_for_model("gpt-5-nano-2025-08-07") == "minimal"
+        assert reasoning_effort_for_model("gpt-5-mini") == "minimal"
+        assert reasoning_effort_for_model("gpt-5") == "minimal"
+        assert reasoning_effort_for_model("gpt-5.1") is None
+        assert reasoning_effort_for_model("gpt-5-pro") is None
+        assert reasoning_effort_for_model("gpt-4o-mini") is None
+        assert uses_max_completion_tokens("gpt-5-nano") is True
+        assert uses_max_completion_tokens("gpt-4o-mini") is False
     
     def test_chat_structured_uses_json_mode(self):
         """Test that structured chat uses JSON response format."""

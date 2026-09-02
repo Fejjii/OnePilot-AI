@@ -22,6 +22,45 @@ def uses_max_completion_tokens(model: str) -> bool:
     return name.startswith(("gpt-5", "o1", "o3", "o4"))
 
 
+def reasoning_effort_for_model(model: str) -> str | None:
+    """Return a Chat Completions ``reasoning_effort`` for GPT-5, or None.
+
+    Models before gpt-5.1 default to ``medium`` reasoning, which counts against
+    ``max_completion_tokens`` and can yield empty ``message.content`` (Nano on
+    the public demo). ``minimal`` is a documented SDK value for that family.
+    gpt-5.1+ defaults to ``none`` and does not accept ``minimal``; gpt-5-pro
+    only supports ``high``. Do not send ``reasoning_effort`` for other models.
+    """
+    name = (model or "").strip().lower()
+    if not name.startswith("gpt-5"):
+        return None
+    if name.startswith(("gpt-5.1", "gpt-5.2", "gpt-5.3", "gpt-5.4", "gpt-5.5")):
+        return None
+    if "pro" in name.split("-"):
+        return None
+    return "minimal"
+
+
+def _as_int(value: object) -> int:
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0
+
+
+def _usage_tokens(response: ChatCompletion) -> tuple[int, int, int]:
+    """Return prompt, completion, and reasoning token counts from a completion."""
+    usage = response.usage
+    if usage is None:
+        return 0, 0, 0
+    prompt = _as_int(getattr(usage, "prompt_tokens", 0))
+    completion = _as_int(getattr(usage, "completion_tokens", 0))
+    details = getattr(usage, "completion_tokens_details", None)
+    reasoning_raw = getattr(details, "reasoning_tokens", 0) if details is not None else 0
+    reasoning = _as_int(reasoning_raw)
+    return prompt, completion, reasoning
+
+
 class OpenAILLMProvider(LLMProvider):
     """OpenAI ChatCompletion-backed LLM provider."""
 
@@ -69,6 +108,9 @@ class OpenAILLMProvider(LLMProvider):
         else:
             kwargs["max_tokens"] = capped
             kwargs["temperature"] = temperature
+        effort = reasoning_effort_for_model(model)
+        if effort is not None:
+            kwargs["reasoning_effort"] = effort
         return kwargs
 
     def chat(
@@ -91,13 +133,25 @@ class OpenAILLMProvider(LLMProvider):
 
             choice = response.choices[0]
             content = choice.message.content or ""
+            finish_reason = choice.finish_reason or "stop"
+            input_tokens, output_tokens, reasoning_tokens = _usage_tokens(response)
+
+            if not content.strip():
+                log.warning(
+                    "openai_empty_completion",
+                    model=response.model or chosen,
+                    finish_reason=finish_reason,
+                    output_tokens=output_tokens,
+                    reasoning_tokens=reasoning_tokens,
+                    content_len=len(content),
+                )
 
             return LLMResponse(
                 content=content,
                 model=response.model,
-                input_tokens=response.usage.prompt_tokens if response.usage else 0,
-                output_tokens=response.usage.completion_tokens if response.usage else 0,
-                finish_reason=choice.finish_reason or "stop",
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                finish_reason=finish_reason,
             )
         except ProviderUnavailableError:
             raise
