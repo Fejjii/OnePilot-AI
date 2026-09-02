@@ -28,18 +28,12 @@ CORS_ORIGINS=https://<YOUR_VERCEL_APP>.vercel.app
 # ── Strongly recommended (public demo) ─────────────────
 REDIS_URL=redis://<USER>:<PASSWORD>@<REDIS_HOST>:6379/0
 
-QDRANT_URL=https://<YOUR_CLUSTER>.cloud.qdrant.io
-QDRANT_API_KEY=<QDRANT_CLOUD_API_KEY>
-
 # ── Public demo: keep integrations in mock mode ──────────
 GMAIL_PROVIDER_MODE=mock
 GOOGLE_CALENDAR_PROVIDER_MODE=mock
 GMAIL_SEND_ENABLED=false
 
 # ── One-click demo access (OP-006) ───────────────────────
-# Enables POST /demo/start: reviewers enter a seeded demo workspace
-# without credentials. In production this REQUIRES the mock provider
-# modes above — the backend refuses to start otherwise.
 PUBLIC_DEMO_ENABLED=true
 PUBLIC_DEMO_SESSION_MINUTES=60
 
@@ -48,12 +42,30 @@ GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GOOGLE_REFRESH_TOKEN=
 
-# ── Optional ─────────────────────────────────────────────
+# ── Optional managed AI (public demo) ───────────────────
+# Set keys only on the backend host (never Vercel). Also set a hard spend
+# limit on the OpenAI project (recommend USD 10/month) before enabling.
 OPENAI_API_KEY=<OPENAI_API_KEY_OPTIONAL>
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+OPENAI_TIMEOUT_SECONDS=30
+OPENAI_MAX_RETRIES=2
+OPENAI_MAX_OUTPUT_TOKENS=1024
 
-SERPER_API_KEY=
+SERPER_API_KEY=<SERPER_API_KEY_OPTIONAL>
+
+# Leave Qdrant empty on public demo (in-memory + warm reindex on startup).
+QDRANT_URL=
+QDRANT_API_KEY=
+
+# Public-demo abuse / spend controls (OP-017)
+PUBLIC_DEMO_CHAT_PER_IP_PER_MINUTE=20
+PUBLIC_DEMO_CHAT_PER_IP_PER_DAY=200
+PUBLIC_DEMO_WEB_SEARCH_PER_IP_PER_MINUTE=5
+PUBLIC_DEMO_WEB_SEARCH_PER_DAY=300
+PUBLIC_DEMO_DAILY_TOKEN_BUDGET=250000
+PUBLIC_DEMO_WARM_REINDEX=true
+
 LANGSMITH_API_KEY=
 LANGSMITH_TRACING=false
 ```
@@ -69,9 +81,12 @@ LANGSMITH_TRACING=false
 | `PUBLIC_DEMO_SESSION_MINUTES` | Lifetime of tokens issued by `/demo/start` (default 60). Expired demo sessions return 401 and the UI falls back to the login page. |
 | `GMAIL_PROVIDER_MODE` | Use `mock` — do not connect personal Gmail. |
 | `GOOGLE_CALENDAR_PROVIDER_MODE` | Use `mock` — do not connect personal Calendar. |
-| `OPENAI_API_KEY` | Optional. App uses deterministic fallback without it. Set spend limits in OpenAI dashboard if enabled. |
+| `OPENAI_API_KEY` | Backend only. Optional. App uses deterministic fallback without it. Set a **hard spend limit** on the OpenAI project (recommend USD 10/month) before enabling. |
+| `OPENAI_MODEL` | Default `gpt-4o-mini`. After OP-016, `gpt-5-mini` is also supported. |
+| `SERPER_API_KEY` | Backend only. Optional. Enable after routing fixes; public demo is per-IP and daily limited. |
 | `REDIS_URL` | Strongly recommended so rate limits are shared across workers. Verify `/health` shows `rate_limit_backend: redis`. |
-| `QDRANT_URL` | Strongly recommended for durable RAG. Without it, vectors are in-memory and lost on restart. |
+| `QDRANT_URL` | Optional on public demo. Empty uses in-memory vectors; `PUBLIC_DEMO_WARM_REINDEX=true` rebuilds them at startup. |
+| `PUBLIC_DEMO_DAILY_TOKEN_BUDGET` | Org-wide daily token cap for the demo tenant (default 250000). |
 
 ---
 

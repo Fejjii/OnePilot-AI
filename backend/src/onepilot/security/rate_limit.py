@@ -17,6 +17,10 @@ FEATURE_DOCUMENT_UPLOAD = "document_upload"
 FEATURE_AUTH_LOGIN = "auth_login"
 FEATURE_AUTH_REGISTER = "auth_register"
 FEATURE_DEMO_START = "demo_start"
+FEATURE_CHAT_IP = "chat_ip"
+FEATURE_CHAT_IP_DAY = "chat_ip_day"
+FEATURE_WEB_SEARCH = "web_search"
+FEATURE_WEB_SEARCH_DAY = "web_search_day"
 
 # Per-feature limits: (max requests, window seconds).
 _FEATURE_LIMITS: dict[str, tuple[int, int]] = {
@@ -25,6 +29,10 @@ _FEATURE_LIMITS: dict[str, tuple[int, int]] = {
     FEATURE_AUTH_LOGIN: (10, 60),
     FEATURE_AUTH_REGISTER: (5, 3600),
     FEATURE_DEMO_START: (10, 3600),
+    FEATURE_CHAT_IP: (20, 60),
+    FEATURE_CHAT_IP_DAY: (200, 86400),
+    FEATURE_WEB_SEARCH: (5, 60),
+    FEATURE_WEB_SEARCH_DAY: (300, 86400),
 }
 
 _KEY_PREFIX = "onepilot:rl:v1"
@@ -249,10 +257,60 @@ def enforce_rate_limit_for_principal(principal: Principal, feature: str) -> None
     )
 
 
+def client_ip_from_request(request: Any) -> str:
+    """Best-effort client IP (first X-Forwarded-For hop, else peer host)."""
+    forwarded = ""
+    headers = getattr(request, "headers", None)
+    if headers is not None:
+        forwarded = str(headers.get("X-Forwarded-For") or "")
+    if forwarded:
+        return forwarded.split(",")[0].strip() or "unknown"
+    client = getattr(request, "client", None)
+    if client is not None and getattr(client, "host", None):
+        return str(client.host)
+    return "unknown"
+
+
+def apply_feature_limit(feature: str, capacity: int, window_seconds: int) -> None:
+    """Override a feature window (used by tests and public-demo settings)."""
+    _FEATURE_LIMITS[feature] = (max(1, int(capacity)), max(1, int(window_seconds)))
+
+
 def enforce_rate_limit_for_client(client_key: str, feature: str) -> None:
     """Rate limit unauthenticated endpoints (login/register) by client identifier."""
     enforce_rate_limit(
         organization_id="_public",
         user_id=client_key,
         feature=feature,
+    )
+
+
+def enforce_public_demo_chat_limits(*, client_ip: str, settings: Settings) -> None:
+    if not settings.PUBLIC_DEMO_ENABLED:
+        return
+    apply_feature_limit(
+        FEATURE_CHAT_IP, settings.PUBLIC_DEMO_CHAT_PER_IP_PER_MINUTE, 60
+    )
+    apply_feature_limit(
+        FEATURE_CHAT_IP_DAY, settings.PUBLIC_DEMO_CHAT_PER_IP_PER_DAY, 86400
+    )
+    enforce_rate_limit_for_client(f"chat:{client_ip}", FEATURE_CHAT_IP)
+    enforce_rate_limit_for_client(f"chat_day:{client_ip}", FEATURE_CHAT_IP_DAY)
+
+
+def enforce_public_demo_web_search_limits(*, client_ip: str, settings: Settings) -> None:
+    if not settings.PUBLIC_DEMO_ENABLED:
+        return
+    apply_feature_limit(
+        FEATURE_WEB_SEARCH, settings.PUBLIC_DEMO_WEB_SEARCH_PER_IP_PER_MINUTE, 60
+    )
+    apply_feature_limit(
+        FEATURE_WEB_SEARCH_DAY, settings.PUBLIC_DEMO_WEB_SEARCH_PER_DAY, 86400
+    )
+    ip = client_ip or "unknown"
+    enforce_rate_limit_for_client(f"web:{ip}", FEATURE_WEB_SEARCH)
+    enforce_rate_limit(
+        organization_id="_public_demo",
+        user_id="org_web_search_day",
+        feature=FEATURE_WEB_SEARCH_DAY,
     )

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from onepilot.api.deps import CurrentPrincipal, DBSession, SettingsDep
 from onepilot.core.constants import Intent
@@ -18,6 +18,7 @@ from onepilot.schemas.chat import (
     TraceStep,
 )
 from onepilot.security.permissions import require_member
+from onepilot.security.rate_limit import client_ip_from_request
 from onepilot.services import chat_service, conversation_service
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -25,6 +26,7 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 
 @router.post("", response_model=ChatResponse)
 def chat(
+    request: Request,
     body: ChatRequest,
     principal: CurrentPrincipal,
     session: DBSession,
@@ -39,6 +41,7 @@ def chat(
         conversation_id=body.conversation_id,
         context=body.context,
         language_preference=body.language_preference,
+        client_ip=client_ip_from_request(request),
     )
     state = outcome.state
     return ChatResponse(

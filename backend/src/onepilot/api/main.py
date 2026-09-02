@@ -31,6 +31,36 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         langsmith_endpoint=settings.LANGSMITH_ENDPOINT if settings.LANGSMITH_ENDPOINT else None,
     )
 
+    if (
+        settings.PUBLIC_DEMO_ENABLED
+        and settings.PUBLIC_DEMO_WARM_REINDEX
+        and not settings.is_test
+    ):
+        try:
+            from onepilot.demo_data import seed as seed_module
+            from onepilot.repositories.session import SessionLocal, init_db
+            from onepilot.services import document_service
+
+            init_db()
+            session = SessionLocal()
+            try:
+                principal = seed_module.ensure_demo_principal(
+                    session, settings=settings
+                )
+                upserts = document_service.reindex_organization_documents(
+                    session, principal=principal, settings=settings
+                )
+                session.commit()
+                logger.info(
+                    "public_demo_warm_reindex_complete",
+                    organization_id=principal.organization_id,
+                    vector_upsert_count=upserts,
+                )
+            finally:
+                session.close()
+        except Exception:
+            logger.exception("public_demo_warm_reindex_failed")
+
     yield
     logger.info("app_shutdown")
 

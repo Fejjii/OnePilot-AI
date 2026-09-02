@@ -72,6 +72,18 @@ class TestMemorySafety:
                 settings=get_settings(),
             )
 
+    def test_rejects_sk_proj_secret_values(self, db_session: Session) -> None:
+        principal = _org_principal(db_session, suffix="secproj")
+        with pytest.raises(ValidationError):
+            memory_service.write_memory(
+                db_session,
+                principal=principal,
+                scope="user",
+                key="api_note",
+                value="OPENAI_API_KEY=sk-proj-abc_DEF-1234567890abcdefghijklmnop",
+                settings=get_settings(),
+            )
+
     def test_rejects_sensitive_keys(self, db_session: Session) -> None:
         principal = _org_principal(db_session, suffix="key")
         with pytest.raises(ValidationError):

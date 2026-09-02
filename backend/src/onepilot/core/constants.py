@@ -48,6 +48,7 @@ class Intent(StrEnum):
     DOCUMENT_SUMMARY = "document_summary"
     WORKFLOW_ACTION = "workflow_action"
     COMPOUND_WORKFLOW = "compound_workflow"
+    WORKSPACE_INSIGHTS = "workspace_insights"
     OUT_OF_SCOPE = "out_of_scope"
     CLARIFICATION = "clarification"
 

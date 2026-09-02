@@ -42,6 +42,7 @@ class WebSearchTool(Tool):
             principal=ctx.principal,
             request=request,
             settings=ctx.settings,
+            client_ip=ctx.client_ip,
         )
         duration_ms = int((time.monotonic() - started) * 1000)
 

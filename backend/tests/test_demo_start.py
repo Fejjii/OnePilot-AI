@@ -89,6 +89,24 @@ class TestDemoStartSuccess:
         docs = client.get("/documents", headers=_h(token))
         assert docs.json()["total"] == 19  # no duplicates
 
+    def test_visitors_do_not_share_conversations(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _enable_public_demo(monkeypatch)
+        token_a = client.post("/demo/start").json()["access_token"]
+        token_b = client.post("/demo/start").json()["access_token"]
+        chat = client.post(
+            "/chat",
+            json={"message": "Hello there, how are you?"},
+            headers=_h(token_a),
+        )
+        assert chat.status_code == 200, chat.text
+        convs_a = client.get("/conversations", headers=_h(token_a)).json()
+        convs_b = client.get("/conversations", headers=_h(token_b)).json()
+        assert convs_a["total"] >= 1
+        assert convs_b["total"] == 0
+        assert convs_b["items"] == []
+
     def test_demo_session_expiry_is_short_lived(
         self, client: TestClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:

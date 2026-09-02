@@ -33,7 +33,11 @@ from onepilot.schemas.agents import AgentState
 from onepilot.schemas.chat import TraceStep
 from onepilot.security.auth import Principal
 from onepilot.security.prompt_injection import SafetyVerdict, check_prompt_injection
-from onepilot.security.rate_limit import FEATURE_CHAT, enforce_rate_limit_for_principal
+from onepilot.security.rate_limit import (
+    FEATURE_CHAT,
+    enforce_public_demo_chat_limits,
+    enforce_rate_limit_for_principal,
+)
 from onepilot.services import (
     audit_service,
     conversation_service,
@@ -163,6 +167,7 @@ def handle_chat(
     context: dict | None = None,
     language_preference: LanguagePreference | str = LanguagePreference.AUTO,
     history_turns: int = 10,
+    client_ip: str | None = None,
 ) -> ChatOutcome:
     started = time.monotonic()
 
@@ -181,6 +186,11 @@ def handle_chat(
     trace_context = tracing_provider.start_trace("chat.handle", trace_metadata)
 
     enforce_rate_limit_for_principal(principal, FEATURE_CHAT)
+    if client_ip:
+        enforce_public_demo_chat_limits(client_ip=client_ip, settings=settings)
+    quota_service.check_daily_token_budget(
+        session, principal.organization_id, settings=settings
+    )
 
     injection_verdict = check_prompt_injection(message)
     if injection_verdict.blocked:
@@ -238,6 +248,7 @@ def handle_chat(
         context=context,
         language_preference=language_preference,
         trace_context=trace_context,
+        client_ip=client_ip,
     )
 
     # Finalize trace

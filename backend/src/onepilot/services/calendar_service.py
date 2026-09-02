@@ -30,7 +30,9 @@ from onepilot.services import audit_service, usage_service
 log = get_logger(__name__)
 
 _AVAILABILITY_INTENT = re.compile(
-    r"\b(am i free|are we free|availability|available|busy|free tomorrow|free next)\b",
+    r"\b(am i free|are we free|availability|available|busy|free tomorrow|free next|"
+    r"on the calendar|calendar this week|what meetings|check my calendar|"
+    r"meetings (are |on ))\b",
     re.IGNORECASE,
 )
 _SUGGEST_SLOTS_INTENT = re.compile(

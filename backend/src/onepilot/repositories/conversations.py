@@ -33,6 +33,17 @@ class ConversationRepository(BaseRepository[Conversation]):
         )
         return list(self._session.execute(stmt).scalars().all())
 
+    def count_for_user(self, organization_id: str, user_id: str) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(Conversation)
+            .where(
+                Conversation.organization_id == organization_id,
+                Conversation.user_id == user_id,
+            )
+        )
+        return self._session.execute(stmt).scalar() or 0
+
 
 class MessageRepository(BaseRepository[Message]):
     def __init__(self, session: Session) -> None:

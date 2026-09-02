@@ -100,6 +100,7 @@ _INTENT_TO_BRANCH: dict[Intent, str] = {
     Intent.LEAD_SUPPORT: "lead_assistant",
     Intent.WORKFLOW_ACTION: "lead_assistant",
     Intent.COMPOUND_WORKFLOW: "compound_workflow",
+    Intent.WORKSPACE_INSIGHTS: "workspace_insights",
     Intent.GENERAL_ASSISTANT: "general_chat",
     Intent.OUT_OF_SCOPE: "out_of_scope",
     Intent.CLARIFICATION: "clarification",
@@ -121,10 +122,16 @@ class AgentDeps:
     principal: Principal
     settings: Settings
     trace_context: TraceContext | None = None
+    client_ip: str | None = None
 
 
 def _ctx(deps: AgentDeps) -> ToolContext:
-    return ToolContext(session=deps.session, principal=deps.principal, settings=deps.settings)
+    return ToolContext(
+        session=deps.session,
+        principal=deps.principal,
+        settings=deps.settings,
+        client_ip=deps.client_ip,
+    )
 
 
 def _append_trace(state: dict, step: str, *, detail: str = "", duration_ms: int = 0) -> None:
@@ -165,6 +172,22 @@ def _record_tool_call(state: dict, result: ToolResult) -> None:
     if result.usage:
         usage = state.setdefault("usage_metadata", {})
         usage.update(result.usage)
+
+
+def _merge_polish_usage(update: dict[str, Any], polished: web_synthesis.PolishResult) -> str:
+    """Fold optional LLM-polish tokens into chat usage so daily budgets count them."""
+    if polished.input_tokens or polished.output_tokens:
+        usage = update.setdefault("usage_metadata", {})
+        usage["input_tokens"] = int(usage.get("input_tokens") or 0) + int(
+            polished.input_tokens
+        )
+        usage["output_tokens"] = int(usage.get("output_tokens") or 0) + int(
+            polished.output_tokens
+        )
+        if polished.model:
+            usage["model"] = polished.model
+        usage.setdefault("provider", "openai")
+    return polished.text
 
 
 # ---------------------------------------------------------------------------
@@ -510,10 +533,17 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
         )
         _record_tool_call(update, web_result)
         web = _web_response_from_tool(web_result)
-        research_summary = web_synthesis.synthesize_web_only(
-            query=state.message,
-            web=web,
-            configured=deps.settings.has_serper,
+        research_summary = _merge_polish_usage(
+            update,
+            web_synthesis.maybe_llm_polish(
+                query=state.message,
+                draft=web_synthesis.synthesize_web_only(
+                    query=state.message,
+                    web=web,
+                    configured=deps.settings.has_serper,
+                ),
+                settings=deps.settings,
+            ),
         )
 
         email_action = gmail_service.infer_email_action(state.message, state.context)
@@ -606,10 +636,17 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
         )
         _record_tool_call(update, result)
         web = _web_response_from_tool(result)
-        update["draft_output"] = web_synthesis.synthesize_web_only(
-            query=state.message,
-            web=web,
-            configured=deps.settings.has_serper,
+        update["draft_output"] = _merge_polish_usage(
+            update,
+            web_synthesis.maybe_llm_polish(
+                query=state.message,
+                draft=web_synthesis.synthesize_web_only(
+                    query=state.message,
+                    web=web,
+                    configured=deps.settings.has_serper,
+                ),
+                settings=deps.settings,
+            ),
         )
         _append_trace(
             update,
@@ -645,12 +682,19 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
 
         internal_answer = str(rag_result.output.get("answer", ""))
         internal_weak = "weak_evidence" in rag_result.safety_flags
-        update["draft_output"] = web_synthesis.synthesize_combined(
-            query=state.message,
-            web=web,
-            internal_answer=internal_answer,
-            internal_weak=internal_weak,
-            configured=deps.settings.has_serper,
+        update["draft_output"] = _merge_polish_usage(
+            update,
+            web_synthesis.maybe_llm_polish(
+                query=state.message,
+                draft=web_synthesis.synthesize_combined(
+                    query=state.message,
+                    web=web,
+                    internal_answer=internal_answer,
+                    internal_weak=internal_weak,
+                    configured=deps.settings.has_serper,
+                ),
+                settings=deps.settings,
+            ),
         )
         rag_confidence = float(rag_result.output.get("confidence", 0.0))
         update["confidence"] = max(state.confidence, rag_confidence)
@@ -664,6 +708,26 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             "execute_tool:web_and_knowledge",
             detail=f"web_results={web.result_count} rag_weak={internal_weak}",
             duration_ms=web_result.duration_ms + rag_result.duration_ms,
+        )
+        return update
+
+    def workspace_insights_node(state: AgentState) -> dict:
+        update: dict[str, Any] = {
+            "trace_steps": list(state.trace_steps),
+            "tool_calls": list(state.tool_calls),
+            "citations": list(state.citations),
+            "safety_flags": list(state.safety_flags),
+            "usage_metadata": dict(state.usage_metadata),
+        }
+        result = registry.get("workspace.insights").run(
+            _ctx(deps),
+            message=state.message,
+        )
+        _record_tool_call(update, result)
+        update["draft_output"] = str(result.output.get("answer", ""))
+        update["confidence"] = max(state.confidence, 0.8)
+        _append_trace(
+            update, "execute_tool:workspace.insights", duration_ms=result.duration_ms
         )
         return update
 
@@ -801,6 +865,7 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
     graph.add_node("calendar_assistant", calendar_assistant_node)
     graph.add_node("calendar_and_email", calendar_and_email_node)
     graph.add_node("compound_workflow", compound_workflow_node)
+    graph.add_node("workspace_insights", workspace_insights_node)
     graph.add_node("lead_assistant", lead_assistant_node)
     graph.add_node("general_chat", general_chat_node)
     graph.add_node("clarification", clarification_node)
@@ -825,6 +890,7 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             "calendar_assistant": "calendar_assistant",
             "calendar_and_email": "calendar_and_email",
             "compound_workflow": "compound_workflow",
+            "workspace_insights": "workspace_insights",
             "lead_assistant": "lead_assistant",
             "general_chat": "general_chat",
             "clarification": "clarification",
@@ -839,6 +905,7 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
         "calendar_assistant",
         "calendar_and_email",
         "compound_workflow",
+        "workspace_insights",
         "lead_assistant",
         "general_chat",
         "clarification",
@@ -866,6 +933,7 @@ def _branch_to_tool_name(branch: str) -> str:
         "calendar_assistant": "calendar.check_availability",
         "calendar_and_email": "calendar.create_event_request",
         "compound_workflow": "external.web_search",
+        "workspace_insights": "workspace.insights",
         "lead_assistant": "lead.support",
         "general_chat": "chat.general",
     }.get(branch, branch)
@@ -974,6 +1042,7 @@ def run_agent(
     context: dict | None = None,
     language_preference: LanguagePreference | str = LanguagePreference.AUTO,
     trace_context: TraceContext | None = None,
+    client_ip: str | None = None,
 ) -> AgentState:
     """Run the full workflow once and return the final :class:`AgentState`."""
     deps = AgentDeps(
@@ -981,6 +1050,7 @@ def run_agent(
         principal=principal,
         settings=settings,
         trace_context=trace_context,
+        client_ip=client_ip,
     )
     workflow = make_workflow(deps)
     pref = (

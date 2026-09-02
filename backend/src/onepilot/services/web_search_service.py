@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from onepilot.core.config import Settings, get_settings
 from onepilot.core.constants import UsageFeature
+from onepilot.core.errors import NotFoundError
 from onepilot.providers import get_search_provider
 from onepilot.providers.search.mock_search_provider import MockSearchProvider
 from onepilot.providers.search.serper_provider import SerperSearchProvider
@@ -18,7 +19,8 @@ from onepilot.schemas.web_search import (
     WebSearchResult,
 )
 from onepilot.security.auth import Principal
-from onepilot.services import usage_service
+from onepilot.security.rate_limit import enforce_public_demo_web_search_limits
+from onepilot.services import quota_service, usage_service
 
 
 def search_web(
@@ -27,10 +29,25 @@ def search_web(
     principal: Principal,
     request: WebSearchRequest,
     settings: Settings | None = None,
+    client_ip: str | None = None,
 ) -> WebSearchResponse:
     """Run external web search and record usage."""
     settings = settings or get_settings()
     started = time.monotonic()
+
+    try:
+        quota_service.check_and_increment(
+            session,
+            principal.organization_id,
+            UsageFeature.WEB_SEARCH,
+            amount=1,
+        )
+    except NotFoundError:
+        pass
+    enforce_public_demo_web_search_limits(
+        client_ip=client_ip or "unknown",
+        settings=settings,
+    )
 
     provider = get_search_provider(settings)
     configured = settings.has_serper

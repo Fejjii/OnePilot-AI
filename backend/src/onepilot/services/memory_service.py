@@ -38,7 +38,7 @@ _SENSITIVE_KEY_RE = re.compile(
 _SENSITIVE_VALUE_RE = re.compile(
     r"("
     r"Bearer\s+[A-Za-z0-9\-._~+/]+=*"
-    r"|sk-[A-Za-z0-9]{20,}"
+    r"|sk-[A-Za-z0-9_\-]{16,}"
     r"|pk_[A-Za-z0-9]{20,}"
     r"|-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----"
     r"|\bpassword\s*[:=]\s*\S+"
@@ -60,10 +60,7 @@ def _resolve_user_id(principal: Principal, scope: str) -> str | None:
 
 def is_shared_demo_principal(principal: Principal, settings: Settings) -> bool:
     """True when the principal is the shared public-demo tenant identity."""
-    return (
-        principal.organization_id == settings.DEV_ORG_ID
-        and principal.user_id == settings.DEV_USER_ID
-    )
+    return principal.organization_id == settings.DEV_ORG_ID
 
 
 def contains_sensitive_content(*, key: str, value: str) -> bool:

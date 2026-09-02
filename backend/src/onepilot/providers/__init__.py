@@ -64,6 +64,9 @@ def get_llm_provider(settings: Settings) -> LLMProvider:
                 _llm_singleton = OpenAILLMProvider(
                     api_key=settings.OPENAI_API_KEY,
                     default_model=settings.OPENAI_MODEL,
+                    timeout_seconds=settings.OPENAI_TIMEOUT_SECONDS,
+                    max_retries=settings.OPENAI_MAX_RETRIES,
+                    max_output_tokens=settings.OPENAI_MAX_OUTPUT_TOKENS,
                 )
                 return _llm_singleton
             except Exception as exc:
@@ -112,6 +115,8 @@ def get_embeddings_provider(settings: Settings) -> EmbeddingsProvider:
                 _embeddings_singleton = OpenAIEmbeddingsProvider(
                     api_key=settings.OPENAI_API_KEY,
                     default_model=settings.OPENAI_EMBEDDING_MODEL,
+                    timeout_seconds=settings.OPENAI_TIMEOUT_SECONDS,
+                    max_retries=settings.OPENAI_MAX_RETRIES,
                 )
                 return _embeddings_singleton
             except Exception as exc:
