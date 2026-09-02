@@ -685,7 +685,24 @@ def answer(
                 model="weak-evidence-guard",
             )
     else:
-        answer_text = response.content.strip() or WEAK_EVIDENCE_ANSWER
+        answer_text = (response.content or "").strip()
+        if not answer_text:
+            logger.warning(
+                "rag_empty_llm_content",
+                organization_id=principal.organization_id,
+                model=response.model,
+                finish_reason=response.finish_reason,
+                output_tokens=response.output_tokens,
+                hit_count=len(outcome.hits),
+            )
+            # Retrieval already passed the weak-evidence guard. Ground the
+            # answer in retrieved chunks instead of the human-handoff refusal.
+            answer_text = synthesize_answer(
+                query,
+                _hits_to_rerank(outcome.hits),
+                response_language=resp_lang.value,
+                min_relevance=0.0,
+            )
 
     usage_service.record(
         session,
