@@ -66,8 +66,15 @@ docs/screenshots/*.jpg
 docs/screenshots/*.gif
 docs/screenshots/*.webp
 
-# Cursor
-.cursor/
+# Cursor (commit shared rules only; ignore the rest of .cursor/)
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
+
+# Local-only agent / private session state (never commit)
+.ai/
+HANDOFF.md
+CHANGELOG_SESSION.md
 
 # Local scratch (do not commit)
 Untitled
