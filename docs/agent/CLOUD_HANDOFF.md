@@ -1,7 +1,7 @@
 # Cloud agent handoff (sanitized)
 
-Generated: 2026-09-03 20:48 UTC  
-Generator: edited directly on `polish/op-028` (no local `HANDOFF.md` in this environment)
+Generated: 2026-09-03 22:09 UTC  
+Generator: edited directly after PR #25 merge (no local `HANDOFF.md` in this environment)
 
 This file is the **only** committed project-state brief for Cursor Cloud / phone agents.
 It is intentionally smaller than any local `HANDOFF.md` and contains **no secrets**.
@@ -21,13 +21,13 @@ It is intentionally smaller than any local `HANDOFF.md` and contains **no secret
 
 | Ref | SHA | Notes |
 |-----|-----|-------|
-| `origin/main` (canonical) | `f73668924becc7619b05e3e6723e3626ead13677` | Includes PR #23 (cloud handoff infra) and PR #24 (OP-027 + OP-029) |
+| `origin/main` (canonical) | `cd51a901242873c3357d89af3b174bd5090541d7` | Includes PR #25 (OP-028) |
 | `origin/deployment/public-demo` | `1c3dd0172250891d71f89c21a4a57e6002a5119d` | Thin deploy pointer; **behind `main`**. Do not fast-forward |
 | `origin/deployment/live-google-demo` | `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332` | Private live-Google pointer; **do not modify** |
-| `polish/op-028` (this work) | see branch HEAD | OP-028 CRM-grounded email + recruiter approval copy; PR #25 |
 
 ## Completed
 
+- OP-028 — CRM-grounded email drafting + recruiter-facing approval copy (merged to `main`, PR #25)
 - OP-027 / OP-029 — workspace insights focus + evaluation report polish (merged to `main`, PR #24)
 - Cloud/mobile handoff infrastructure (merged to `main`, PR #23)
 - OP-025 — deterministic UUID5 Qdrant point IDs for idempotent upsert (merged to `main`, PR #22)
@@ -42,12 +42,9 @@ It is intentionally smaller than any local `HANDOFF.md` and contains **no secret
 
 ## Current task / in progress
 
-- **OP-028** on `polish/op-028` (PR #25, not merged): CRM-grounded email drafting and recruiter-facing approval titles/descriptions.
-  - Resolves tenant-scoped seeded leads (name / company / email / most promising).
-  - Drafts use only stored CRM facts; missing context falls back to generic copy.
-  - Bracketed placeholders such as `[recipient]` and `[relevant outcome]` are removed.
-  - Human approval is still required before any email action. Public Gmail stays mock and send-disabled.
+- **This file** is the sanitized Cloud/mobile handoff context. Local `HANDOFF.md` (gitignored) remains authoritative for private/local state.
 - Public infrastructure is essentially complete (OP-026 COMPLETE; public demo Qdrant cleaned).
+- Recruiter-facing polish on `main`: insights (OP-027/029) and CRM-grounded email drafts (OP-028). Public demo deploy pointer is still behind `main`.
 - Private live-Google demo remains a later user-gated track (Cloud must not assume OAuth or live Google access).
 - Product work belongs on a feature/fix branch off `main`, never on a deployment branch.
 
@@ -68,12 +65,12 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 - Public demo: Vercel frontend + Railway API/Postgres/Redis; Gmail/Calendar **mock**; shared-demo agent memory disabled.
 - Private live-Google track exists on `deployment/live-google-demo` and is **user-gated**. Cloud must not assume OAuth or live Google access.
 - Vectors: Qdrant when configured, in-memory fallback otherwise. Cloud must not target live Qdrant clusters.
-- Email drafts now resolve org-scoped CRM leads when present; they must not invent customer facts.
+- Email drafts resolve org-scoped CRM leads when present and must not invent customer facts. Human approval is still required; public Gmail stays mock/send-disabled.
 
 ## Tests / status
 
-- Documented counts in README (2026-07-20): **703** backend tests (3 skipped), **126** frontend tests. Later merges added Qdrant/OpenAI/CRM-email coverage — trust current CI on `main` / PR #25.
-- OP-028 targeted: `backend/tests/test_crm_email_grounding.py` plus email/Gmail/approval/workflow tests.
+- Documented counts in README (2026-07-20): **703** backend tests (3 skipped), **126** frontend tests. Later merges added Qdrant/OpenAI/CRM-email coverage — trust current CI on `main`.
+- OP-028 CI on PR #25 was green (backend 766 passed / 3 skipped; frontend 131 passed).
 - CI (`.github/workflows/ci.yml`) runs backend pytest + frontend typecheck/tests/build on PRs to `main` and `deployment/**`.
 - Public-demo smoke: `python scripts/smoke_test_public_demo.py --base-url <public-api>` (never print tokens).
 - Cloud-handoff sync tests: `python -m pytest -q scripts/tests`
@@ -92,7 +89,10 @@ Cloud (and any agent) must **not** touch:
 
 ## Recommended next task
 
-After OP-028 is reviewed/merged: a scoped recruiter-demo consistency pass (starter-prompt narrative vs CRM ranking) **or** a named near-term item from `docs/limitations_roadmap.md` (HTTP-only cookie auth). Operator should name the task.
+Operator should name the next task. Cloud-safe options:
+
+- Scoped recruiter-demo consistency pass (starter-prompt “most promising lead” vs insights ranking; public-demo pointer still behind `main` — do not fast-forward unless authorized)
+- A named near-term item from `docs/limitations_roadmap.md` (HTTP-only cookie auth)
 
 Do not re-run live Qdrant or modify deployment branches unless the operator explicitly authorizes that exact branch.
 

@@ -310,6 +310,7 @@ def _joined_extracted(extracted: ExtractedHandoff, *needles: str) -> str | None:
 
 
 DEFAULT_COMPLETED = """\
+- OP-028 — CRM-grounded email drafting + recruiter-facing approval copy (merged to `main`, PR #25)
 - OP-027 / OP-029 — workspace insights focus + evaluation report polish (merged to `main`, PR #24)
 - Cloud/mobile handoff infrastructure (merged to `main`, PR #23)
 - OP-025 — deterministic UUID5 Qdrant point IDs for idempotent upsert (merged to `main`, PR #22)
@@ -324,9 +325,8 @@ DEFAULT_COMPLETED = """\
 
 DEFAULT_CURRENT = """\
 - **This file** is the sanitized Cloud/mobile handoff context. Local `HANDOFF.md` (gitignored) remains authoritative for private/local state.
-- **OP-028** CRM-grounded email drafting + recruiter approval copy (PR branch; do not merge unless asked).
 - Public infrastructure is essentially complete (OP-026 COMPLETE). Cloud must not re-run live Qdrant work.
-- Product work belongs on a feature/fix branch off `main`, never on a deployment branch.
+- Recruiter-facing polish on `main` includes OP-027/OP-029 and OP-028. Product work belongs on a feature/fix branch off `main`, never on a deployment branch.
 """
 
 DEFAULT_BACKLOG = """\
@@ -341,7 +341,7 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 """
 
 DEFAULT_NEXT = """\
-After OP-028 is reviewed/merged: a scoped recruiter-demo consistency pass or a named near-term item from `docs/limitations_roadmap.md`. Operator should name the task.
+Recommended next Cloud-safe task: a scoped recruiter-demo consistency pass, or a named near-term item from `docs/limitations_roadmap.md`, after the operator names the task.
 
 OP-026 is complete; do not re-run live Qdrant or modify deployment branches unless the operator explicitly authorizes that exact branch.
 """
