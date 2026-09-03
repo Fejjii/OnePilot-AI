@@ -11,8 +11,6 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING, Any
 
-from ulid import ULID
-
 from onepilot.core.errors import ProviderUnavailableError
 from onepilot.core.logging import get_logger
 from onepilot.providers.vector.base import VectorProvider, VectorSearchResult
@@ -24,6 +22,11 @@ log = get_logger(__name__)
 
 # Qdrant Cloud strict mode rejects filtered search unless this payload field is indexed.
 _ORGANIZATION_ID_PAYLOAD_FIELD = "organization_id"
+
+# Dedicated UUID5 namespace so the same chunk identifier always maps to the same
+# Qdrant point ID (unsigned integer or UUID). Do not use uuid4 — reindex would
+# append duplicates instead of replacing the existing point.
+_QDRANT_POINT_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_DNS, "onepilot.ai.qdrant")
 
 
 class QdrantVectorProvider(VectorProvider):
@@ -101,9 +104,8 @@ class QdrantVectorProvider(VectorProvider):
         client = self._get_client()
         points = []
         for chunk_id, vec, payload in zip(ids, vectors, payloads):
-            qdrant_point_id = str(uuid.uuid4())
             payload["chunk_ulid"] = chunk_id  # Store original ULID in payload
-            points.append(qm.PointStruct(id=qdrant_point_id, vector=vec, payload=payload))
+            points.append(qm.PointStruct(id=_to_point_id(chunk_id), vector=vec, payload=payload))
 
         client.upsert(collection_name=collection, points=points, wait=True)
         return len(ids)
@@ -153,18 +155,13 @@ class QdrantVectorProvider(VectorProvider):
         )
 
 
-def _to_point_id(value: str) -> str:
-    """Converts a ULID string to a UUID string if it's not already a valid UUID."""
-    try:
-        uuid.UUID(value) # Check if it's already a valid UUID
-        return value
-    except ValueError:
-        # If not a UUID, assume it's a ULID string and convert
-        if "_" in value:
-            _, ulid_str = value.split("_", 1)
-        else:
-            ulid_str = value
-        return str(ULID.from_str(ulid_str).to_uuid())
+def _to_point_id(chunk_id: str) -> str:
+    """Map a stable chunk identifier to a Qdrant-compatible UUID5 point ID.
+
+    Upsert and delete must share this helper so reindex overwrites the same
+    points and deletes target the IDs that were actually written.
+    """
+    return str(uuid.uuid5(_QDRANT_POINT_NAMESPACE, chunk_id))
 
 
 def _build_filter(filters: dict | None) -> Any:
