@@ -11,7 +11,7 @@
         docker-build docker-up docker-down docker-logs docker-migrate docker-seed \
         check-stack reset-demo \
         test lint \
-        sync-cloud-handoff scripts-test
+        sync-cloud-handoff scripts-test sync-handoffs
 
 # ── Default ───────────────────────────────────────────────────────────────────
 help: ## Show this help
@@ -86,10 +86,13 @@ lint: backend-lint frontend-lint ## Run all linters (backend + frontend)
 
 # ── Cloud handoff (local Mac → sanitized committed file) ──────────────────────
 sync-cloud-handoff: ## Generate docs/agent/CLOUD_HANDOFF.md (does not commit or push)
-	python scripts/sync_cloud_handoff.py
+	python3 scripts/sync_cloud_handoff.py
+
+sync-handoffs: ## Local -> iCloud -> Cloud (does not commit or push)
+	bash scripts/sync_all_handoffs.sh
 
 scripts-test: ## Run sanitizer / fail-closed tests for the cloud-handoff script
-	python -m pytest -q scripts/tests
+	python3 -m pytest -q scripts/tests
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
 check-stack: ## Check that all services are healthy
