@@ -310,6 +310,8 @@ def _joined_extracted(extracted: ExtractedHandoff, *needles: str) -> str | None:
 
 
 DEFAULT_COMPLETED = """\
+- OP-027 / OP-029 — workspace insights focus + evaluation report polish (merged to `main`, PR #24)
+- Cloud/mobile handoff infrastructure (merged to `main`, PR #23)
 - OP-025 — deterministic UUID5 Qdrant point IDs for idempotent upsert (merged to `main`, PR #22)
 - OP-024 — `organization_id` payload index for strict-mode filtered Qdrant search (PR #21)
 - OP-023 — empty `gpt-5-nano` completion handling for RAG and email drafts (PR #20)
@@ -322,7 +324,8 @@ DEFAULT_COMPLETED = """\
 
 DEFAULT_CURRENT = """\
 - **This file** is the sanitized Cloud/mobile handoff context. Local `HANDOFF.md` (gitignored) remains authoritative for private/local state.
-- **OP-026** is a local/live-Qdrant task. Cloud agents must not start, continue, or inspect it.
+- **OP-028** CRM-grounded email drafting + recruiter approval copy (PR branch; do not merge unless asked).
+- Public infrastructure is essentially complete (OP-026 COMPLETE). Cloud must not re-run live Qdrant work.
 - Product work belongs on a feature/fix branch off `main`, never on a deployment branch.
 """
 
@@ -338,9 +341,9 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 """
 
 DEFAULT_NEXT = """\
-Recommended next Cloud-safe task: a scoped product/fix branch off `main` from the near-term list in `docs/limitations_roadmap.md`, after the operator names the task.
+After OP-028 is reviewed/merged: a scoped recruiter-demo consistency pass or a named near-term item from `docs/limitations_roadmap.md`. Operator should name the task.
 
-Do not start OP-026, do not touch live Qdrant, and do not modify deployment branches unless the operator explicitly authorizes that exact branch.
+OP-026 is complete; do not re-run live Qdrant or modify deployment branches unless the operator explicitly authorizes that exact branch.
 """
 
 DEFAULT_ARCHITECTURE = """\

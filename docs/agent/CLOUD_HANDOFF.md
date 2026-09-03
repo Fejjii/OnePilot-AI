@@ -1,12 +1,10 @@
 # Cloud agent handoff (sanitized)
 
-Generated: 2026-09-03 21:40 UTC  
-Generator: Cloud agent (manual, sanitized; no local `HANDOFF.md`)
+Generated: 2026-09-03 22:11 UTC  
+Generator: Cloud agent (manual, sanitized; merged `origin/main` into `polish/op-031`; no local `HANDOFF.md`)
 
 This file is the **only** committed project-state brief for Cursor Cloud / phone agents.
 It is intentionally smaller than any local `HANDOFF.md` and contains **no secrets**.
-
-No local `HANDOFF.md` was available. Task sections use repo defaults and/or the previous Cloud file.
 
 
 ## How to read this file
@@ -23,16 +21,17 @@ No local `HANDOFF.md` was available. Task sections use repo defaults and/or the 
 
 | Ref | SHA | Notes |
 |-----|-----|-------|
-| `origin/main` (canonical) | `f73668924becc7619b05e3e6723e3626ead13677` | Product source of truth (includes OP-027/OP-029) |
-| `origin/deployment/public-demo` | `1c3dd0172250891d71f89c21a4a57e6002a5119d` | Thin deploy pointer; **behind `main`**; do not fast-forward unless authorized |
+| `origin/main` (canonical) | `cd51a901242873c3357d89af3b174bd5090541d7` | Includes PR #25 (OP-028 CRM-grounded email) |
+| `origin/deployment/public-demo` | `1c3dd0172250891d71f89c21a4a57e6002a5119d` | Thin deploy pointer; **behind `main`**. Do not fast-forward |
 | `origin/deployment/live-google-demo` | `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332` | Private live-Google pointer; **do not modify** |
 | `polish/op-031` (this work) | see latest commit on that branch | OP-031 PR #26 into `main`; do not merge unless asked |
 
 ## Completed
 
-- OP-031 — persist/render safe recruiter-facing agent execution traces + complete intent/tool badges (PR #26, `polish/op-031`; not merged)
-- OP-028 — complete and merged (operator-confirmed)
-- OP-027 / OP-029 — workspace insights focus + eval reports (merged to `main`, PR #24)
+- OP-031 — persist/render safe recruiter-facing agent execution traces + complete intent/tool badges (PR #26, `polish/op-031`; implemented, **not merged**)
+- OP-028 — CRM-grounded email drafting + recruiter-facing approval copy (merged to `main`, PR #25)
+- OP-027 / OP-029 — workspace insights focus + evaluation report polish (merged to `main`, PR #24)
+- Cloud/mobile handoff infrastructure (merged to `main`, PR #23)
 - OP-025 — deterministic UUID5 Qdrant point IDs for idempotent upsert (merged to `main`, PR #22)
 - OP-026 — local/live Qdrant cleanup complete (public demo Qdrant cleaned: UUID4 duplicates removed; UUID5 deterministic vectors retained)
 - OP-024 — `organization_id` payload index for strict-mode filtered Qdrant search (PR #21)
@@ -46,6 +45,7 @@ No local `HANDOFF.md` was available. Task sections use repo defaults and/or the 
 ## Current task / in progress
 
 - **OP-031** implemented on `polish/op-031` (PR #26). Awaits review; do not merge unless asked.
+- OP-028 is on `main` (PR #25): tenant-scoped CRM lead resolution, no invented customer facts, no `[recipient]` / `[relevant outcome]` placeholders, HITL approval still required, public Gmail mock/send-disabled.
 - Public infrastructure is essentially complete (OP-026 COMPLETE; public demo Qdrant cleaned).
 - Recruiter-facing public demo polish continues after OP-031 (wording, checklist alignment) when the operator names the next item.
 - Private live-Google demo remains a later user-gated track (Cloud must not assume OAuth or live Google access).
@@ -65,7 +65,8 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 ## Architecture state
 
 - Multi-tenant FastAPI + Next.js workspace: LangGraph agent, RAG + citations, HITL approvals, usage/quotas, memory.
-- Assistant messages now persist a sanitized `execution_trace` (observable steps only). Internal graph details, prompts, tokens, and secrets are not shown in the recruiter UI.
+- Assistant messages persist a sanitized `execution_trace` (observable steps only). Internal graph details, prompts, tokens, and secrets are not shown in the recruiter UI.
+- Email drafts resolve org-scoped CRM leads when present and must not invent customer facts. Human approval is still required; public Gmail stays mock/send-disabled.
 - Public demo: Vercel frontend + Railway API/Postgres/Redis; Gmail/Calendar **mock**; shared-demo agent memory disabled.
 - Private live-Google track exists on `deployment/live-google-demo` and is **user-gated**. Cloud must not assume OAuth or live Google access.
 - Vectors: Qdrant when configured, in-memory fallback otherwise. Cloud must not target live Qdrant clusters.
@@ -73,7 +74,8 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 ## Tests / status
 
 - OP-031 validation: backend **765 passed, 3 skipped**; frontend **155 passed**; `pnpm typecheck` and `pnpm build` passed.
-- Documented counts in README (2026-07-20): **703** backend tests (3 skipped), **126** frontend tests. Later merges added coverage — trust current CI on `main`.
+- OP-028 on `main` (PR #25): CRM-email grounding plus email/Gmail/approval/workflow tests; CI green (backend 766 passed / 3 skipped; frontend 131 passed).
+- Documented counts in README (2026-07-20): **703** backend tests (3 skipped), **126** frontend tests. Later merges added Qdrant/OpenAI/CRM-email/execution-trace coverage — trust current CI on `main` / PR #26.
 - CI (`.github/workflows/ci.yml`) runs backend pytest + frontend typecheck/tests/build on PRs to `main` and `deployment/**`.
 - Public-demo smoke: `python scripts/smoke_test_public_demo.py --base-url <public-api>` (never print tokens).
 - Cloud-handoff sync tests: `python -m pytest -q scripts/tests`
@@ -92,7 +94,7 @@ Cloud (and any agent) must **not** touch:
 
 ## Recommended next task
 
-After OP-031 is reviewed/merged: remaining recruiter-facing public-demo polish (copy, checklist alignment) **or** a named item from the near-term list in `docs/limitations_roadmap.md`. Operator should name the next OP/task.
+After OP-031 is reviewed/merged: remaining recruiter-facing public-demo polish (copy, checklist alignment, starter-prompt vs CRM ranking) **or** a named item from the near-term list in `docs/limitations_roadmap.md` (HTTP-only cookie auth). Operator should name the next OP/task.
 
 Do not re-run live Qdrant or modify deployment branches unless the operator explicitly authorizes that exact branch.
 
