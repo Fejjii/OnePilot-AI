@@ -22,6 +22,9 @@ if TYPE_CHECKING:  # pragma: no cover
 
 log = get_logger(__name__)
 
+# Qdrant Cloud strict mode rejects filtered search unless this payload field is indexed.
+_ORGANIZATION_ID_PAYLOAD_FIELD = "organization_id"
+
 
 class QdrantVectorProvider(VectorProvider):
     """Vector provider backed by a Qdrant deployment."""
@@ -64,11 +67,13 @@ class QdrantVectorProvider(VectorProvider):
                     collection_name=collection,
                     vectors_config=qm.VectorParams(size=dimension, distance=qm.Distance.COSINE),
                 )
+                _ensure_organization_id_payload_index(client, collection)
                 return
             raise ProviderUnavailableError("Qdrant get_collection failed") from exc
 
         existing_dimension = _collection_vector_size(collection_info)
         if existing_dimension == dimension:
+            _ensure_organization_id_payload_index(client, collection, collection_info)
             return
 
         log.warning(
@@ -82,6 +87,7 @@ class QdrantVectorProvider(VectorProvider):
             collection_name=collection,
             vectors_config=qm.VectorParams(size=dimension, distance=qm.Distance.COSINE),
         )
+        _ensure_organization_id_payload_index(client, collection)
 
     def upsert(
         self,
@@ -191,3 +197,59 @@ def _collection_vector_size(collection_info: Any) -> int | None:
 def _is_missing_collection_error(exc: Exception) -> bool:
     message = str(exc).lower()
     return "not found" in message or "does not exist" in message or "missing" in message
+
+
+def _is_index_already_exists_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return "already exists" in message or "already exist" in message
+
+
+def _payload_field_data_type(field_info: Any) -> str | None:
+    data_type = getattr(field_info, "data_type", None)
+    if data_type is None and isinstance(field_info, dict):
+        data_type = field_info.get("data_type")
+    if data_type is None:
+        return None
+    value = getattr(data_type, "value", data_type)
+    return str(value).lower()
+
+
+def _has_keyword_payload_index(collection_info: Any, field_name: str) -> bool:
+    payload_schema = getattr(collection_info, "payload_schema", None)
+    if not isinstance(payload_schema, dict):
+        return False
+    field_info = payload_schema.get(field_name)
+    if field_info is None:
+        return False
+    return _payload_field_data_type(field_info) == "keyword"
+
+
+def _ensure_organization_id_payload_index(
+    client: Any,
+    collection: str,
+    collection_info: Any | None = None,
+) -> None:
+    """Create a keyword payload index on organization_id if one is not already present.
+
+    Qdrant Cloud strict mode (`unindexed_filtering_retrieve=false`) rejects filtered
+    search unless this index exists. Must be idempotent and must not recreate the
+    collection just to add the index.
+    """
+    if collection_info is not None and _has_keyword_payload_index(
+        collection_info, _ORGANIZATION_ID_PAYLOAD_FIELD
+    ):
+        return
+
+    from qdrant_client.http import models as qm
+
+    try:
+        client.create_payload_index(
+            collection_name=collection,
+            field_name=_ORGANIZATION_ID_PAYLOAD_FIELD,
+            field_schema=qm.PayloadSchemaType.KEYWORD,
+            wait=True,
+        )
+    except Exception as exc:
+        if _is_index_already_exists_error(exc):
+            return
+        raise ProviderUnavailableError("Qdrant create_payload_index failed") from exc
