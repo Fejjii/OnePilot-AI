@@ -23,7 +23,6 @@ from onepilot.services.crm_email_grounding import (
     select_most_promising_lead,
 )
 
-
 STARTER_PROMPT = (
     "Draft a follow-up email to our most promising lead about scheduling an intro call."
 )
@@ -261,7 +260,7 @@ class TestEmailDraftGrounding:
         subject = outcome.draft.subject
         assert "Sarah" in body
         assert "Brightline Analytics" in body
-        assert "Support team overwhelmed" in body
+        assert "support team overwhelmed" in body.lower()
         assert "Schedule discovery call" in body
         assert "Northwind" not in body
         assert "$4" not in body

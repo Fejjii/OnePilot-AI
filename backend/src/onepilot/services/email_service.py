@@ -121,9 +121,7 @@ def _fallback_draft(
     next_action = facts.get("recommended_next_action")
 
     greeting = f"Hi {name}," if name else "Hello,"
-    if company and name:
-        subject = f"Following up with {company}"
-    elif company:
+    if company:
         subject = f"Following up with {company}"
     elif name:
         subject = f"Following up with {name}"
