@@ -30,6 +30,7 @@ No local `HANDOFF.md` was available. Task sections use repo defaults and/or the 
 ## Completed
 
 - OP-025 — deterministic UUID5 Qdrant point IDs for idempotent upsert (merged to `main`, PR #22)
+- OP-026 — local/live Qdrant cleanup complete (public demo Qdrant cleaned: UUID4 duplicates removed; UUID5 deterministic vectors retained)
 - OP-024 — `organization_id` payload index for strict-mode filtered Qdrant search (PR #21)
 - OP-023 — empty `gpt-5-nano` completion handling for RAG and email drafts (PR #20)
 - OP-022 — public-demo managed-provider enablement checklist (docs only; host env is user-gated)
@@ -41,7 +42,9 @@ No local `HANDOFF.md` was available. Task sections use repo defaults and/or the 
 ## Current task / in progress
 
 - **This file** is the sanitized Cloud/mobile handoff context. Local `HANDOFF.md` (gitignored) remains authoritative for private/local state.
-- **OP-026** is a local/live-Qdrant task. Cloud agents must not start, continue, or inspect it.
+- Public infrastructure is essentially complete (OP-026 COMPLETE; public demo Qdrant cleaned).
+- Next product phase: recruiter-facing public demo polish (audit, refinement, wording, and final checklist alignment).
+- Private live-Google demo remains a later user-gated track (Cloud must not assume OAuth or live Google access).
 - Product work belongs on a feature/fix branch off `main`, never on a deployment branch.
 
 ## Backlog
@@ -75,7 +78,7 @@ Cloud (and any agent) must **not** touch:
 
 - `deployment/public-demo` and `deployment/live-google-demo` (no checkout-for-edit, no force-push, no fast-forward) unless the operator explicitly authorizes that exact branch
 - Live **Qdrant**, **Railway**, **Vercel**, production env vars, or application deployment
-- OP-026 and any in-flight live-data work
+- OP-026 is COMPLETE — do not re-run or modify live-Qdrant work
 - git `stash` (including `stash@{0}`)
 - gitignored local files: `.ai/`, `HANDOFF.md`, `CHANGELOG_SESSION.md`, `.env`, `.env.local`
 
@@ -85,7 +88,7 @@ Cloud (and any agent) must **not** touch:
 
 Recommended next Cloud-safe task: a scoped product/fix branch off `main` from the near-term list in `docs/limitations_roadmap.md`, after the operator names the task.
 
-Do not start OP-026, do not touch live Qdrant, and do not modify deployment branches unless the operator explicitly authorizes that exact branch.
+OP-026 is complete; do not re-run live Qdrant or modify deployment branches unless the operator explicitly authorizes that exact branch.
 
 ## Local-only reminder
 
