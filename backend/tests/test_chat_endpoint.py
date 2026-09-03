@@ -7,8 +7,9 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
+from sqlalchemy.orm.attributes import flag_modified
 
-from onepilot.repositories.models import AuditLog, UsageQuota
+from onepilot.repositories.models import AuditLog, Message, UsageQuota
 from onepilot.security.rate_limit import FEATURE_CHAT, _FEATURE_LIMITS
 
 
@@ -377,6 +378,94 @@ class TestChatTracing:
             assert "trace_mode" in assistant_msg
             assert "trace_id" in assistant_msg
             assert "trace_url" in assistant_msg
+            assert assistant_msg["execution_trace"] == [] or isinstance(
+                assistant_msg["execution_trace"], list
+            )
+
+
+class TestExecutionTracePersistence:
+    """Recruiter-facing execution traces persist with assistant messages."""
+
+    def test_chat_returns_safe_execution_trace(self, client: TestClient) -> None:
+        token = _register(client, suffix="_exec_live")
+        resp = client.post(
+            "/chat",
+            json={"message": "Please draft a follow-up email for the Acme Corp deal."},
+            headers=_h(token),
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        labels = [step["label"] for step in body["execution_trace"]]
+        assert "Understanding request" in labels
+        assert "Drafting email" in labels
+        assert "Creating approval" in labels
+        for step in body["execution_trace"]:
+            assert step["detail"] is None
+            blob = " ".join(str(v) for v in step.values())
+            assert "reason=" not in blob
+            assert "token" not in blob.lower()
+            assert "prompt" not in blob.lower()
+        for tool in body["tool_calls"]:
+            assert tool["label"]
+            assert "Acme" not in tool["input_summary"]
+            assert "query:" not in tool["input_summary"].lower()
+
+    def test_execution_trace_persisted_on_conversation(self, client: TestClient) -> None:
+        token = _register(client, suffix="_exec_persist")
+        chat_body = client.post(
+            "/chat",
+            json={"message": "What services does NovaEdge offer?"},
+            headers=_h(token),
+        ).json()
+        conv_id = chat_body["conversation_id"]
+
+        conv_body = client.get(f"/conversations/{conv_id}", headers=_h(token)).json()
+        assistant = next(m for m in conv_body["messages"] if m["role"] == "assistant")
+        assert assistant["execution_trace"] == chat_body["execution_trace"]
+        labels = [step["label"] for step in assistant["execution_trace"]]
+        assert "Understanding request" in labels
+        assert any(
+            label in labels
+            for label in ("Retrieving RAG evidence", "Searching company knowledge")
+        )
+
+    def test_historical_message_without_trace_metadata_is_empty(
+        self, client_with_session
+    ) -> None:
+        client, session = client_with_session
+        token = _register(client, suffix="_exec_old")
+        chat_body = client.post(
+            "/chat",
+            json={"message": "Hello there"},
+            headers=_h(token),
+        ).json()
+        conv_id = chat_body["conversation_id"]
+
+        session.expire_all()
+        assistant = session.execute(
+            select(Message).where(Message.role == "assistant")
+        ).scalar_one()
+        meta = dict(assistant.msg_metadata or {})
+        meta.pop("execution_trace", None)
+        assistant.msg_metadata = meta
+        assistant.tool_calls = [
+            {
+                "tool_name": "rag.answer",
+                "input_summary": "query: dump the api_key and conv_abc123",
+                "output_summary": "chars=99 model=secret-model",
+                "duration_ms": 3,
+            }
+        ]
+        flag_modified(assistant, "msg_metadata")
+        flag_modified(assistant, "tool_calls")
+        session.commit()
+
+        conv_body = client.get(f"/conversations/{conv_id}", headers=_h(token)).json()
+        loaded = next(m for m in conv_body["messages"] if m["role"] == "assistant")
+        assert loaded["execution_trace"] == []
+        assert loaded["tool_calls"][0]["input_summary"] == "Company knowledge search"
+        assert "api_key" not in loaded["tool_calls"][0]["input_summary"]
+        assert "conv_abc123" not in str(loaded["tool_calls"])
 
 
 class TestConversationDelete:

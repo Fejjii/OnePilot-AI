@@ -28,12 +28,22 @@ class ToolCallTrace(BaseModel):
     input_summary: str
     output_summary: str
     duration_ms: int
+    label: str | None = None
 
 
 class TraceStep(BaseModel):
     step: str
     detail: str | None = None
     intent: Intent | None = None
+    duration_ms: int = 0
+
+
+class ExecutionTraceStep(BaseModel):
+    """Safe, recruiter-facing observable step persisted with assistant messages."""
+
+    key: str = Field(min_length=1, max_length=64)
+    label: str = Field(min_length=1, max_length=80)
+    detail: str | None = Field(default=None, max_length=160)
     duration_ms: int = 0
 
 
@@ -49,6 +59,7 @@ class ChatResponse(BaseModel):
     approval_id: str | None = None
     usage: dict = Field(default_factory=dict)
     trace_steps: list[TraceStep] = Field(default_factory=list)
+    execution_trace: list[ExecutionTraceStep] = Field(default_factory=list)
     safety_flags: list[str] = Field(default_factory=list)
 
     # Trace metadata
@@ -78,6 +89,10 @@ class MessageResponse(BaseModel):
     trace_id: str | None = None
     trace_url: str | None = None
     span_count: int | None = None
+    execution_trace: list[ExecutionTraceStep] = Field(default_factory=list)
+    approval_required: bool = False
+    approval_id: str | None = None
+    safety_flags: list[str] = Field(default_factory=list)
 
     detected_language: str | None = None
     response_language: str | None = None

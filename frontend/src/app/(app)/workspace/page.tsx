@@ -56,11 +56,16 @@ import type {
   ChatResponse,
   Citation,
   ConversationDetailResponse,
+  ExecutionTraceStep,
   LanguagePreference,
   MessageResponse,
   ToolCallTrace,
-  TraceStep,
 } from "@/types/api";
+import {
+  executionTraceFromChat,
+  executionTraceFromMessage,
+  publicUsageEntries,
+} from "@/lib/execution-trace";
 
 /** Inline failure state for the last POST /chat attempt. */
 interface SendFailure {
@@ -185,6 +190,10 @@ function WorkspaceInner() {
         trace_id: response.trace_id,
         trace_url: response.trace_url,
         span_count: response.span_count,
+        execution_trace: response.execution_trace ?? [],
+        approval_required: response.approval_required,
+        approval_id: response.approval_id ?? null,
+        safety_flags: response.safety_flags,
       });
     }
 
@@ -558,7 +567,7 @@ function panelDataFromChatResponse(resp: ChatResponse): PanelData {
   return {
     citations: resp.citations,
     toolCalls: resp.tool_calls,
-    traceSteps: resp.trace_steps,
+    executionTrace: executionTraceFromChat(resp),
     approvalRequired: resp.approval_required,
     approvalId: resp.approval_id ?? null,
     safetyFlags: resp.safety_flags,
@@ -578,10 +587,10 @@ function panelDataFromMessage(msg: MessageResponse): PanelData {
   return {
     citations: msg.citations,
     toolCalls: msg.tool_calls,
-    traceSteps: [],
-    approvalRequired: false,
-    approvalId: null,
-    safetyFlags: [],
+    executionTrace: executionTraceFromMessage(msg),
+    approvalRequired: Boolean(msg.approval_required),
+    approvalId: msg.approval_id ?? null,
+    safetyFlags: msg.safety_flags ?? [],
     usage: {},
     confidence: msg.confidence,
     intent: msg.intent ?? null,
@@ -951,7 +960,7 @@ function AssistantTypingBubble() {
 interface PanelData {
   citations: Citation[];
   toolCalls: ToolCallTrace[];
-  traceSteps: TraceStep[];
+  executionTrace: ExecutionTraceStep[];
   approvalRequired: boolean;
   approvalId: string | null;
   safetyFlags: string[];
@@ -1073,21 +1082,21 @@ function DetailsPanel({ data, sending }: DetailsPanelProps) {
               </h4>
               <ToolTracePanel
                 toolCalls={data.toolCalls}
-                traceSteps={data.traceSteps}
+                executionTrace={data.executionTrace}
                 traceMode={data.traceMode}
                 traceUrl={data.traceUrl}
               />
             </section>
 
-            {Object.keys(data.usage).length > 0 && (
+            {publicUsageEntries(data.usage).length > 0 && (
               <section>
                 <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Usage
                 </h4>
                 <div className="rounded-md border border-slate-200 bg-slate-50/60 p-2 font-mono text-[11px] text-slate-700">
-                  {Object.entries(data.usage).map(([k, v]) => (
+                  {publicUsageEntries(data.usage).map(([k, v]) => (
                     <p key={k}>
-                      <span className="text-slate-500">{k}:</span> {String(v)}
+                      <span className="text-slate-500">{k}:</span> {v}
                     </p>
                   ))}
                 </div>

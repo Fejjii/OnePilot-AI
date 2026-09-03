@@ -34,6 +34,10 @@ const CHAT_RESPONSE = {
   trace_steps: [
     { step: "router", detail: "intent=knowledge_search", intent: null, duration_ms: 4 },
   ],
+  execution_trace: [
+    { key: "understanding_request", label: "Understanding request", detail: null, duration_ms: 4 },
+    { key: "retrieving_rag_evidence", label: "Retrieving RAG evidence", detail: null, duration_ms: 20 },
+  ],
   safety_flags: [],
   trace_mode: "local",
   trace_id: "local_trace_123",
@@ -80,12 +84,17 @@ const CONVERSATION_KNOWLEDGE = {
           input_summary: "NovaEdge services",
           output_summary: "3 chunks retrieved",
           duration_ms: 120,
+          label: "Knowledge",
         },
       ],
       created_at: "2024-01-01T00:00:01Z",
       trace_mode: "local",
       trace_id: "local_k",
       trace_url: null,
+      execution_trace: [
+        { key: "understanding_request", label: "Understanding request", detail: null, duration_ms: 3 },
+        { key: "retrieving_rag_evidence", label: "Retrieving RAG evidence", detail: null, duration_ms: 120 },
+      ],
     },
   ],
 };
@@ -118,10 +127,15 @@ const CONVERSATION_GENERAL = {
           input_summary: "What can you do?",
           output_summary: "Capability overview",
           duration_ms: 40,
+          label: "Chat",
         },
       ],
       created_at: "2024-01-02T00:00:01Z",
       trace_mode: "local",
+      execution_trace: [
+        { key: "understanding_request", label: "Understanding request", detail: null, duration_ms: 2 },
+        { key: "drafting_reply", label: "Drafting reply", detail: null, duration_ms: 40 },
+      ],
     },
   ],
 };
@@ -393,7 +407,11 @@ describe("WorkspacePage", () => {
 
     await waitFor(() => {
       expect(screen.getByText(/old conversation/i)).toBeInTheDocument();
+      expect(screen.getByText(/old response without trace metadata/i)).toBeInTheDocument();
+      expect(screen.getByText(/no recorded steps for this reply/i)).toBeInTheDocument();
     });
+    expect(screen.queryByText(/understanding request/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/classify_intent/i)).not.toBeInTheDocument();
   });
 
   it("New Conversation clears messages and response details", async () => {
@@ -405,7 +423,7 @@ describe("WorkspacePage", () => {
     const { rerender } = renderWithProviders(<WorkspacePage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/chat\.general/i)).toBeInTheDocument();
+      expect(screen.getByText(/drafting reply/i)).toBeInTheDocument();
     });
 
     await user.click(
@@ -422,7 +440,7 @@ describe("WorkspacePage", () => {
     await waitFor(() => {
       expect(screen.getByText(/no response yet/i)).toBeInTheDocument();
     });
-    expect(screen.queryByText(/chat\.general/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/drafting reply/i)).not.toBeInTheDocument();
     expect(
       screen.getByText(/ask onepilot about this business/i),
     ).toBeInTheDocument();
@@ -436,7 +454,7 @@ describe("WorkspacePage", () => {
     const { rerender } = renderWithProviders(<WorkspacePage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/chat\.general/i)).toBeInTheDocument();
+      expect(screen.getByText(/drafting reply/i)).toBeInTheDocument();
     });
     expect(
       screen.queryByText(/NovaEdge Services Overview/i),
@@ -450,8 +468,8 @@ describe("WorkspacePage", () => {
         screen.getByText(/NovaEdge Services Overview/i),
       ).toBeInTheDocument();
     });
-    expect(screen.queryByText(/chat\.general/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/knowledge\.search/i)).toBeInTheDocument();
+    expect(screen.queryByText(/drafting reply/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/retrieving rag evidence/i)).toBeInTheDocument();
   });
 
   it("switching from knowledge to general conversation updates trace tools", async () => {
@@ -471,7 +489,7 @@ describe("WorkspacePage", () => {
     rerender(<WorkspacePage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/chat\.general/i)).toBeInTheDocument();
+      expect(screen.getByText(/drafting reply/i)).toBeInTheDocument();
     });
     expect(
       screen.queryByText(/NovaEdge Services Overview/i),
@@ -487,7 +505,7 @@ describe("WorkspacePage", () => {
     const { rerender } = renderWithProviders(<WorkspacePage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/chat\.general/i)).toBeInTheDocument();
+      expect(screen.getByText(/drafting reply/i)).toBeInTheDocument();
     });
 
     await user.click(screen.getByText(/What services does NovaEdge Solution/i));
@@ -505,7 +523,7 @@ describe("WorkspacePage", () => {
         screen.getByText(/NovaEdge Services Overview/i),
       ).toBeInTheDocument();
     });
-    expect(screen.queryByText(/chat\.general/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/drafting reply/i)).not.toBeInTheDocument();
   });
 
   it("does not show stale in-flight response after switching conversations", async () => {
@@ -578,7 +596,7 @@ describe("WorkspacePage", () => {
     rerender(<WorkspacePage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/chat\.general/i)).toBeInTheDocument();
+      expect(screen.getByText(/drafting reply/i)).toBeInTheDocument();
     });
     expect(screen.queryByText(/Stale general reply/i)).not.toBeInTheDocument();
     expect(
@@ -597,7 +615,7 @@ describe("WorkspacePage", () => {
     renderWithProviders(<WorkspacePage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/chat\.general/i)).toBeInTheDocument();
+      expect(screen.getByText(/drafting reply/i)).toBeInTheDocument();
     });
 
     await user.click(
@@ -610,7 +628,7 @@ describe("WorkspacePage", () => {
         screen.getByText(/ask onepilot about this business/i),
       ).toBeInTheDocument();
     });
-    expect(screen.queryByText(/chat\.general/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/drafting reply/i)).not.toBeInTheDocument();
     expect(navigationMocks.replace).toHaveBeenCalledWith(
       "/workspace",
       expect.objectContaining({ scroll: false }),
@@ -628,7 +646,7 @@ describe("WorkspacePage", () => {
     renderWithProviders(<WorkspacePage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/chat\.general/i)).toBeInTheDocument();
+      expect(screen.getByText(/drafting reply/i)).toBeInTheDocument();
     });
 
     await user.click(screen.getByText(/What services does NovaEdge Solution/i));
@@ -638,8 +656,8 @@ describe("WorkspacePage", () => {
         screen.getByText(/NovaEdge Services Overview/i),
       ).toBeInTheDocument();
     });
-    expect(screen.queryByText(/chat\.general/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/knowledge\.search/i)).toBeInTheDocument();
+    expect(screen.queryByText(/drafting reply/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/retrieving rag evidence/i)).toBeInTheDocument();
   });
 
   it("does not render conversation detail when cached data id mismatches active id", async () => {
@@ -668,7 +686,7 @@ describe("WorkspacePage", () => {
     await waitFor(() => {
       expect(screen.getByText(/no response yet/i)).toBeInTheDocument();
     });
-    expect(screen.queryByText(/chat\.general/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/drafting reply/i)).not.toBeInTheDocument();
     expect(
       screen.queryByText(/NovaEdge Services Overview/i),
     ).not.toBeInTheDocument();

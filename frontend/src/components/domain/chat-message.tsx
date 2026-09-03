@@ -1,8 +1,10 @@
 import { User, Bot } from "lucide-react";
 import type { MessageResponse } from "@/types/api";
 import { IntentBadge } from "./intent-badge";
+import { ToolBadge } from "./tool-badge";
 import { ConfidenceBadge } from "./confidence-badge";
 import { AssistantMessageContent } from "./assistant-message-content";
+import { uniqueToolLabels } from "@/lib/execution-trace";
 import { formatDateTime } from "@/lib/utils";
 
 interface ChatMessageProps {
@@ -30,7 +32,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <p className="text-xs font-semibold text-slate-900">
             {isUser ? "You" : isAssistant ? "Assistant" : "System"}
           </p>
@@ -40,6 +42,10 @@ export function ChatMessage({ message }: ChatMessageProps) {
           {isAssistant && message.intent && (
             <IntentBadge intent={message.intent} />
           )}
+          {isAssistant &&
+            uniqueToolLabels(message.tool_calls ?? []).map((label) => (
+              <ToolBadge key={label} label={label} />
+            ))}
           {isAssistant && message.confidence > 0 && (
             <ConfidenceBadge value={message.confidence} />
           )}

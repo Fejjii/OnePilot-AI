@@ -23,8 +23,13 @@ export type Intent =
   | "web_and_knowledge"
   | "lead_support"
   | "email_drafting"
+  | "calendar_availability"
+  | "calendar_scheduling"
+  | "calendar_and_email"
   | "document_summary"
   | "workflow_action"
+  | "compound_workflow"
+  | "workspace_insights"
   | "out_of_scope"
   | "clarification";
 
@@ -174,12 +179,20 @@ export interface ToolCallTrace {
   input_summary: string;
   output_summary: string;
   duration_ms: number;
+  label?: string | null;
 }
 
 export interface TraceStep {
   step: string;
   detail?: string | null;
   intent?: Intent | null;
+  duration_ms: number;
+}
+
+export interface ExecutionTraceStep {
+  key: string;
+  label: string;
+  detail?: string | null;
   duration_ms: number;
 }
 
@@ -195,6 +208,7 @@ export interface ChatResponse {
   approval_id?: string | null;
   usage: Record<string, unknown>;
   trace_steps: TraceStep[];
+  execution_trace?: ExecutionTraceStep[];
   safety_flags: string[];
   trace_mode: string;
   trace_id?: string | null;
@@ -218,6 +232,10 @@ export interface MessageResponse {
   trace_id?: string | null;
   trace_url?: string | null;
   span_count?: number | null;
+  execution_trace?: ExecutionTraceStep[];
+  approval_required?: boolean;
+  approval_id?: string | null;
+  safety_flags?: string[];
   detected_language?: LanguageCode | null;
   response_language?: LanguageCode | null;
   language_preference?: LanguagePreference | null;
