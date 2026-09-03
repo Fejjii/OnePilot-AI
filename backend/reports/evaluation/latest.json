@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-19T15:23:34.187073+00:00",
+  "generated_at": "2026-09-03T16:08:46.372539+00:00",
   "status": "complete",
   "run_command": "cd backend && uv run python -m onepilot.evaluation.run_all_evals",
   "disclaimer": "These are deterministic evaluation checks for demo-quality gating. They are not a replacement for full production RAGAS or human evaluation.",
@@ -17,7 +17,7 @@
   "suites": {
     "routing": {
       "test_name": "intent_and_routing",
-      "timestamp": "2026-07-19T15:23:34.162545+00:00",
+      "timestamp": "2026-09-03T16:08:46.350028+00:00",
       "total": 46,
       "correct": 46,
       "accuracy": 1.0,
@@ -593,7 +593,7 @@
     },
     "rag": {
       "test_name": "rag_golden",
-      "timestamp": "2026-07-19T15:23:34.177342+00:00",
+      "timestamp": "2026-09-03T16:08:46.365183+00:00",
       "total": 10,
       "rag_golden_pass_rate": 1.0,
       "source_hit_rate": 0.9,
@@ -799,7 +799,7 @@
     },
     "safety": {
       "test_name": "safety_guardrails",
-      "timestamp": "2026-07-19T15:23:34.185325+00:00",
+      "timestamp": "2026-09-03T16:08:46.371210+00:00",
       "total": 12,
       "passed": 12,
       "safety_guardrail_pass_rate": 1.0,

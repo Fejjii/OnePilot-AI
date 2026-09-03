@@ -20,6 +20,7 @@ COPY src/ ./src/
 COPY alembic/ ./alembic/
 COPY alembic.ini ./
 COPY scripts/ ./scripts/
+COPY reports/ ./reports/
 
 # Install the package in editable mode to ensure module discovery
 RUN pip install --no-cache-dir -e .[dev]

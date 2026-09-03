@@ -2,13 +2,56 @@
 
 from __future__ import annotations
 
-from sqlalchemy.orm import Session
+import re
+from typing import TYPE_CHECKING
 
 from onepilot.core.constants import ApprovalStatus
-from onepilot.security.auth import Principal
 from onepilot.services import approval_service, conversation_service, lead_service
 
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
+    from onepilot.security.auth import Principal
+
 _URGENCY_RANK = {"high": 0, "medium": 1, "low": 2}
+
+_OVERVIEW_KEYWORDS_RE = re.compile(
+    r"\b(summarize|summary of|overview)\b|business activity|recent business activity",
+    re.IGNORECASE,
+)
+_APPROVALS_KEYWORD_RE = re.compile(r"\bapprov(?:al|als)\b", re.IGNORECASE)
+_LEADS_INTENT_RE = re.compile(
+    r"\b(analy|prioritize|promising|highlight|most promising)\b", re.IGNORECASE
+)
+_PENDING_RE = re.compile(r"\bpending\b|currently pending", re.IGNORECASE)
+
+
+def _detect_focus(query: str) -> str:
+    """Detect which `workspace-insights` focus mode the prompt intends.
+
+    Ordering matters: overview/business-summary requests should not be
+    misclassified as approvals just because they mention the word
+    "approvals".
+    """
+
+    lowered = (query or "").lower()
+
+    if _OVERVIEW_KEYWORDS_RE.search(lowered):
+        return "overview"
+
+    # Approvals-focused prompts should mention both "approvals" and "pending".
+    if _APPROVALS_KEYWORD_RE.search(lowered) and _PENDING_RE.search(lowered):
+        return "approvals"
+
+    # Leads-focused prompts typically describe analysis/promotion within leads.
+    if "lead" in lowered and _LEADS_INTENT_RE.search(lowered):
+        return "leads"
+
+    # Backstop: explicit leads mention -> leads focus.
+    if "lead" in lowered:
+        return "leads"
+
+    return "overview"
 
 
 def build_insights(
@@ -52,12 +95,7 @@ def build_insights(
     if not promising:
         promising = ranked_leads[:5]
 
-    lowered = (query or "").lower()
-    focus = "overview"
-    if "approval" in lowered:
-        focus = "approvals"
-    elif "lead" in lowered:
-        focus = "leads"
+    focus = _detect_focus(query)
 
     answer = _format_answer(
         focus=focus,
