@@ -184,6 +184,8 @@ class TestEmailEmptyNanoCompletion:
 
         assert outcome.draft.body.strip()
         assert outcome.draft.subject.strip()
+        assert "[recipient]" not in outcome.draft.body
+        assert "[relevant outcome]" not in outcome.draft.body
         payload = gmail_service.build_approval_payload(
             subject=outcome.draft.subject,
             body=outcome.draft.body,
@@ -243,3 +245,5 @@ class TestEmailDraftChatEmptyNano:
         assert body["approval_id"]
         assert body["final_response"]
         assert "Invalid email approval payload" not in (body["final_response"] or "")
+        assert "[recipient]" not in (body["final_response"] or "")
+        assert "[relevant outcome]" not in (body["final_response"] or "")

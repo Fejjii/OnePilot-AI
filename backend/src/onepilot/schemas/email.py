@@ -20,7 +20,7 @@ class EmailDraft(BaseModel):
     subject: str
     body: str
     tone: str = "professional"
-    recipient_placeholder: str = "[recipient]"
+    recipient_placeholder: str = ""
     context_used: list[str] = Field(default_factory=list)
     citations: list[Citation] = Field(default_factory=list)
     risk_level: str = "medium"

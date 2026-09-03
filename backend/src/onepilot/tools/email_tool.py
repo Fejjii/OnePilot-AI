@@ -11,6 +11,7 @@ from typing import Any
 
 from onepilot.core.config import get_settings
 from onepilot.services import email_service, gmail_service
+from onepilot.services.crm_email_grounding import build_approval_copy
 from onepilot.tools.base import Tool, ToolContext, ToolResult
 
 
@@ -29,6 +30,8 @@ class EmailDraftTool(Tool):
         tone: str = "professional",
         recipient_name: str | None = None,
         recipient_email: str | None = None,
+        company: str | None = None,
+        crm_facts: dict[str, str] | None = None,
         action: str = "draft_only",
         citations: list[dict] | None = None,
         **_: Any,
@@ -41,6 +44,7 @@ class EmailDraftTool(Tool):
             tone=tone,
             recipient_name=recipient_name,
             recipient_email=recipient_email,
+            crm_facts=crm_facts,
             citations=citations,
             settings=ctx.settings,
         )
@@ -82,11 +86,21 @@ class EmailDraftTool(Tool):
         if live_gmail_draft and gmail_result and gmail_result.get("status") == "success":
             approval_required = False
 
+        approval_title, approval_description = build_approval_copy(
+            action_type=approval_action,
+            recipient_name=recipient_name,
+            company=company,
+            facts=crm_facts,
+        )
+
         output: dict = {
             "draft": outcome.draft.model_dump(),
             "model": outcome.model,
             "fallback_used": outcome.fallback_used,
             "gmail_action_pending": approval_required,
+            "crm_grounded": bool(crm_facts),
+            "recipient_name": recipient_name,
+            "recipient_company": company,
         }
         if live_gmail_draft and gmail_result:
             output["gmail_result"] = gmail_result
@@ -104,7 +118,8 @@ class EmailDraftTool(Tool):
             duration_ms=duration_ms,
             approval_required=approval_required,
             approval_action_type=approval_action if approval_required else None,
-            approval_title=f"Gmail action: {outcome.draft.subject[:80]}",
+            approval_title=approval_title if approval_required else None,
+            approval_description=approval_description if approval_required else None,
             approval_payload=proposed_payload if approval_required else None,
             approval_risk="high" if approval_action == "gmail_send_email" else "medium",
             safety_flags=["fallback_used"] if outcome.fallback_used else [],

@@ -2,7 +2,7 @@ import { Clock } from "lucide-react";
 import type { ApprovalResponse } from "@/types/api";
 import { StatusBadge } from "./status-badge";
 import { RiskBadge } from "./risk-badge";
-import { formatRelativeTime, titleize } from "@/lib/utils";
+import { approvalActionLabel, formatRelativeTime } from "@/lib/utils";
 
 interface ApprovalCardProps {
   approval: ApprovalResponse;
@@ -28,7 +28,7 @@ export function ApprovalCard({ approval, onClick, active }: ApprovalCardProps) {
         <RiskBadge level={approval.risk_level} />
       </div>
       <p className="mt-1 text-xs text-slate-500">
-        {titleize(approval.action_type)}
+        {approvalActionLabel(approval.action_type)}
       </p>
       {approval.description && (
         <p className="mt-1 line-clamp-2 text-xs text-slate-600">

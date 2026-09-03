@@ -73,3 +73,15 @@ export function titleize(value: string | null | undefined): string {
     .replace(/[_-]+/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
+
+const APPROVAL_ACTION_LABELS: Record<string, string> = {
+  gmail_create_draft: "Email draft",
+  gmail_send_email: "Send email",
+  send_email: "Send email",
+};
+
+/** Recruiter-facing label for approval action types. Avoids raw Gmail IDs. */
+export function approvalActionLabel(actionType: string | null | undefined): string {
+  if (!actionType) return "";
+  return APPROVAL_ACTION_LABELS[actionType] ?? titleize(actionType);
+}

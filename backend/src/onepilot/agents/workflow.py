@@ -355,29 +355,18 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             "usage_metadata": dict(state.usage_metadata),
         }
         email_action = gmail_service.infer_email_action(state.message, state.context)
-        recipient_email = _resolve_recipient_email(state)
         result = registry.get("email.draft").run(
             _ctx(deps),
             context=state.message,
             tone=state.context.get("tone", "professional"),
-            recipient_name=state.context.get("recipient_name"),
-            recipient_email=recipient_email,
             action=email_action,
+            **_resolve_email_recipient_kwargs(deps, state),
         )
         _record_tool_call(update, result)
         draft = result.output.get("draft", {})
         update["draft_output"] = _format_email(draft, result.output)
         if result.approval_required and result.approval_action_type:
-            approval = approval_service.create(
-                deps.session,
-                principal=deps.principal,
-                action_type=result.approval_action_type,
-                title=result.approval_title or "Approval required",
-                description=draft.get("body", "")[:1024],
-                proposed_payload=result.approval_payload or {},
-                risk_level=result.approval_risk,
-                reason="Agent proposed an external action.",
-            )
+            approval = _create_email_approval(deps, result, fallback_description=draft.get("body", ""))
             update["approval_required"] = True
             update["approval_id"] = approval.id
         _append_trace(update, "execute_tool:email.draft", duration_ms=result.duration_ms)
@@ -438,9 +427,8 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             _ctx(deps),
             context=state.message,
             tone=state.context.get("tone", "professional"),
-            recipient_name=state.context.get("recipient_name"),
-            recipient_email=_resolve_recipient_email(state),
             action=email_action,
+            **_resolve_email_recipient_kwargs(deps, state),
         )
         _record_tool_call(update, email_result)
         calendar_result = registry.get("calendar.create_event_request").run(
@@ -461,14 +449,10 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
 
         approval_ids: list[str] = []
         if email_result.approval_required and email_result.approval_action_type:
-            email_approval = approval_service.create(
-                deps.session,
-                principal=deps.principal,
-                action_type=email_result.approval_action_type,
-                title=email_result.approval_title or "Gmail approval required",
-                description=sections[1][:1024],
-                proposed_payload=email_result.approval_payload or {},
-                risk_level=email_result.approval_risk,
+            email_approval = _create_email_approval(
+                deps,
+                email_result,
+                fallback_description=sections[1],
                 reason="Agent proposed an external email action.",
             )
             approval_ids.append(email_approval.id)
@@ -551,9 +535,8 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             _ctx(deps),
             context=state.message,
             tone=state.context.get("tone", "professional"),
-            recipient_name=state.context.get("recipient_name"),
-            recipient_email=_resolve_recipient_email(state),
             action=email_action,
+            **_resolve_email_recipient_kwargs(deps, state),
         )
         _record_tool_call(update, email_result)
 
@@ -590,14 +573,10 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             )
             approval_ids.append(calendar_approval.id)
         if email_result.approval_required and email_result.approval_action_type:
-            email_approval = approval_service.create(
-                deps.session,
-                principal=deps.principal,
-                action_type=email_result.approval_action_type,
-                title=email_result.approval_title or "Gmail approval required",
-                description=sections[3][:1024],
-                proposed_payload=email_result.approval_payload or {},
-                risk_level=email_result.approval_risk,
+            email_approval = _create_email_approval(
+                deps,
+                email_result,
+                fallback_description=sections[3],
                 reason="Compound workflow proposed an email action.",
             )
             approval_ids.append(email_approval.id)
@@ -958,13 +937,40 @@ def _web_response_from_tool(result: ToolResult) -> WebSearchResponse:
     )
 
 
-def _resolve_recipient_email(state: AgentState) -> str | None:
-    from onepilot.services import lead_service
+def _resolve_email_recipient_kwargs(deps: AgentDeps, state: AgentState) -> dict[str, Any]:
+    from onepilot.services.crm_email_grounding import resolve_email_recipient
 
-    explicit = state.context.get("recipient_email")
-    if explicit:
-        return str(explicit)
-    return lead_service.extract_email(state.message)
+    resolved = resolve_email_recipient(
+        deps.session,
+        principal=deps.principal,
+        message=state.message,
+        context=state.context,
+    )
+    return {
+        "recipient_name": resolved.recipient_name,
+        "recipient_email": resolved.recipient_email,
+        "company": resolved.company,
+        "crm_facts": resolved.facts or None,
+    }
+
+
+def _create_email_approval(
+    deps: AgentDeps,
+    result: ToolResult,
+    *,
+    fallback_description: str,
+    reason: str = "Agent proposed an external action.",
+) -> Any:
+    return approval_service.create(
+        deps.session,
+        principal=deps.principal,
+        action_type=result.approval_action_type or "gmail_create_draft",
+        title=result.approval_title or "Review email draft",
+        description=(result.approval_description or fallback_description or "")[:1024],
+        proposed_payload=result.approval_payload or {},
+        risk_level=result.approval_risk,
+        reason=reason,
+    )
 
 
 def _format_email(draft: dict, tool_output: dict | None = None) -> str:
