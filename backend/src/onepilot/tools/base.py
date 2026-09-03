@@ -42,6 +42,7 @@ class ToolResult:
     approval_required: bool = False
     approval_action_type: str | None = None
     approval_title: str | None = None
+    approval_description: str | None = None
     approval_payload: dict | None = None
     approval_risk: str = "medium"
     safety_flags: list[str] = field(default_factory=list)

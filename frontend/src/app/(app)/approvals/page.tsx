@@ -27,6 +27,7 @@ import { useAuth, isAdminRole } from "@/lib/auth";
 import { ApiRequestError } from "@/lib/api-client";
 import {
   cn,
+  approvalActionLabel,
   formatDateTime,
   formatRelativeTime,
   titleize,
@@ -211,7 +212,7 @@ function ApprovalDetail({ approval, isAdmin, onClear }: ApprovalDetailProps) {
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={approval.status} />
           <RiskBadge level={approval.risk_level} />
-          <Badge tone="info">{titleize(approval.action_type)}</Badge>
+          <Badge tone="info">{approvalActionLabel(approval.action_type)}</Badge>
         </div>
 
         {approval.description && (
