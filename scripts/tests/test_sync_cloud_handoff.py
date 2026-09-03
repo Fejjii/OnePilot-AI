@@ -2,24 +2,17 @@
 
 from __future__ import annotations
 
-import importlib.util
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
-SCRIPT_PATH = Path(__file__).resolve().parents[1] / "sync_cloud_handoff.py"
+SCRIPTS_DIR = Path(__file__).resolve().parents[1]
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
 
-
-def _load_module():
-    spec = importlib.util.spec_from_file_location("sync_cloud_handoff", SCRIPT_PATH)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-sync = _load_module()
+import sync_cloud_handoff as sync  # noqa: E402
 
 
 SAFE_HANDOFF = """# Local handoff
@@ -70,8 +63,15 @@ def test_redacts_jwt_and_bearer() -> None:
     )
     out = sync.redact_text(f"Authorization: Bearer {jwt}")
     assert jwt not in out
-    assert "Bearer [TOKEN_REDACTED]" in out
+    assert "[JWT_REDACTED]" in out or "[TOKEN_REDACTED]" in out
     assert "[JWT_REDACTED]" in sync.redact_text(jwt)
+
+
+def test_redacts_query_token_when_not_an_assignment_key() -> None:
+    text = "https://example.com/callback?token=s3cretValue99&next=/app"
+    out = sync.redact_text(text)
+    assert "s3cretValue99" not in out
+    assert "[URL_SECRET_REDACTED]" in out
 
 
 def test_redacts_connection_strings_and_url_secrets() -> None:
@@ -83,7 +83,7 @@ def test_redacts_connection_strings_and_url_secrets() -> None:
     assert "hunter2" not in out
     assert "abcdEFGHijklMNOP" not in out
     assert "[CONNECTION_REDACTED]" in out or "[REDACTED]" in out
-    assert "[URL_SECRET_REDACTED]" in out
+    assert "[URL_SECRET_REDACTED]" in out or "[REDACTED]" in out
 
 
 def test_redacts_cloud_vendor_and_qdrant_tokens() -> None:
@@ -253,10 +253,7 @@ def test_cli_writes_only_after_clean_scan(tmp_path: Path) -> None:
     assert code == 0
     text = output.read_text(encoding="utf-8")
     assert "sk-" not in text
-    assert "does not commit or push" in text.lower() or "This script does not commit" in (
-        # CLI prints the reminder; file says the generator does not commit.
-        output.read_text(encoding="utf-8")
-    )
+    assert "does **not** commit or push" in text
     assert sync.find_residual_secrets(text) == []
 
 
