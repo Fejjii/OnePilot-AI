@@ -1,6 +1,7 @@
 import "@/test-utils/next-mocks";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@/test-utils/render-with-providers";
 import { installFetchMock } from "@/test-utils/mock-fetch";
 import EvaluationPage from "./page";
@@ -101,7 +102,16 @@ describe("EvaluationPage", () => {
     await waitFor(() => {
       expect(screen.getByText(/No evaluation report yet/i)).toBeInTheDocument();
     });
-    expect(screen.getByText(/run_all_evals/i)).toBeInTheDocument();
+
+    expect(screen.getByText(/Engineering details/i)).toBeInTheDocument();
+    expect(screen.queryByText(/run_all_evals/i)).not.toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByText(/Engineering details/i));
+
+    await waitFor(() => {
+      expect(screen.getByText(/run_all_evals/i)).toBeInTheDocument();
+    });
   });
 
   it("renders metrics when report is available", async () => {
@@ -115,6 +125,9 @@ describe("EvaluationPage", () => {
     });
     expect(screen.getAllByText("100%").length).toBeGreaterThan(0);
     expect(screen.getByText(/deterministic evaluation checks/i)).toBeInTheDocument();
+
+    // Engineering-only regen command should be hidden by default.
+    expect(screen.queryByText(/run_all_evals/i)).not.toBeInTheDocument();
   });
 
   it("shows RAG, routing, and safety sections", async () => {

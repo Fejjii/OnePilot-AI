@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   ClipboardCheck,
   ShieldCheck,
@@ -66,7 +67,7 @@ export default function EvaluationPage() {
             "Run the offline evaluation script to generate reports/evaluation/latest.json."
           }
         />
-        <RunEvalCard command={data?.run_command} />
+        <EngineeringDetailsCard command={data?.run_command} available={data?.available ?? false} />
         <ReviewerCopy />
         <RoadmapSection items={data?.future_roadmap} />
       </div>
@@ -131,7 +132,7 @@ export default function EvaluationPage() {
         />
       </div>
 
-      <RunEvalCard command={data.run_command} />
+      <EngineeringDetailsCard command={data.run_command} available={data.available} />
 
       <SuiteTable
         title="Routing & intent evaluation"
@@ -207,23 +208,60 @@ export default function EvaluationPage() {
   );
 }
 
-function RunEvalCard({ command }: { command?: string | null }) {
+function EngineeringDetailsCard({
+  command,
+  available,
+}: {
+  command?: string | null;
+  available: boolean;
+}) {
   const cmd = command ?? "cd backend && uv run python -m onepilot.evaluation.run_all_evals";
+  const latestJsonPath = "backend/reports/evaluation/latest.json";
+  const latestMdPath = "backend/reports/evaluation/latest.md";
+
+  const [open, setOpen] = useState(false);
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Terminal className="h-4 w-4" />
-          Regenerate evaluation report
+          Evaluation report maintenance
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="mb-2 text-sm text-slate-600">
-          Reports are written to{" "}
-          <code className="text-xs">backend/reports/evaluation/latest.json</code>. The API reads
-          the file — it does not run evals on request.
-        </p>
-        <pre className="overflow-x-auto rounded-lg bg-slate-900 p-4 text-xs text-slate-100">{cmd}</pre>
+        <details
+          onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}
+          className="w-full"
+        >
+          <summary className="cursor-pointer select-none text-sm font-medium text-slate-800">
+            Engineering details
+          </summary>
+          {open && (
+            <div className="mt-3 space-y-3">
+              <p className="text-sm text-slate-600">
+                Backend reads pre-generated artifacts. The API does not execute evaluation on
+                request.
+              </p>
+
+              <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
+                <div>
+                  `reports/evaluation/latest.json` availability (API):{" "}
+                  <span className="font-medium">{available ? "available" : "missing"}</span>
+                </div>
+                <div className="mt-1">
+                  Report path: <code className="text-[11px]">{latestJsonPath}</code>
+                </div>
+                <div className="mt-1">
+                  Markdown path: <code className="text-[11px]">{latestMdPath}</code>
+                </div>
+              </div>
+
+              <pre className="overflow-x-auto rounded-lg bg-slate-900 p-4 text-xs text-slate-100">
+                {cmd}
+              </pre>
+            </div>
+          )}
+        </details>
       </CardContent>
     </Card>
   );

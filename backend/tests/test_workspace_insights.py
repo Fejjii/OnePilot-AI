@@ -46,3 +46,49 @@ def test_workspace_insights_agent_branch(db_session) -> None:
     ]
     assert "workspace.insights" in tool_names
     assert "leads" in (state.final_response or "").lower()
+
+
+def test_starter_prompt_chip_focus_modes_are_distinct(db_session) -> None:
+    principal = _principal("org_insights_agent", "usr_insights_agent")
+    ctx = ToolContext(session=db_session, principal=principal, settings=get_settings())
+    tool = WorkspaceInsightsTool()
+
+    overview_prompt = (
+        "Summarize our recent business activity across leads, approvals, and conversations."
+    )
+    approvals_prompt = (
+        "Which approvals are currently pending and what do they cover?"
+    )
+    leads_prompt = "Analyze our current leads and highlight the most promising ones."
+
+    overview = tool.run(ctx, message=overview_prompt).output
+    approvals = tool.run(ctx, message=approvals_prompt).output
+    leads = tool.run(ctx, message=leads_prompt).output
+
+    # Focus mapping
+    assert overview["focus"] == "overview"
+    assert approvals["focus"] == "approvals"
+    assert leads["focus"] == "leads"
+
+    # Key section grounding differences (avoid brittle full-string equality)
+    overview_answer = str(overview["answer"])
+    approvals_answer = str(approvals["answer"])
+    leads_answer = str(leads["answer"])
+
+    assert "Recent workspace activity:" in overview_answer
+    assert "Source: pending ApprovalRequest rows in this organization." in (
+        approvals_answer
+    )
+    assert (
+        "Source: Lead records in this organization, ranked by urgency and stage."
+        in leads_answer
+    )
+
+    # And they should not collapse into the same output.
+    assert overview_answer != approvals_answer
+    assert overview_answer != leads_answer
+    assert approvals_answer != leads_answer
+
+    # Deterministic: same inputs -> same outputs.
+    overview2 = tool.run(ctx, message=overview_prompt).output
+    assert str(overview2["answer"]) == overview_answer
