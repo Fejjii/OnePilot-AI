@@ -1,7 +1,7 @@
 # Cloud agent handoff (sanitized)
 
-Generated: 2026-09-03 15:24 UTC  
-Generator: `scripts/sync_cloud_handoff.py` (does **not** commit or push)
+Generated: 2026-09-03 21:40 UTC  
+Generator: Cloud agent (manual, sanitized; no local `HANDOFF.md`)
 
 This file is the **only** committed project-state brief for Cursor Cloud / phone agents.
 It is intentionally smaller than any local `HANDOFF.md` and contains **no secrets**.
@@ -23,12 +23,16 @@ No local `HANDOFF.md` was available. Task sections use repo defaults and/or the 
 
 | Ref | SHA | Notes |
 |-----|-----|-------|
-| `origin/main` (canonical) | `1c3dd0172250891d71f89c21a4a57e6002a5119d` | Product source of truth |
-| `origin/deployment/public-demo` | `1c3dd0172250891d71f89c21a4a57e6002a5119d` | matches `main` (thin deploy pointer) |
+| `origin/main` (canonical) | `f73668924becc7619b05e3e6723e3626ead13677` | Product source of truth (includes OP-027/OP-029) |
+| `origin/deployment/public-demo` | `1c3dd0172250891d71f89c21a4a57e6002a5119d` | Thin deploy pointer; **behind `main`**; do not fast-forward unless authorized |
 | `origin/deployment/live-google-demo` | `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332` | Private live-Google pointer; **do not modify** |
+| `polish/op-031` (this work) | see latest commit on that branch | OP-031 PR #26 into `main`; do not merge unless asked |
 
 ## Completed
 
+- OP-031 — persist/render safe recruiter-facing agent execution traces + complete intent/tool badges (PR #26, `polish/op-031`; not merged)
+- OP-028 — complete and merged (operator-confirmed)
+- OP-027 / OP-029 — workspace insights focus + eval reports (merged to `main`, PR #24)
 - OP-025 — deterministic UUID5 Qdrant point IDs for idempotent upsert (merged to `main`, PR #22)
 - OP-026 — local/live Qdrant cleanup complete (public demo Qdrant cleaned: UUID4 duplicates removed; UUID5 deterministic vectors retained)
 - OP-024 — `organization_id` payload index for strict-mode filtered Qdrant search (PR #21)
@@ -41,9 +45,9 @@ No local `HANDOFF.md` was available. Task sections use repo defaults and/or the 
 
 ## Current task / in progress
 
-- **This file** is the sanitized Cloud/mobile handoff context. Local `HANDOFF.md` (gitignored) remains authoritative for private/local state.
+- **OP-031** implemented on `polish/op-031` (PR #26). Awaits review; do not merge unless asked.
 - Public infrastructure is essentially complete (OP-026 COMPLETE; public demo Qdrant cleaned).
-- Next product phase: recruiter-facing public demo polish (audit, refinement, wording, and final checklist alignment).
+- Recruiter-facing public demo polish continues after OP-031 (wording, checklist alignment) when the operator names the next item.
 - Private live-Google demo remains a later user-gated track (Cloud must not assume OAuth or live Google access).
 - Product work belongs on a feature/fix branch off `main`, never on a deployment branch.
 
@@ -61,13 +65,15 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 ## Architecture state
 
 - Multi-tenant FastAPI + Next.js workspace: LangGraph agent, RAG + citations, HITL approvals, usage/quotas, memory.
+- Assistant messages now persist a sanitized `execution_trace` (observable steps only). Internal graph details, prompts, tokens, and secrets are not shown in the recruiter UI.
 - Public demo: Vercel frontend + Railway API/Postgres/Redis; Gmail/Calendar **mock**; shared-demo agent memory disabled.
 - Private live-Google track exists on `deployment/live-google-demo` and is **user-gated**. Cloud must not assume OAuth or live Google access.
 - Vectors: Qdrant when configured, in-memory fallback otherwise. Cloud must not target live Qdrant clusters.
 
 ## Tests / status
 
-- Documented counts in README (2026-07-20): **703** backend tests (3 skipped), **126** frontend tests. Later merges added Qdrant/OpenAI coverage — trust current CI on `main`.
+- OP-031 validation: backend **765 passed, 3 skipped**; frontend **155 passed**; `pnpm typecheck` and `pnpm build` passed.
+- Documented counts in README (2026-07-20): **703** backend tests (3 skipped), **126** frontend tests. Later merges added coverage — trust current CI on `main`.
 - CI (`.github/workflows/ci.yml`) runs backend pytest + frontend typecheck/tests/build on PRs to `main` and `deployment/**`.
 - Public-demo smoke: `python scripts/smoke_test_public_demo.py --base-url <public-api>` (never print tokens).
 - Cloud-handoff sync tests: `python -m pytest -q scripts/tests`
@@ -86,9 +92,11 @@ Cloud (and any agent) must **not** touch:
 
 ## Recommended next task
 
-Recommended next Cloud-safe task: a scoped product/fix branch off `main` from the near-term list in `docs/limitations_roadmap.md`, after the operator names the task.
+After OP-031 is reviewed/merged: remaining recruiter-facing public-demo polish (copy, checklist alignment) **or** a named item from the near-term list in `docs/limitations_roadmap.md`. Operator should name the next OP/task.
 
-OP-026 is complete; do not re-run live Qdrant or modify deployment branches unless the operator explicitly authorizes that exact branch.
+Do not re-run live Qdrant or modify deployment branches unless the operator explicitly authorizes that exact branch.
+
+Suggested model: the same Cloud-capable coding model used for OP-031, on a scoped feature/fix branch off `main`.
 
 ## Local-only reminder
 

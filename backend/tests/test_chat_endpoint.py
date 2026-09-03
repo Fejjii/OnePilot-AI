@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm.attributes import flag_modified
 
 from onepilot.repositories.models import AuditLog, Message, UsageQuota
-from onepilot.security.rate_limit import FEATURE_CHAT, _FEATURE_LIMITS
+from onepilot.security.rate_limit import _FEATURE_LIMITS, FEATURE_CHAT
 
 
 def _register(client: TestClient, *, suffix: str) -> str:

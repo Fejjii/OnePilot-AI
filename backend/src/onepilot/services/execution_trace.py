@@ -16,8 +16,10 @@ UI or persisted message metadata:
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 from onepilot.schemas.chat import ExecutionTraceStep, ToolCallTrace, TraceStep
 
@@ -282,9 +284,7 @@ def is_safe_public_text(value: str | None) -> bool:
         return False
     if any(pattern.search(text) for pattern in _SECRET_PATTERNS[1:]):
         return False
-    if _RAW_ID.search(text) or _EMAIL.search(text):
-        return False
-    return True
+    return not (_RAW_ID.search(text) or _EMAIL.search(text))
 
 
 def _safe_persisted_step(item: Any) -> ExecutionTraceStep | None:

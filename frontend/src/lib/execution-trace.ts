@@ -174,8 +174,12 @@ export function publicUsageEntries(
   usage: Record<string, unknown> | null | undefined,
 ): Array<[string, string]> {
   if (!usage) return [];
-  return Object.entries(usage)
-    .filter(([key]) => !HIDDEN_USAGE_KEYS.has(key) && !/token/i.test(key))
-    .map(([key, value]) => [key, String(value)])
-    .filter(([, value]) => isSafePublicText(value));
+  const entries: Array<[string, string]> = [];
+  for (const [key, value] of Object.entries(usage)) {
+    if (HIDDEN_USAGE_KEYS.has(key) || /token/i.test(key)) continue;
+    const text = String(value);
+    if (!isSafePublicText(text)) continue;
+    entries.push([key, text]);
+  }
+  return entries;
 }

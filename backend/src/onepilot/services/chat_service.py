@@ -32,11 +32,6 @@ from onepilot.repositories.models import Conversation, Message
 from onepilot.schemas.agents import AgentState
 from onepilot.schemas.chat import TraceStep
 from onepilot.security.auth import Principal
-from onepilot.services.execution_trace import (
-    build_execution_trace,
-    execution_trace_as_dicts,
-    sanitize_tool_calls,
-)
 from onepilot.security.prompt_injection import SafetyVerdict, check_prompt_injection
 from onepilot.security.rate_limit import (
     FEATURE_CHAT,
@@ -48,6 +43,11 @@ from onepilot.services import (
     conversation_service,
     quota_service,
     usage_service,
+)
+from onepilot.services.execution_trace import (
+    build_execution_trace,
+    execution_trace_as_dicts,
+    sanitize_tool_calls,
 )
 
 logger = get_logger(__name__)
