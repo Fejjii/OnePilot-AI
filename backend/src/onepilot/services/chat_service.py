@@ -44,6 +44,11 @@ from onepilot.services import (
     quota_service,
     usage_service,
 )
+from onepilot.services.execution_trace import (
+    build_execution_trace,
+    execution_trace_as_dicts,
+    sanitize_tool_calls,
+)
 
 logger = get_logger(__name__)
 
@@ -97,6 +102,7 @@ def _handle_prompt_injection_block(
         step="safety_check",
         detail=", ".join(verdict.reasons),
     )
+    execution_trace = build_execution_trace(trace_steps=[safety_step])
     state = AgentState(
         organization_id=principal.organization_id,
         user_id=principal.user_id,
@@ -125,6 +131,8 @@ def _handle_prompt_injection_block(
             "trace_mode": state.trace_mode,
             "trace_id": state.trace_id,
             "trace_url": state.trace_url,
+            "execution_trace": execution_trace_as_dicts(execution_trace),
+            "approval_required": False,
         },
     )
 
@@ -254,6 +262,12 @@ def handle_chat(
     # Finalize trace
     tracing_provider.finalize_trace(trace_context)
 
+    public_tool_calls = sanitize_tool_calls(state.tool_calls)
+    execution_trace = build_execution_trace(
+        trace_steps=state.trace_steps,
+        tool_calls=state.tool_calls,
+        approval_required=state.approval_required,
+    )
     assistant_msg = conversation_service.append_message(
         session,
         conversation=conversation,
@@ -263,9 +277,7 @@ def handle_chat(
         intent=state.intent.value if state.intent else None,
         confidence=state.confidence,
         citations=[c.model_dump() if hasattr(c, "model_dump") else c for c in state.citations],
-        tool_calls=[
-            tc.model_dump() if hasattr(tc, "model_dump") else tc for tc in state.tool_calls
-        ],
+        tool_calls=[tc.model_dump() for tc in public_tool_calls],
         metadata={
             "approval_required": state.approval_required,
             "approval_id": state.approval_id,
@@ -277,6 +289,7 @@ def handle_chat(
             "detected_language": state.detected_language,
             "response_language": state.response_language,
             "language_preference": state.language_preference.value,
+            "execution_trace": execution_trace_as_dicts(execution_trace),
         },
     )
 
