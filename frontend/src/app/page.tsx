@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -26,37 +27,37 @@ const CAPABILITIES = [
     icon: MessageSquare,
     title: "AI workspace & chat",
     description:
-      "A conversational workspace where a multi-intent agent answers questions, drafts emails, and proposes actions — with structured responses and full tool traces for every step.",
+      "One conversation that can answer questions, rank leads, draft follow-ups, and propose meetings — then show the sources and steps it used.",
   },
   {
     icon: BookOpen,
     title: "Knowledge & retrieval",
     description:
-      "Upload company documents and get grounded answers with citations. Retrieval-augmented generation with confidence scoring, reranking, and honest fallbacks when evidence is weak.",
+      "Ask about company documents and get cited answers. If the evidence is thin, the assistant says so instead of guessing.",
   },
   {
     icon: ShieldCheck,
     title: "Approvals & human control",
     description:
-      "Every external action — sending email, creating events, updating records — is held for explicit human approval. Owners and admins decide; everything is audited.",
+      "Emails and calendar changes wait for a teammate. Owners and admins decide what goes out; every decision is recorded.",
   },
   {
     icon: BarChart3,
     title: "Business insights",
     description:
-      "A live dashboard for leads, conversations, usage, and estimated cost, so teams see what the AI is doing and what it costs — per organization, in real time.",
+      "See leads, conversations, and pending approvals in one place — including which prospects look most promising right now.",
   },
   {
     icon: Mail,
     title: "Gmail & Calendar workflows",
     description:
-      "Draft customer emails, check availability, and propose meeting slots. Integrations run live or fully simulated, and always behind the approval gate.",
+      "The assistant drafts emails and meeting proposals for real. In this public demo, sending mail and writing calendar events is simulated.",
   },
   {
     icon: FlaskConical,
     title: "Demo-safe by design",
     description:
-      "The public demo runs entirely on mock providers: no real emails, no real calendar events, no credentials required — the safeguards are enforced by server configuration.",
+      "No sign-up and no credentials. You can try the full workflow without sending a real email or creating a real calendar event.",
   },
 ] as const;
 
@@ -65,7 +66,7 @@ const SAFETY_STEPS = [
     icon: MessageSquare,
     title: "The AI proposes",
     description:
-      "The agent drafts the email or meeting request and explains its reasoning — nothing leaves the workspace yet.",
+      "The assistant drafts the email or meeting request and shows what it used — nothing leaves the workspace yet.",
   },
   {
     icon: UserCheck,
@@ -77,16 +78,16 @@ const SAFETY_STEPS = [
     icon: ScrollText,
     title: "Execution is audited",
     description:
-      "Approved actions run through the configured provider and land in a per-organization audit log.",
+      "Approved actions are recorded. In this public demo, Gmail and Calendar side effects stay simulated.",
   },
 ] as const;
 
 const SAFEGUARDS = [
   "Human approval required before any external action executes",
   "Strict tenant isolation — every query is scoped to one organization",
-  "Prompt-injection detection and per-feature rate limiting",
-  "Role-based access control for sensitive operations",
-  "Public demo locked to simulated Gmail and Calendar providers",
+  "Prompt-injection checks and per-feature rate limiting",
+  "Role-based access for sensitive operations",
+  "Public demo locked to simulated Gmail and Calendar side effects",
 ] as const;
 
 const TECH_STACK = [
@@ -180,11 +181,10 @@ export default function LandingPage() {
                 One workspace. One AI copilot for every business operation.
               </h1>
               <p className="mt-5 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
-                OnePilot AI is an AI operations platform for small businesses.
-                It answers questions from your own knowledge base with
-                citations, drafts emails, schedules meetings, and tracks leads
-                — and it never takes an external action without a human saying
-                yes.
+                OnePilot AI is an operations copilot for small businesses.
+                A real AI assistant searches your documents, ranks leads, and
+                drafts emails or meetings — then waits for a person before
+                anything is sent.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-start">
                 <TryDemoButton size="lg" label="Try the live demo" />
@@ -203,8 +203,9 @@ export default function LandingPage() {
                 </Link>
               </div>
               <p className="mt-4 text-xs text-slate-500">
-                The demo opens a pre-loaded workspace. Gmail and Calendar are
-                simulated — no real emails or events are ever created.
+                The demo opens a pre-loaded workspace. The assistant, document
+                search, and approvals are real. Gmail and Calendar side effects
+                are simulated — no real emails or events are created.
               </p>
             </div>
 
@@ -268,8 +269,8 @@ export default function LandingPage() {
                 What OnePilot can do
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-slate-600 sm:text-base">
-                A single agent, many skills — each one explainable, traceable,
-                and gated where it matters.
+                One assistant, several jobs — each one cited, reviewable, and
+                gated before anything leaves the workspace.
               </p>
             </div>
             <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -356,48 +357,73 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Architecture */}
+        {/* What's real vs simulated */}
         <section
-          id="architecture"
-          aria-labelledby="architecture-heading"
+          id="whats-real"
+          aria-labelledby="whats-real-heading"
           className="scroll-mt-20 border-t border-slate-200 bg-white"
         >
           <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
             <div className="max-w-2xl">
               <h2
-                id="architecture-heading"
+                id="whats-real-heading"
                 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl"
               >
-                Under the hood
+                What is real in this demo
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-slate-600 sm:text-base">
-                A layered, production-style architecture: the Next.js frontend
-                calls a FastAPI backend, which routes each message through a
-                LangGraph agent to tools for retrieval, email, calendar, and
-                lead management. External actions pause for human approval
-                before any provider executes them, and every step is logged.
+                Recruiters should judge the assistant on real AI work, not on
+                simulated inbox or calendar side effects. The public demo is
+                honest about that split.
               </p>
             </div>
-            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {TECH_STACK.map((tech) => (
-                <div
-                  key={tech.name}
-                  className="rounded-xl border border-slate-200 bg-slate-50/60 p-5"
-                >
-                  <p className="font-mono text-sm font-semibold text-slate-900">
-                    {tech.name}
-                  </p>
-                  <p className="mt-2 text-xs leading-relaxed text-slate-600">
-                    {tech.role}
-                  </p>
-                </div>
-              ))}
+            <div className="mt-10 grid gap-6 md:grid-cols-2">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-6">
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                  Working for real
+                </p>
+                <ul className="mt-4 space-y-2 text-sm text-slate-700">
+                  {[
+                    "OpenAI language model for answers and drafts",
+                    "Document search with embeddings, Qdrant, and citations",
+                    "Web search when configured",
+                    "Assistant routing across knowledge, CRM, email, and calendar",
+                    "CRM lead ranking and follow-up copy from stored facts",
+                    "Human approval before any external send or event write",
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2.5">
+                      <CheckCircle2
+                        className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"
+                        aria-hidden="true"
+                      />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-6">
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">
+                  Simulated in the public demo
+                </p>
+                <ul className="mt-4 space-y-2 text-sm text-slate-700">
+                  {[
+                    "Gmail side effects — drafts and sends do not reach a real inbox",
+                    "Calendar side effects — events are not written to a live calendar",
+                    "No credentials or Google account are required to try the workflow",
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2.5">
+                      <FlaskConical
+                        className="mt-0.5 h-4 w-4 shrink-0 text-amber-700"
+                        aria-hidden="true"
+                      />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
-            <p className="mt-6 text-xs text-slate-500">
-              When managed services are unavailable, the platform degrades
-              gracefully to deterministic fallbacks — retrieval, embeddings,
-              rate limiting, and the demo keep working end to end.
-            </p>
+
+            <EngineeringStack />
           </div>
         </section>
 
@@ -416,17 +442,17 @@ export default function LandingPage() {
                   See it for yourself — one click, zero risk
                 </h2>
                 <p className="mt-3 text-sm leading-relaxed text-slate-600 sm:text-base">
-                  The public demo opens a shared workspace pre-loaded with a
-                  knowledge base, leads, and pending approvals. Everything you
-                  trigger is simulated: no real emails are sent, no real
-                  calendar events are created, and no credentials are
-                  required.
+                  The public demo opens a shared workspace with a knowledge
+                  base, leads, and pending approvals. The assistant work is
+                  real. Gmail and Calendar side effects stay simulated: no
+                  real emails are sent, no real events are created, and no
+                  credentials are required.
                 </p>
                 <ul className="mt-6 space-y-2.5">
                   {[
-                    "Ask the agent about company policies and get cited answers",
-                    "Draft a customer email and watch it stop at the approval gate",
-                    "Review this week's meetings — nothing is booked on a live calendar",
+                    "Ask about company policies and get cited answers",
+                    "Draft a follow-up to the most promising lead and stop at approval",
+                    "Review this week's meetings and check open time slots",
                   ].map((item) => (
                     <li
                       key={item}
@@ -460,31 +486,76 @@ export default function LandingPage() {
   );
 }
 
+function EngineeringStack() {
+  const [open, setOpen] = useState(false);
+  return (
+    <details
+      className="mt-10 rounded-xl border border-slate-200 bg-slate-50/60 p-5"
+      onToggle={(event) =>
+        setOpen((event.currentTarget as HTMLDetailsElement).open)
+      }
+    >
+      <summary className="cursor-pointer select-none text-sm font-medium text-slate-800">
+        Engineering details
+      </summary>
+      {open && (
+        <div className="mt-4">
+          <p className="text-sm leading-relaxed text-slate-600">
+            The product workspace is a Next.js app talking to a FastAPI
+            backend. The assistant routes each request to knowledge search,
+            CRM, email, or calendar tools, then pauses for approval before
+            any external write.
+          </p>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {TECH_STACK.map((tech) => (
+              <div
+                key={tech.name}
+                className="rounded-xl border border-slate-200 bg-white p-5"
+              >
+                <p className="text-sm font-semibold text-slate-900">
+                  {tech.name}
+                </p>
+                <p className="mt-2 text-xs leading-relaxed text-slate-600">
+                  {tech.role}
+                </p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-6 text-xs text-slate-500">
+            If a managed service is unavailable, the demo keeps working
+            with safe fallbacks for search, embeddings, and rate limits.
+          </p>
+        </div>
+      )}
+    </details>
+  );
+}
+
 /**
  * Static product vignette: a chat exchange stopping at the approval gate.
  * Pure markup — communicates the core interaction without screenshots.
  */
 function HeroPreview() {
   return (
-    <div aria-hidden="true" className="relative hidden lg:block">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xl shadow-indigo-500/5">
+    <div aria-hidden="true" className="relative">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xl shadow-indigo-500/5 sm:p-5">
         <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 text-xs font-bold text-white">
             O
           </span>
           <p className="text-xs font-semibold text-slate-900">AI Workspace</p>
           <span className="ml-auto rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
-            Demo mode — simulated
+            Demo — Gmail simulated
           </span>
         </div>
 
         <div className="space-y-3 pt-4">
           <div className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-tr-sm bg-indigo-600 px-4 py-2.5 text-xs text-white">
-            Draft a follow-up email to Northwind about the renewal quote.
+            Draft a follow-up email to our most promising lead.
           </div>
           <div className="w-fit max-w-[90%] rounded-2xl rounded-tl-sm bg-slate-100 px-4 py-2.5 text-xs text-slate-700">
-            Here&apos;s a draft based on your pricing docs and the last
-            conversation. Ready to send when you are.
+            Draft for Sarah Chen at Brightline Analytics, based on the stored
+            CRM next step. Ready when you approve it.
           </div>
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
             <div className="flex items-center gap-2">
@@ -494,8 +565,8 @@ function HeroPreview() {
               </p>
             </div>
             <p className="mt-1 text-[11px] leading-relaxed text-amber-700">
-              send_email · to: sales@northwind.example — waiting for an owner
-              or admin to approve.
+              Email draft to Sarah Chen at Brightline Analytics — waiting for
+              an owner or admin.
             </p>
             <div className="mt-2.5 flex gap-2">
               <span className="rounded-md bg-emerald-600 px-2.5 py-1 text-[10px] font-medium text-white">
@@ -507,8 +578,8 @@ function HeroPreview() {
             </div>
           </div>
           <div className="flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-[10px] text-slate-500">
-            <ScrollText className="h-3.5 w-3.5" />
-            Audit log: email.draft created · approval pending · nothing sent
+            <ScrollText className="h-3.5 w-3.5 shrink-0" />
+            Recorded: draft prepared · approval pending · nothing sent
           </div>
         </div>
       </div>

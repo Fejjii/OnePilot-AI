@@ -22,7 +22,7 @@ import {
   CircleDashed,
 } from "lucide-react";
 import { useAuth, isAdminRole } from "@/lib/auth";
-import { useApprovals, useHealth, useProviderDiagnostics } from "@/lib/queries";
+import { useApprovals, useProviderDiagnostics } from "@/lib/queries";
 import { summarizeProviderStatus } from "@/lib/provider-status-summary";
 import { PlanBadge } from "@/components/domain/plan-badge";
 import { DemoModeBanner } from "@/components/domain/demo-mode-banner";
@@ -247,18 +247,17 @@ function PendingApprovalsDot() {
 }
 
 function ProviderStatusIndicator() {
-  const health = useHealth();
   const diagnostics = useProviderDiagnostics();
 
   if (diagnostics.isLoading && !diagnostics.data) {
     return (
       <div
         role="status"
-        aria-label="Checking providers"
+        aria-label="Checking connections"
         className="flex items-center gap-1.5 text-xs text-slate-500"
       >
         <CircleDashed className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-        <span className="hidden sm:inline">Checking providers…</span>
+        <span className="hidden sm:inline">Checking connections…</span>
       </div>
     );
   }
@@ -284,7 +283,7 @@ function ProviderStatusIndicator() {
   return (
     <div
       role="status"
-      aria-label="Provider status"
+      aria-label="Connection status"
       className="flex max-w-[min(100%,20rem)] items-center gap-2 sm:max-w-md"
       title={summary.detail}
     >
@@ -293,9 +292,6 @@ function ProviderStatusIndicator() {
         <p className="truncate font-medium text-slate-900">{summary.label}</p>
         <p className="hidden truncate text-[10px] text-slate-500 sm:block">
           {summary.detail}
-          {health.data
-            ? ` · env: ${health.data.env} · v${health.data.version}`
-            : ""}
         </p>
       </div>
     </div>

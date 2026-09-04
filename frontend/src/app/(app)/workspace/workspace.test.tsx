@@ -469,7 +469,7 @@ describe("WorkspacePage", () => {
       ).toBeInTheDocument();
     });
     expect(screen.queryByText(/drafting reply/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/retrieving rag evidence/i)).toBeInTheDocument();
+    expect(screen.getByText(/finding cited sources/i)).toBeInTheDocument();
   });
 
   it("switching from knowledge to general conversation updates trace tools", async () => {
@@ -657,7 +657,7 @@ describe("WorkspacePage", () => {
       ).toBeInTheDocument();
     });
     expect(screen.queryByText(/drafting reply/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/retrieving rag evidence/i)).toBeInTheDocument();
+    expect(screen.getByText(/finding cited sources/i)).toBeInTheDocument();
   });
 
   it("does not render conversation detail when cached data id mismatches active id", async () => {

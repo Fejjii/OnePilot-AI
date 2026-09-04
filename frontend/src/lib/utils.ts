@@ -78,10 +78,24 @@ const APPROVAL_ACTION_LABELS: Record<string, string> = {
   gmail_create_draft: "Email draft",
   gmail_send_email: "Send email",
   send_email: "Send email",
+  schedule_meeting: "Schedule meeting",
+  calendar_create_event: "Calendar event",
+  google_calendar_create_event: "Calendar event",
+  update_crm: "Update CRM",
+  email_send: "Send email",
 };
 
-/** Recruiter-facing label for approval action types. Avoids raw Gmail IDs. */
+const TECHNICAL_ID_RE =
+  /^(?:usr|org|user|lead|apv|apr|app|conv|msg|doc|sub|gmail)_[a-z0-9]+$/i;
+
+/** Recruiter-facing label for approval action types. Avoids raw provider IDs. */
 export function approvalActionLabel(actionType: string | null | undefined): string {
   if (!actionType) return "";
   return APPROVAL_ACTION_LABELS[actionType] ?? titleize(actionType);
+}
+
+/** True for internal identifiers that should not appear in recruiter UI. */
+export function isTechnicalIdentifier(value: string | null | undefined): boolean {
+  if (!value) return false;
+  return TECHNICAL_ID_RE.test(value.trim());
 }

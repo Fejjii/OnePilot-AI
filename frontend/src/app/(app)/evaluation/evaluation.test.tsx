@@ -137,10 +137,14 @@ describe("EvaluationPage", () => {
     ]);
     renderWithProviders(<EvaluationPage />);
     await waitFor(() => {
-      expect(screen.getByText(/Routing & intent evaluation/i)).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: /task routing/i })).toBeInTheDocument();
     });
-    expect(screen.getByText(/RAG golden evaluation/i)).toBeInTheDocument();
-    expect(screen.getByText(/Safety & guardrail evaluation/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /knowledge answers/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /safety checks/i }),
+    ).toBeInTheDocument();
   });
 
   it("shows HITL approval safety section", async () => {

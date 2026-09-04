@@ -15,8 +15,8 @@ export function ApprovalBanner({ approvalId }: ApprovalBannerProps) {
           Approval required
         </p>
         <p className="text-[11px] text-amber-800">
-          The agent proposed a sensitive action that needs admin review before it
-          can execute.
+          The assistant prepared an action that needs a teammate to review it
+          before anything is sent.
         </p>
       </div>
       {approvalId && (

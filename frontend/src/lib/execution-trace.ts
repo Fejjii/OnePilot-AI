@@ -10,7 +10,7 @@ const STEP_LABELS: Record<string, string> = {
   understanding_request: "Understanding request",
   reading_crm_context: "Reading CRM context",
   searching_company_knowledge: "Searching company knowledge",
-  retrieving_rag_evidence: "Retrieving RAG evidence",
+  retrieving_rag_evidence: "Finding cited sources",
   searching_the_web: "Searching the web",
   drafting_email: "Drafting email",
   reading_calendar: "Reading calendar",

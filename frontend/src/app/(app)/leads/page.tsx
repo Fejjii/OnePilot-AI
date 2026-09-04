@@ -120,7 +120,7 @@ export default function LeadsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Leads"
-        description="Prospects captured from chat, forms, and the lead-support intent."
+        description="Prospects captured from chat, forms, and assistant follow-up."
         actions={
           <Button
             leftIcon={<Plus className="h-4 w-4" />}
@@ -370,7 +370,7 @@ function CreateLeadModal({ open, onClose }: CreateLeadModalProps) {
         onClose();
       }}
       title="Create lead"
-      description="Capture a prospect manually. The agent can also create leads via the lead-support intent."
+      description="Capture a prospect manually. The assistant can also add leads from a conversation."
       size="lg"
       footer={
         <>

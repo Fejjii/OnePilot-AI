@@ -69,7 +69,7 @@ describe("LandingPage", () => {
         }),
       ).toBeInTheDocument();
       expect(
-        screen.getByText(/ai operations platform for small businesses/i),
+        screen.getByText(/operations copilot for small businesses/i),
       ).toBeInTheDocument();
     });
 
@@ -94,12 +94,16 @@ describe("LandingPage", () => {
         }),
       ).toBeInTheDocument();
       expect(
-        screen.getByRole("heading", { name: /under the hood/i }),
+        screen.getByRole("heading", { name: /what is real in this demo/i }),
       ).toBeInTheDocument();
     });
 
-    it("lists the technology stack for reviewers", () => {
+    it("lists the technology stack behind engineering details", async () => {
+      const user = userEvent.setup();
       renderLanding();
+      expect(screen.queryByText("FastAPI")).not.toBeInTheDocument();
+
+      await user.click(screen.getByText(/engineering details/i));
       for (const tech of [
         "FastAPI",
         "Next.js",
@@ -112,6 +116,18 @@ describe("LandingPage", () => {
       ]) {
         expect(screen.getByText(tech)).toBeInTheDocument();
       }
+    });
+
+    it("distinguishes real AI work from simulated Gmail and Calendar side effects", () => {
+      renderLanding();
+      expect(screen.getByText(/working for real/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/simulated in the public demo/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/gmail side effects/i),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/send_email/i)).not.toBeInTheDocument();
     });
 
     it("communicates that demo actions are simulated and credential-free", () => {
@@ -159,7 +175,7 @@ describe("LandingPage", () => {
         document.querySelector("#capabilities"),
       ).toBeInTheDocument();
       expect(document.querySelector("#safety")).toBeInTheDocument();
-      expect(document.querySelector("#architecture")).toBeInTheDocument();
+      expect(document.querySelector("#whats-real")).toBeInTheDocument();
     });
 
     it("shows Open dashboard instead of Sign in in the header when authenticated", async () => {

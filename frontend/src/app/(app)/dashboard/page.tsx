@@ -79,7 +79,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title="Dashboard"
-        description="Operational overview across knowledge, agent activity, leads, and approvals."
+        description="A quick look at conversations, knowledge, leads, and approvals in this workspace."
         actions={
           <Link href="/workspace">
             <Button leftIcon={<Sparkles className="h-4 w-4" />}>
@@ -187,7 +187,7 @@ export default function DashboardPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Provider diagnostics</CardTitle>
+              <CardTitle>Integrations</CardTitle>
               <Link
                 href="/settings"
                 className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
@@ -207,8 +207,8 @@ export default function DashboardPage() {
                 </div>
               ) : diagnostics.isError || !diagnostics.data ? (
                 <ErrorState
-                  title="Provider diagnostics unavailable"
-                  description="We couldn't load provider status. Please try again."
+                  title="Integrations unavailable"
+                  description="We couldn't load connection status. Please try again."
                   onRetry={() => diagnostics.refetch()}
                 />
               ) : (
@@ -219,8 +219,8 @@ export default function DashboardPage() {
                         <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
                         <p className="text-[11px] text-amber-900">
                           {allCoreLive
-                            ? "Core providers are live, but some SaaS providers are using mock adapters."
-                            : "Mixed provider modes: Some providers are using fallback or mock implementations."}
+                            ? "Core AI and data connections are live. Email and calendar stays simulated in this public demo."
+                            : "Some connections are live; others use a safe fallback or a simulated inbox and calendar."}
                         </p>
                       </div>
                     </div>
@@ -244,7 +244,7 @@ export default function DashboardPage() {
                   {hasMixedModes && (
                     <details className="group">
                       <summary className="cursor-pointer text-[11px] text-indigo-600 hover:text-indigo-700 font-medium">
-                        Show SaaS provider status ({
+                        Show email, calendar, and other connections ({
                           diagnostics.data.providers.filter((p) =>
                             ["search", "email", "crm", "calendar", "sms", "billing"].includes(
                               p.category
@@ -449,9 +449,7 @@ function ProviderCard({
         <div>
           <p className="text-xs font-semibold text-slate-900">{provider.name}</p>
           <p className="text-[10px] text-slate-500">
-            {provider.mode === "live"
-              ? provider.model || "Operational"
-              : provider.reason?.split(",")[0] || titleize(provider.mode)}
+            {providerModeCaption(provider.mode)}
           </p>
         </div>
       </div>
@@ -460,8 +458,18 @@ function ProviderCard({
   );
 }
 
-function titleize(str: string) {
-  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+function providerModeCaption(mode: ProviderMode | string): string {
+  const safeMode = normalizeProviderMode(mode);
+  const captions: Record<ProviderMode, string> = {
+    live: "Operational",
+    local: "Local",
+    mock: "Simulated",
+    fallback: "Fallback ready",
+    missing: "Not configured",
+    optional: "Optional",
+    unhealthy: "Needs attention",
+  };
+  return captions[safeMode];
 }
 
 interface QuickActionProps {
