@@ -29,8 +29,21 @@ export interface MeetingProposalDetails {
   endTime: string;
   timezone: string;
   approvalStatus: string;
-  providerMode: string;
   nextAction: string;
+  attendees: string;
+}
+
+export interface CalendarListItem {
+  title: string;
+  when: string;
+  detail: string;
+}
+
+export interface CalendarListDetails {
+  heading: string;
+  notice: string;
+  items: CalendarListItem[];
+  footer: string;
 }
 
 export type ParsedAssistantResponse =
@@ -38,6 +51,8 @@ export type ParsedAssistantResponse =
   | { kind: "compound"; sections: StructuredSection[] }
   | { kind: "email"; subject: string; body: string }
   | { kind: "meeting-proposal"; proposal: MeetingProposalDetails }
+  | { kind: "meetings-list"; list: CalendarListDetails }
+  | { kind: "availability-slots"; list: CalendarListDetails }
   | { kind: "plain"; content: string };
 
 const STANDARD_SECTION_TITLES: Record<string, StructuredSectionId> = {
@@ -148,28 +163,88 @@ function parseEmailDraft(content: string): { subject: string; body: string } | n
 
 function parseMeetingProposal(content: string): MeetingProposalDetails | null {
   const titleMatch = content.match(/^(?:Title|Meeting proposal):\s*(.+)$/m);
-  const timeMatch = content.match(
-    /^(?:Date and time|Proposed):\s*(.+?)\s+[–—]\s+(.+?)(?:\s*\([^)]+\))?$/m,
-  );
+  const timeMatch = content.match(/^(?:Date and time|Proposed time):\s*(.+)$/m);
   const timezoneMatch = content.match(/^Timezone:\s*(.+)$/m);
   const approvalMatch = content.match(/^Approval status:\s*(.+)$/m);
-  const providerMatch = content.match(/^Provider mode:\s*(.+)$/m);
   const nextActionMatch = content.match(/^Next action:\s*(.+)$/m);
+  const attendeesMatch = content.match(/^Attendees:\s*(.+)$/m);
 
   if (!titleMatch || !timeMatch) {
     return null;
   }
 
+  const when = timeMatch[1].trim();
+  const split = when.split(/\s+[–—]\s+/);
   return {
     title: titleMatch[1].trim(),
-    startTime: timeMatch[1].trim(),
-    endTime: timeMatch[2].trim(),
+    startTime: split[0]?.trim() ?? when,
+    endTime: split[1]?.trim() ?? "",
     timezone: timezoneMatch?.[1]?.trim() ?? "",
     approvalStatus: approvalMatch?.[1]?.trim() ?? "pending",
-    providerMode: providerMatch?.[1]?.trim() ?? "",
     nextAction:
       nextActionMatch?.[1]?.trim() ??
-      "Review and approve to create the calendar event.",
+      "Review and approve to create this meeting.",
+    attendees: attendeesMatch?.[1]?.trim() ?? "",
+  };
+}
+
+function parseNumberedCalendarItems(content: string): CalendarListItem[] {
+  const items: CalendarListItem[] = [];
+  const lines = content.split("\n");
+  for (let i = 0; i < lines.length; i += 1) {
+    const numbered = lines[i].trim().match(/^\d+[.)]\s+(.+)$/);
+    if (!numbered) continue;
+    const rest = numbered[1].trim();
+    const [titlePart, whenPart] = rest.split(/\s+—\s+/, 2);
+    let detail = "";
+    const next = lines[i + 1];
+    if (next && /^\s{2,}\S/.test(next) && !/^\d+[.)]\s+/.test(next.trim())) {
+      detail = next.trim();
+    }
+    items.push({
+      title: (titlePart || rest).trim(),
+      when: (whenPart || "").trim(),
+      detail,
+    });
+  }
+  return items;
+}
+
+function parseCalendarListBlock(
+  content: string,
+  headingPattern: RegExp,
+): CalendarListDetails | null {
+  const trimmed = content.trim();
+  if (!headingPattern.test(trimmed.split("\n", 1)[0] ?? "")) {
+    return null;
+  }
+  const lines = trimmed.split("\n");
+  const heading = (lines[0] ?? "").replace(/:$/, "").trim();
+  const noticeLines: string[] = [];
+  const footerLines: string[] = [];
+  const bodyLines: string[] = [];
+  let seenItem = false;
+  for (const line of lines.slice(1)) {
+    const trimmedLine = line.trim();
+    if (!trimmedLine) continue;
+    if (/^times shown in /i.test(trimmedLine)) {
+      footerLines.push(trimmedLine);
+      continue;
+    }
+    if (/^\d+[.)]\s+/.test(trimmedLine) || (seenItem && /^\s{2,}\S/.test(line))) {
+      seenItem = true;
+      bodyLines.push(line);
+      continue;
+    }
+    if (!seenItem) {
+      noticeLines.push(trimmedLine);
+    }
+  }
+  return {
+    heading,
+    notice: noticeLines.join(" "),
+    items: parseNumberedCalendarItems(bodyLines.join("\n")),
+    footer: footerLines.join(" "),
   };
 }
 
@@ -195,6 +270,22 @@ export function parseStructuredResponse(content: string): ParsedAssistantRespons
   const meetingProposal = parseMeetingProposal(trimmed);
   if (meetingProposal && !trimmed.startsWith("##")) {
     return { kind: "meeting-proposal", proposal: meetingProposal };
+  }
+
+  const meetingsList = parseCalendarListBlock(
+    trimmed,
+    /^(upcoming meetings|no meetings are on the calendar)/i,
+  );
+  if (meetingsList && !trimmed.startsWith("##")) {
+    return { kind: "meetings-list", list: meetingsList };
+  }
+
+  const availabilityList = parseCalendarListBlock(
+    trimmed,
+    /^(available time slots|available meeting times|you are available)/i,
+  );
+  if (availabilityList && !trimmed.startsWith("##")) {
+    return { kind: "availability-slots", list: availabilityList };
   }
 
   if (contentHasCompoundHeaders(trimmed)) {

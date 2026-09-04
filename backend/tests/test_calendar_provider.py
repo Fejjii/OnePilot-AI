@@ -154,6 +154,35 @@ class TestCalendarProviderSelection:
         assert result["status"] == "success"
         assert result.get("event_id")
 
+    def test_mock_list_events_returns_seeded_meetings(self) -> None:
+        provider = MockCalendarProvider()
+        start = datetime(2026, 5, 18, 0, 0)
+        end = datetime(2026, 5, 25, 0, 0)
+        events = provider.list_events(start, end)
+        titles = {str(item["summary"]) for item in events}
+        assert "Discovery call with Sarah Chen" in titles
+        assert any(item.get("company") == "Brightline Analytics" for item in events)
+        blob = str(events)
+        assert "access_token" not in blob
+        assert "refresh_token" not in blob
+        assert "evt_mock_busy_01" not in blob
+
+    def test_mock_availability_is_not_a_meeting_list(self) -> None:
+        provider = MockCalendarProvider()
+        start = datetime(2026, 5, 18, 0, 0)
+        end = datetime(2026, 5, 25, 0, 0)
+        result = provider.get_availability(
+            start,
+            end,
+            timezone="Europe/Berlin",
+            workday_start="09:00",
+            workday_end="17:00",
+            slot_duration_minutes=30,
+        )
+        assert result["available_slots"]
+        assert result["mode"] == "mock"
+
+
 
 class TestCalendarOAuth:
     def test_token_refresh_never_exposes_refresh_token(self) -> None:

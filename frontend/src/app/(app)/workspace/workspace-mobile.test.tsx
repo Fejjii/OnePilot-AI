@@ -156,6 +156,11 @@ describe("WorkspacePage mobile navigation", () => {
         name: PROMPT_SUGGESTIONS[0].label,
       }),
     ).toBeInTheDocument();
+    expect(
+      within(list).getByRole("button", {
+        name: "Show this week's meetings",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("switches between Chat, History, and Details panels", async () => {

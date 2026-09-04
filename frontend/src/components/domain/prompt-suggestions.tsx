@@ -54,8 +54,8 @@ export const PROMPT_SUGGESTIONS: readonly PromptSuggestion[] = [
     icon: Mail,
   },
   {
-    label: "Check calendar activity",
-    prompt: "What meetings are on the calendar this week?",
+    label: "Show this week's meetings",
+    prompt: "Show my meetings this week.",
     icon: CalendarDays,
   },
 ];

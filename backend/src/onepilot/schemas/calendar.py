@@ -49,12 +49,13 @@ class CalendarProviderStatus(BaseModel):
     capabilities: dict[str, bool] = Field(
         default_factory=lambda: {
             "availability_check": True,
+            "list_events": True,
             "suggest_slots": True,
             "create_event": False,
             "requires_approval_for_create": True,
         }
     )
-    purpose: str = "Availability checks and approval-gated event creation"
+    purpose: str = "Meeting lists, availability checks, and approval-gated event creation"
 
 
 class CalendarEventAttendee(BaseModel):
@@ -73,6 +74,7 @@ class CalendarEvent(BaseModel):
     end_time: datetime
     timezone: str = "UTC"
     attendees: list[str] = Field(default_factory=list)
+    company: str | None = None
     location: str | None = None
     description: str | None = None
 
@@ -121,6 +123,20 @@ class CalendarAvailabilityResult(BaseModel):
     timezone: str
     busy_events: list[CalendarEvent] = Field(default_factory=list)
     available_slots: list[CalendarSlot] = Field(default_factory=list)
+    fallback_used: bool = False
+    latency_ms: int = 0
+    status: Literal["success", "error"] = "success"
+    error_code: str | None = None
+    safe_error_message: str | None = None
+
+
+class CalendarEventsResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str = "google_calendar"
+    mode: Literal["live", "mock", "missing", "unhealthy"] = "mock"
+    timezone: str
+    events: list[CalendarEvent] = Field(default_factory=list)
     fallback_used: bool = False
     latency_ms: int = 0
     status: Literal["success", "error"] = "success"

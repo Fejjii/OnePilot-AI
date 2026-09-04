@@ -30,8 +30,10 @@ SEARCHING_COMPANY_KNOWLEDGE = "searching_company_knowledge"
 RETRIEVING_RAG_EVIDENCE = "retrieving_rag_evidence"
 SEARCHING_THE_WEB = "searching_the_web"
 DRAFTING_EMAIL = "drafting_email"
+READING_CALENDAR = "reading_calendar"
 CHECKING_CALENDAR = "checking_calendar"
 FINDING_MEETING_TIMES = "finding_meeting_times"
+PREPARING_MEETING = "preparing_meeting"
 CREATING_APPROVAL = "creating_approval"
 REVIEWING_WORKSPACE = "reviewing_workspace"
 DRAFTING_REPLY = "drafting_reply"
@@ -46,8 +48,10 @@ _STEP_LABELS: dict[str, str] = {
     RETRIEVING_RAG_EVIDENCE: "Retrieving RAG evidence",
     SEARCHING_THE_WEB: "Searching the web",
     DRAFTING_EMAIL: "Drafting email",
-    CHECKING_CALENDAR: "Checking calendar",
+    READING_CALENDAR: "Reading calendar",
+    CHECKING_CALENDAR: "Checking availability",
     FINDING_MEETING_TIMES: "Finding meeting times",
+    PREPARING_MEETING: "Preparing meeting",
     CREATING_APPROVAL: "Creating approval",
     REVIEWING_WORKSPACE: "Reviewing workspace activity",
     DRAFTING_REPLY: "Drafting reply",
@@ -80,9 +84,10 @@ _INTERNAL_STEP_TO_KEY: dict[str, str] = {
     "safety_check": SAFETY_CHECK,
     "execute_tool:rag.answer": RETRIEVING_RAG_EVIDENCE,
     "execute_tool:email.draft": DRAFTING_EMAIL,
+    "execute_tool:calendar.list_events": READING_CALENDAR,
     "execute_tool:calendar.check_availability": CHECKING_CALENDAR,
-    "execute_tool:calendar.suggest_slots": FINDING_MEETING_TIMES,
-    "execute_tool:calendar.create_event_request": CREATING_APPROVAL,
+    "execute_tool:calendar.suggest_slots": CHECKING_CALENDAR,
+    "execute_tool:calendar.create_event_request": PREPARING_MEETING,
     "execute_tool:lead.support": READING_CRM_CONTEXT,
     "execute_tool:external.web_search": SEARCHING_THE_WEB,
     "execute_tool:workspace.insights": REVIEWING_WORKSPACE,
@@ -95,9 +100,10 @@ _TOOL_TO_KEY: dict[str, str] = {
     "rag.answer": RETRIEVING_RAG_EVIDENCE,
     "knowledge.search": SEARCHING_COMPANY_KNOWLEDGE,
     "email.draft": DRAFTING_EMAIL,
+    "calendar.list_events": READING_CALENDAR,
     "calendar.check_availability": CHECKING_CALENDAR,
-    "calendar.suggest_slots": FINDING_MEETING_TIMES,
-    "calendar.create_event_request": CREATING_APPROVAL,
+    "calendar.suggest_slots": CHECKING_CALENDAR,
+    "calendar.create_event_request": PREPARING_MEETING,
     "lead.support": READING_CRM_CONTEXT,
     "external.web_search": SEARCHING_THE_WEB,
     "workspace.insights": REVIEWING_WORKSPACE,
@@ -108,6 +114,7 @@ _TOOL_LABELS: dict[str, str] = {
     "rag.answer": "Knowledge",
     "knowledge.search": "Knowledge",
     "email.draft": "Email",
+    "calendar.list_events": "Calendar",
     "calendar.check_availability": "Calendar",
     "calendar.suggest_slots": "Calendar",
     "calendar.create_event_request": "Calendar",
@@ -121,9 +128,10 @@ _SAFE_TOOL_SUMMARIES: dict[str, tuple[str, str]] = {
     "rag.answer": ("Company knowledge search", "Retrieved knowledge evidence"),
     "knowledge.search": ("Company knowledge search", "Retrieved knowledge evidence"),
     "email.draft": ("Email draft request", "Prepared email draft"),
+    "calendar.list_events": ("Calendar meeting list", "Read calendar"),
     "calendar.check_availability": ("Calendar availability check", "Checked availability"),
-    "calendar.suggest_slots": ("Meeting-time search", "Suggested meeting times"),
-    "calendar.create_event_request": ("Calendar event request", "Created approval"),
+    "calendar.suggest_slots": ("Meeting-time search", "Checked availability"),
+    "calendar.create_event_request": ("Calendar event request", "Prepared meeting"),
     "lead.support": ("CRM context lookup", "Read CRM context"),
     "external.web_search": ("Web search", "Retrieved web results"),
     "workspace.insights": ("Workspace activity review", "Summarized workspace activity"),
@@ -198,7 +206,7 @@ def build_execution_trace(
         name = _tool_name(raw)
         key = _TOOL_TO_KEY.get(name)
         if key is None and name.startswith("calendar."):
-            key = CHECKING_CALENDAR
+            key = READING_CALENDAR
         if key is None:
             continue
         add(key, duration_ms=_duration_ms(raw))

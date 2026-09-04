@@ -62,6 +62,7 @@ class TestRegistry:
             "external.web_search",
             "email.draft",
             "calendar.check_availability",
+            "calendar.list_events",
             "calendar.suggest_slots",
             "calendar.create_event_request",
             "lead.support",

@@ -81,4 +81,60 @@ describe("AssistantMessageContent", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("Summary")).not.toBeInTheDocument();
   });
+
+  it("renders upcoming meetings without availability copy", () => {
+    render(
+      <AssistantMessageContent
+        content={[
+          "Upcoming meetings this week:",
+          "1. Discovery call with Sarah Chen — Friday, 5 September, 10:00 to 10:30",
+          "   Sarah Chen · Brightline Analytics",
+          "Times shown in Europe/Berlin.",
+        ].join("\n")}
+      />,
+    );
+
+    expect(screen.getByText("Upcoming meetings")).toBeInTheDocument();
+    expect(screen.getByText(/Discovery call with Sarah Chen/i)).toBeInTheDocument();
+    expect(screen.getByText(/Brightline Analytics/i)).toBeInTheDocument();
+    expect(screen.queryByText(/open times, not existing meetings/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/provider mode/i)).not.toBeInTheDocument();
+  });
+
+  it("renders available slots as open times, not meetings", () => {
+    render(
+      <AssistantMessageContent
+        content={[
+          "Available time slots:",
+          "These are open times, not existing meetings.",
+          "1. Friday, 5 September, 09:00 to 09:30",
+          "Times shown in Europe/Berlin.",
+        ].join("\n")}
+      />,
+    );
+
+    expect(screen.getByText("Available time slots")).toBeInTheDocument();
+    expect(
+      screen.getByText(/open times, not existing meetings/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Discovery call/i)).not.toBeInTheDocument();
+  });
+
+  it("hides provider jargon on meeting proposals", () => {
+    render(
+      <AssistantMessageContent
+        content={[
+          "Title: Follow-up meeting",
+          "Date and time: Monday, 11 May, 10:00 to 10:30",
+          "Timezone: Europe/Berlin",
+          "Approval status: pending",
+          "Next action: Review and approve to create this meeting.",
+        ].join("\n")}
+      />,
+    );
+
+    expect(screen.getByText("Meeting proposal")).toBeInTheDocument();
+    expect(screen.getByText("Follow-up meeting")).toBeInTheDocument();
+    expect(screen.queryByText(/provider mode/i)).not.toBeInTheDocument();
+  });
 });

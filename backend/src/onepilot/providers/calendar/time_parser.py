@@ -20,6 +20,7 @@ _WEEKDAY_NAMES = {
 _AFTERNOON = re.compile(r"\bafternoon\b", re.IGNORECASE)
 _TOMORROW = re.compile(r"\btomorrow\b", re.IGNORECASE)
 _NEXT_WEEK = re.compile(r"\b(next week|following week)\b", re.IGNORECASE)
+_THIS_WEEK = re.compile(r"\bthis week\b", re.IGNORECASE)
 _AMPM = r"a\.?\s*m\.?|p\.?\s*m\.?"
 _SCHEDULE_CUE = re.compile(
     r"\b(schedule|book|set up|create|meeting|call|demo|appointment)\b",
@@ -201,6 +202,19 @@ def parse_calendar_window(
             timezone=timezone,
             query_type="range",
             label="next week",
+        )
+
+    # This week — current calendar week Monday 00:00 through next Monday 00:00
+    if _THIS_WEEK.search(lower):
+        monday = local_now.date() - timedelta(days=local_now.weekday())
+        start_local = datetime(monday.year, monday.month, monday.day, 0, 0, tzinfo=tz)
+        end_local = start_local + timedelta(days=7)
+        return ParsedCalendarWindow(
+            time_min=_to_utc_naive(start_local),
+            time_max=_to_utc_naive(end_local),
+            timezone=timezone,
+            query_type="range",
+            label="this week",
         )
 
     # Explicit local time for scheduling or availability checks

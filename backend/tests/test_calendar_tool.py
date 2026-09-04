@@ -43,6 +43,7 @@ class TestCalendarToolsRegistry:
     def test_calendar_tools_registered(self) -> None:
         names = registry.names()
         assert "calendar.check_availability" in names
+        assert "calendar.list_events" in names
         assert "calendar.suggest_slots" in names
         assert "calendar.create_event_request" in names
 
@@ -106,6 +107,52 @@ class TestCalendarAgentWorkflow:
         assert state.intent == Intent.CALENDAR_AVAILABILITY
         assert any(tc.tool_name == "calendar.check_availability" for tc in state.tool_calls)
         assert state.approval_required is False
+        assert "open times, not existing meetings" in (state.final_response or "").lower()
+        assert "upcoming meetings" not in (state.final_response or "").lower()
+
+    def test_meetings_this_week_lists_seeded_meetings(self, client_with_session) -> None:
+        client, session = client_with_session
+        _token, org_id, user_id = _register(client, suffix="_meetings")
+        state = run_agent(
+            session=session,
+            principal=_principal(org_id, user_id),
+            settings=get_settings(),
+            conversation_id="conv_cal_meetings",
+            message="Show my meetings this week.",
+            history=[],
+        )
+        assert state.intent == Intent.CALENDAR_AVAILABILITY
+        assert any(tc.tool_name == "calendar.list_events" for tc in state.tool_calls)
+        assert not any(tc.tool_name == "calendar.check_availability" for tc in state.tool_calls)
+        assert state.approval_required is False
+        text = state.final_response or ""
+        assert "Upcoming meetings" in text
+        assert "Sarah Chen" in text
+        assert "Brightline Analytics" in text
+        assert "open times, not existing meetings" not in text.lower()
+        assert "available time slots" not in text.lower()
+        assert "evt_demo" not in text
+        assert "Provider mode" not in text
+        step_names = [s.step for s in state.trace_steps]
+        assert any(name == "execute_tool:calendar.list_events" for name in step_names)
+
+    def test_find_availability_does_not_list_meetings(self, client_with_session) -> None:
+        client, session = client_with_session
+        _token, org_id, user_id = _register(client, suffix="_open")
+        state = run_agent(
+            session=session,
+            principal=_principal(org_id, user_id),
+            settings=get_settings(),
+            conversation_id="conv_cal_open",
+            message="Find available time slots this week.",
+            history=[],
+        )
+        assert any(tc.tool_name == "calendar.check_availability" for tc in state.tool_calls)
+        assert not any(tc.tool_name == "calendar.list_events" for tc in state.tool_calls)
+        text = state.final_response or ""
+        assert "Available time slots" in text
+        assert "not existing meetings" in text.lower()
+        assert "Discovery call with Sarah Chen" not in text
 
     def test_schedule_creates_approval_not_event(self, client_with_session) -> None:
         client, session = client_with_session
@@ -120,8 +167,14 @@ class TestCalendarAgentWorkflow:
         )
         assert state.intent == Intent.CALENDAR_SCHEDULING
         assert any(tc.tool_name == "calendar.create_event_request" for tc in state.tool_calls)
+        assert not any(tc.tool_name == "calendar.list_events" for tc in state.tool_calls)
+        assert not any(tc.tool_name == "calendar.check_availability" for tc in state.tool_calls)
         assert state.approval_required is True
         assert state.approval_id
+        text = state.final_response or ""
+        assert "approve" in text.lower()
+        assert "Provider mode" not in text
+        assert "Available time slots" not in text
 
     def test_gmail_route_still_works(self, client_with_session) -> None:
         client, session = client_with_session

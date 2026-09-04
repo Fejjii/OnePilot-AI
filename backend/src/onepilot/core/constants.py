@@ -78,6 +78,7 @@ class UsageFeature(StrEnum):
     GMAIL_CREATE_DRAFT = "gmail_create_draft"
     GMAIL_SEND_EMAIL = "gmail_send_email"
     CALENDAR_AVAILABILITY = "calendar_availability"
+    CALENDAR_LIST_EVENTS = "calendar_list_events"
     CALENDAR_SUGGEST_SLOTS = "calendar_suggest_slots"
     CALENDAR_CREATE_EVENT = "calendar_create_event"
     CALENDAR_APPROVAL_CREATED = "calendar_approval_created"

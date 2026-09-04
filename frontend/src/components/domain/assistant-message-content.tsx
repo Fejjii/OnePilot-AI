@@ -14,6 +14,7 @@ import {
   parseEvidenceContent,
   parseSourceLine,
   parseStructuredResponse,
+  type CalendarListDetails,
   type MeetingProposalDetails,
   type ParsedAssistantResponse,
   type SourceItem,
@@ -214,6 +215,9 @@ function StructuredKnowledgeResponse({ sections }: { sections: StructuredSection
 }
 
 function MeetingProposalCard({ proposal }: { proposal: MeetingProposalDetails }) {
+  const when = proposal.endTime
+    ? `${proposal.startTime} – ${proposal.endTime}`
+    : proposal.startTime;
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-1.5">
@@ -229,9 +233,7 @@ function MeetingProposalCard({ proposal }: { proposal: MeetingProposalDetails })
         </div>
         <div>
           <p className="text-[11px] font-medium text-slate-500">Date and time</p>
-          <p className="mt-0.5 text-sm text-slate-800">
-            {proposal.startTime} – {proposal.endTime}
-          </p>
+          <p className="mt-0.5 text-sm text-slate-800">{when}</p>
         </div>
         {proposal.timezone && (
           <div>
@@ -239,23 +241,66 @@ function MeetingProposalCard({ proposal }: { proposal: MeetingProposalDetails })
             <p className="mt-0.5 text-sm text-slate-800">{proposal.timezone}</p>
           </div>
         )}
-        <div className="grid gap-2 sm:grid-cols-2">
+        {proposal.attendees && (
           <div>
-            <p className="text-[11px] font-medium text-slate-500">Approval status</p>
-            <p className="mt-0.5 text-sm text-slate-800">{proposal.approvalStatus}</p>
+            <p className="text-[11px] font-medium text-slate-500">Attendees</p>
+            <p className="mt-0.5 text-sm text-slate-800">{proposal.attendees}</p>
           </div>
-          {proposal.providerMode && (
-            <div>
-              <p className="text-[11px] font-medium text-slate-500">Provider mode</p>
-              <p className="mt-0.5 text-sm text-slate-800">{proposal.providerMode}</p>
-            </div>
-          )}
+        )}
+        <div>
+          <p className="text-[11px] font-medium text-slate-500">Approval status</p>
+          <p className="mt-0.5 text-sm text-slate-800">{proposal.approvalStatus}</p>
         </div>
         <div>
           <p className="text-[11px] font-medium text-slate-500">Next action</p>
           <p className="mt-0.5 text-sm text-slate-700">{proposal.nextAction}</p>
         </div>
       </div>
+    </div>
+  );
+}
+
+function CalendarListCard({
+  list,
+  heading,
+}: {
+  list: CalendarListDetails;
+  heading: string;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-1.5">
+        <CalendarDays className="h-3.5 w-3.5 text-indigo-500" />
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          {heading}
+        </p>
+      </div>
+      {list.notice && (
+        <p className="text-sm leading-relaxed text-slate-700">{list.notice}</p>
+      )}
+      {list.items.length > 0 ? (
+        <ul className="space-y-2">
+          {list.items.map((item, index) => (
+            <li
+              key={`${index}-${item.title.slice(0, 24)}`}
+              className="rounded-md border border-slate-200 bg-slate-50/50 px-3 py-2.5"
+            >
+              <p className="text-sm font-medium text-slate-900">{item.title}</p>
+              {item.when && (
+                <p className="mt-0.5 text-sm text-slate-700">{item.when}</p>
+              )}
+              {item.detail && (
+                <p className="mt-0.5 text-xs text-slate-500">{item.detail}</p>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm leading-relaxed text-slate-700">{list.heading}</p>
+      )}
+      {list.footer && (
+        <p className="text-[11px] text-slate-500">{list.footer}</p>
+      )}
     </div>
   );
 }
@@ -336,6 +381,10 @@ function renderParsedResponse(parsed: ParsedAssistantResponse) {
       return <EmailDraftContent subject={parsed.subject} body={parsed.body} />;
     case "meeting-proposal":
       return <MeetingProposalCard proposal={parsed.proposal} />;
+    case "meetings-list":
+      return <CalendarListCard list={parsed.list} heading="Upcoming meetings" />;
+    case "availability-slots":
+      return <CalendarListCard list={parsed.list} heading="Available time slots" />;
     case "plain":
       return <PlainTextBlock content={parsed.content} />;
   }
@@ -347,7 +396,9 @@ export function AssistantMessageContent({ content }: AssistantMessageContentProp
     parsed.kind === "structured" ||
     parsed.kind === "compound" ||
     parsed.kind === "email" ||
-    parsed.kind === "meeting-proposal";
+    parsed.kind === "meeting-proposal" ||
+    parsed.kind === "meetings-list" ||
+    parsed.kind === "availability-slots";
 
   return (
     <div

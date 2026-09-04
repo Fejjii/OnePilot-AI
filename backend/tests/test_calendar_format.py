@@ -6,8 +6,11 @@ from datetime import UTC, datetime, timedelta
 
 from onepilot.providers.calendar.time_parser import parse_calendar_window
 from onepilot.services.calendar_format import (
+    contains_provider_jargon,
     contains_raw_iso_timestamps,
     format_availability_response,
+    format_meetings_response,
+    format_proposal_response,
     format_suggestion_response,
 )
 
@@ -48,7 +51,8 @@ class TestCalendarFormat:
         assert "11:00" in text
         assert "09:00" not in text
         assert not contains_raw_iso_timestamps(text)
-        assert "Calendar availability checked in Europe/Berlin" in text
+        assert "These are open times, not existing meetings." in text
+        assert "Provider mode" not in text
 
     def test_specific_query_detects_busy_with_timezone_field(self) -> None:
         from onepilot.providers.calendar.event_utils import parse_event_bounds
@@ -90,7 +94,7 @@ class TestCalendarFormat:
             "has_conflicts": True,
         }
         text = format_availability_response(raw)
-        assert "not available" in text.lower() or "busy" in text.lower()
+        assert "not open" in text.lower() or "overlaps" in text.lower()
         assert "11:00" in text
 
     def test_specific_query_detects_busy_at_11_local(self) -> None:
@@ -127,7 +131,7 @@ class TestCalendarFormat:
             ],
         }
         text = format_availability_response(raw)
-        assert "not available" in text.lower() or "busy" in text.lower()
+        assert "not open" in text.lower() or "overlaps" in text.lower()
         assert "11:00" in text
         assert "09:00" not in text
         assert not contains_raw_iso_timestamps(text)
@@ -163,6 +167,7 @@ class TestCalendarFormat:
         }
         text = format_availability_response(raw)
         assert "tomorrow afternoon" in text.lower()
+        assert "open times" in text.lower()
         assert "13:00" in text
         assert "13:30" in text
         assert not contains_raw_iso_timestamps(text)
@@ -192,11 +197,13 @@ class TestCalendarFormat:
             ],
         }
         text = format_suggestion_response(raw)
-        assert "Suggested meeting slots next week" in text
+        assert "Available meeting times" in text
+        assert "not existing meetings" in text.lower()
         assert "Monday" in text
         assert "09:00" in text
         assert "07:00" not in text
         assert not contains_raw_iso_timestamps(text)
+        assert "Provider mode" not in text
 
     def test_unhealthy_does_not_claim_open_slots(self) -> None:
         raw = {
@@ -206,5 +213,60 @@ class TestCalendarFormat:
             "error_code": "missing_calendar_scope",
         }
         text = format_availability_response(raw)
-        assert "No open slots" not in text
-        assert "unhealthy" in text.lower()
+        assert "No open times" not in text
+        assert "couldn't check availability" in text.lower()
+        assert "unhealthy" not in text.lower()
+        assert "Provider mode" not in text
+
+    def test_meetings_list_is_not_availability(self) -> None:
+        raw = {
+            "mode": "mock",
+            "timezone": _TZ,
+            "window_label": "this week",
+            "events": [
+                {
+                    "id": "evt_demo_secret",
+                    "summary": "Discovery call with Sarah Chen",
+                    "start": datetime(2026, 5, 18, 8, 0).isoformat(),
+                    "end": datetime(2026, 5, 18, 8, 30).isoformat(),
+                    "attendees": ["Sarah Chen"],
+                    "company": "Brightline Analytics",
+                }
+            ],
+        }
+        text = format_meetings_response(raw)
+        assert "Upcoming meetings this week" in text
+        assert "Sarah Chen" in text
+        assert "Brightline Analytics" in text
+        assert "evt_demo" not in text
+        assert "open times" not in text.lower()
+        assert "available time slots" not in text.lower()
+        assert not contains_raw_iso_timestamps(text)
+        assert not contains_provider_jargon(text)
+
+    def test_proposal_uses_local_times_and_approval_copy(self) -> None:
+        raw = {
+            "approval_status": "pending",
+            "provider_mode": "mock",
+            "timezone": _TZ,
+            "approval_payload": {
+                "summary": "Follow-up meeting with high priority lead",
+                "start_time": datetime(2026, 5, 25, 8, 0).isoformat(),
+                "end_time": datetime(2026, 5, 25, 8, 30).isoformat(),
+                "timezone": _TZ,
+                "attendees": ["marcus.webb@northwindlegal.com"],
+            },
+            "selected_slot": {
+                "start_time": datetime(2026, 5, 25, 8, 0).isoformat(),
+                "end_time": datetime(2026, 5, 25, 8, 30).isoformat(),
+            },
+        }
+        text = format_proposal_response(raw)
+        assert "Follow-up meeting with high priority lead" in text
+        assert "10:00 to 10:30" in text
+        assert "approve" in text.lower()
+        assert "Provider mode" not in text
+        assert "marcus.webb@" not in text
+        assert "Marcus Webb" in text
+        assert not contains_raw_iso_timestamps(text)
+        assert not contains_provider_jargon(text)

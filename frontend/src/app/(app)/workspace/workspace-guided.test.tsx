@@ -161,6 +161,34 @@ describe("WorkspacePage guided experience", () => {
     });
   });
 
+  it("submits the calendar meetings prompt from the starter chip", async () => {
+    let capturedBody: Record<string, unknown> | null = null;
+    restoreFetch = installFetchMock([
+      CONV_NEW_DETAIL,
+      EMPTY_CONVERSATIONS,
+      {
+        method: "POST",
+        url: "/chat",
+        response: ({ body }) => {
+          capturedBody = body as Record<string, unknown>;
+          return { body: CHAT_RESPONSE };
+        },
+      },
+    ]);
+
+    const user = userEvent.setup();
+    renderWithProviders(<WorkspacePage />);
+
+    const chip = await screen.findByRole("button", {
+      name: "Show this week's meetings",
+    });
+    await user.click(chip);
+
+    await waitFor(() => {
+      expect(capturedBody?.message).toBe("Show my meetings this week.");
+    });
+  });
+
   it("supports keyboard activation of prompt chips", async () => {
     let capturedBody: Record<string, unknown> | null = null;
     restoreFetch = installFetchMock([
