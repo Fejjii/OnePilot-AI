@@ -1,6 +1,7 @@
 import "@/test-utils/next-mocks";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@/test-utils/render-with-providers";
 import { installFetchMock } from "@/test-utils/mock-fetch";
 import { AuthProvider } from "@/lib/auth";
@@ -77,6 +78,11 @@ describe("ApprovalsPage", () => {
     expect(screen.getAllByText(/high risk/i).length).toBeGreaterThan(0);
     expect(screen.queryByText("usr_1")).not.toBeInTheDocument();
     expect(screen.queryByText(/proposed payload/i)).not.toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /send pricing email to acme/i }));
     expect(screen.getByText(/engineering details/i)).toBeInTheDocument();
+    expect(screen.queryByText("usr_1")).not.toBeInTheDocument();
+    expect(screen.queryByText(/proposed payload/i)).not.toBeInTheDocument();
   });
 });

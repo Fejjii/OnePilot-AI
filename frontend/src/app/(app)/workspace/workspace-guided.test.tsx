@@ -185,7 +185,8 @@ describe("WorkspacePage guided experience", () => {
     await user.click(chip);
 
     await waitFor(() => {
-    expect(capturedBody?.message).toBe("Show my meetings this week.");
+      expect(capturedBody?.message).toBe("Show my meetings this week.");
+    });
   });
 
   it("submits the availability prompt from the starter chip", async () => {
@@ -216,7 +217,6 @@ describe("WorkspacePage guided experience", () => {
         "Check my calendar availability for a 30-minute intro call this week.",
       );
     });
-  });
   });
 
   it("supports keyboard activation of prompt chips", async () => {

@@ -76,7 +76,7 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 
 ## Tests / status
 
-- Trust current CI on `main` / the OP-032 PR. Earlier OP-031 validation: backend **765 passed, 3 skipped**; frontend **155 passed**.
+- OP-032 validation on this branch: backend **795 passed, 3 skipped**; frontend **167 passed**; `pnpm typecheck` and `pnpm build` passed; handoff sanitizer **21 passed**.
 - Documented counts in README (2026-07-20): **703** backend tests (3 skipped), **126** frontend tests. Later merges added Qdrant/OpenAI/CRM-email/execution-trace coverage.
 - CI (`.github/workflows/ci.yml`) runs backend pytest + frontend typecheck/tests/build on PRs to `main` and `deployment/**`.
 - Public-demo smoke: `python scripts/smoke_test_public_demo.py --base-url <public-api>` (never print tokens).
