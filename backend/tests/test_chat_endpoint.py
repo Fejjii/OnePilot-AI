@@ -426,7 +426,7 @@ class TestExecutionTracePersistence:
         assert "Understanding request" in labels
         assert any(
             label in labels
-            for label in ("Retrieving RAG evidence", "Searching company knowledge")
+            for label in ("Finding cited sources", "Searching company knowledge")
         )
 
     def test_historical_message_without_trace_metadata_is_empty(

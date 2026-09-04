@@ -75,5 +75,8 @@ describe("ApprovalsPage", () => {
       expect(screen.getByText(/Send pricing email to Acme/)).toBeInTheDocument();
     });
     expect(screen.getAllByText(/high risk/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText("usr_1")).not.toBeInTheDocument();
+    expect(screen.queryByText(/proposed payload/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/engineering details/i)).toBeInTheDocument();
   });
 });

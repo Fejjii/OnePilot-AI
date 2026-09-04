@@ -7,13 +7,22 @@ from typing import TYPE_CHECKING
 
 from onepilot.core.constants import ApprovalStatus
 from onepilot.services import approval_service, conversation_service, lead_service
+from onepilot.services.crm_email_grounding import rank_leads
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
     from onepilot.security.auth import Principal
 
-_URGENCY_RANK = {"high": 0, "medium": 1, "low": 2}
+_ACTION_LABELS = {
+    "send_email": "send email",
+    "gmail_create_draft": "email draft",
+    "gmail_send_email": "send email",
+    "schedule_meeting": "schedule meeting",
+    "calendar_create_event": "calendar event",
+    "google_calendar_create_event": "calendar event",
+    "update_crm": "update CRM",
+}
 
 _OVERVIEW_KEYWORDS_RE = re.compile(
     r"\b(summarize|summary of|overview)\b|business activity|recent business activity",
@@ -79,13 +88,7 @@ def build_insights(
         limit=10,
     )
 
-    ranked_leads = sorted(
-        leads,
-        key=lambda lead: (
-            _URGENCY_RANK.get((lead.urgency or "medium").lower(), 9),
-            lead.name.lower(),
-        ),
-    )
+    ranked_leads = rank_leads(leads)
     promising = [
         lead
         for lead in ranked_leads
@@ -130,7 +133,7 @@ def _format_answer(
             f"{lead.name}"
             + (f" ({lead.company})" if lead.company else "")
             + f" — {lead.urgency or 'medium'} urgency"
-            + (f", {lead.status}" if lead.status else "")
+            + (f", {_pretty_label(lead.status)}" if lead.status else "")
             + (
                 f". Next: {lead.recommended_next_action}"
                 if lead.recommended_next_action
@@ -140,7 +143,7 @@ def _format_answer(
         for lead in promising
     ]
     approval_points = [
-        f"{item.title} ({item.action_type}, {item.risk_level} risk)"
+        f"{item.title} ({_action_label(item.action_type)}, {item.risk_level} risk)"
         for item in approvals[:8]
     ]
 
@@ -155,7 +158,7 @@ def _format_answer(
             if pending_count
             else "No approval action is needed right now."
         )
-        evidence = "Source: pending ApprovalRequest rows in this organization."
+        evidence = "Source: pending approvals in this workspace."
     elif focus == "leads":
         summary = (
             f"The workspace has {lead_total} lead"
@@ -167,7 +170,7 @@ def _format_answer(
             if promising and promising[0].recommended_next_action
             else "Review the leads pipeline and capture a follow-up."
         )
-        evidence = "Source: Lead records in this organization, ranked by urgency and stage."
+        evidence = "Source: leads in this workspace, ranked by urgency and stage."
     else:
         summary = (
             f"Recent workspace activity: {lead_total} leads, {pending_count} pending "
@@ -187,7 +190,7 @@ def _format_answer(
             "Review pending approvals, then follow up with the highest-urgency lead."
         )
         evidence = (
-            "Sources: Lead, ApprovalRequest, and Conversation rows scoped to this organization."
+            "Sources: leads, approvals, and conversations in this workspace."
         )
 
     bullets = "\n".join(f"- {point}" for point in key_points)
@@ -201,3 +204,14 @@ def _format_answer(
         "## Suggested next action\n"
         f"{next_action}"
     )
+
+
+def _action_label(action_type: str | None) -> str:
+    raw = (action_type or "").strip()
+    if not raw:
+        return "action"
+    return _ACTION_LABELS.get(raw, raw.replace("_", " "))
+
+
+def _pretty_label(value: str | None) -> str:
+    return (value or "").replace("_", " ")

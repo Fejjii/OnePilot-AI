@@ -62,7 +62,7 @@ def test_knowledge_web_and_crm_labels() -> None:
     )
     assert [step.label for step in steps] == [
         "Understanding request",
-        "Retrieving RAG evidence",
+        "Finding cited sources",
         "Searching the web",
         "Reading CRM context",
     ]

@@ -35,7 +35,7 @@ export default function EvaluationPage() {
       <div className="space-y-6">
         <PageHeader
           title="Evaluation & Quality"
-          description="Deterministic checks for routing, RAG, and safety — automated quality gates."
+          description="Independent checks of how the assistant picks a task, answers from documents, and stays behind approval gates."
         />
         <LoadingSkeleton lines={6} />
       </div>
@@ -57,7 +57,7 @@ export default function EvaluationPage() {
       <div className="space-y-6">
         <PageHeader
           title="Evaluation & Quality"
-          description="Deterministic checks for routing, RAG, and safety — automated quality gates."
+          description="Independent checks of how the assistant picks a task, answers from documents, and stays behind approval gates."
         />
         <EmptyState
           icon={ClipboardCheck}
@@ -84,7 +84,7 @@ export default function EvaluationPage() {
     <div className="space-y-8">
       <PageHeader
         title="Evaluation & Quality"
-        description="Deterministic checks for routing, RAG, and safety — automated quality gates."
+        description="Independent checks of how the assistant picks a task, answers from documents, and stays behind approval gates."
         badge={
           data.generated_at ? (
             <Badge tone="muted" className="text-xs font-normal">
@@ -103,7 +103,7 @@ export default function EvaluationPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard label="Intent accuracy" value={pct(metrics.intent_accuracy)} icon={Route} />
         <MetricCard label="Routing accuracy" value={pct(metrics.routing_accuracy)} icon={Route} />
-        <MetricCard label="RAG golden pass" value={pct(metrics.rag_golden_pass_rate)} icon={BookOpen} />
+        <MetricCard label="Knowledge answer quality" value={pct(metrics.rag_golden_pass_rate)} icon={BookOpen} />
         <MetricCard
           label="Safety pass rate"
           value={pct(metrics.safety_guardrail_pass_rate)}
@@ -135,22 +135,22 @@ export default function EvaluationPage() {
       <EngineeringDetailsCard command={data.run_command} available={data.available} />
 
       <SuiteTable
-        title="Routing & intent evaluation"
-        description="Two-stage classifier: message class → intent."
+        title="Task routing"
+        description="Does the assistant pick the right job for each request?"
         rows={(routingSuite?.case_results as Array<Record<string, unknown>>) ?? []}
         columns={routingColumns}
       />
 
       <SuiteTable
-        title="RAG golden evaluation"
-        description="Offline keyword scoring over NovaEdge demo docs."
+        title="Knowledge answers"
+        description="Cited answers checked against the sample company documents."
         rows={(ragSuite?.case_results as Array<Record<string, unknown>>) ?? []}
         columns={ragColumns}
       />
 
       <SuiteTable
-        title="Safety & guardrail evaluation"
-        description="Prompt injection, approval bypass, and HITL policy checks."
+        title="Safety checks"
+        description="Prompt-injection, approval bypass, and human-review policy checks."
         rows={(safetySuite?.case_results as Array<Record<string, unknown>>) ?? []}
         columns={safetyColumns}
       />
@@ -277,10 +277,10 @@ function ReviewerCopy() {
         <div>
           <p className="font-medium text-slate-900">Covered today</p>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>Agent routing (message class + intent)</li>
-            <li>RAG golden queries (retrieval heuristics + citations)</li>
-            <li>Safety guardrails and approval gating policies</li>
-            <li>494+ backend pytest cases (auth, RAG, tools, approvals)</li>
+            <li>Whether the assistant picks the right task</li>
+            <li>Cited answers from the sample knowledge base</li>
+            <li>Safety checks and approval-before-send rules</li>
+            <li>Automated quality gates used in development</li>
           </ul>
         </div>
         <div>
@@ -339,7 +339,16 @@ function HitlSection({
         </ul>
         {hitl && (
           <p className="text-xs text-slate-500">
-            Gated actions: {hitl.gated_action_types.join(", ")}
+            Gated actions:{" "}
+            {hitl.gated_action_types
+              .map((action) =>
+                action
+                  .replace(/[_-]+/g, " ")
+                  .replace(/\b\w/g, (c) => c.toUpperCase())
+                  .replace(/\bGmail\b/g, "email")
+                  .replace(/\bCrm\b/g, "CRM"),
+              )
+              .join(", ")}
           </p>
         )}
         {approvalCases.length > 0 && (
@@ -348,7 +357,10 @@ function HitlSection({
             <ul className="mt-2 space-y-1 text-xs">
               {approvalCases.map((c) => (
                 <li key={String(c.action_type)}>
-                  {String(c.action_type)} → requires approval:{" "}
+                  {String(c.action_type)
+                    .replace(/[_-]+/g, " ")
+                    .replace(/\b\w/g, (ch) => ch.toUpperCase())}{" "}
+                  → requires approval:{" "}
                   {c.actual_requires_approval ? "yes" : "no"}
                   {c.passed ? " ✓" : " ✗"}
                 </li>

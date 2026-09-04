@@ -32,9 +32,9 @@ export function WorkspaceEmptyState({
           Ask OnePilot about this business
         </h3>
         <p className="text-xs leading-relaxed text-slate-600">
-          OnePilot answers questions grounded in the knowledge base, analyzes
-          leads and business activity, and prepares emails and meeting
-          proposals with full citations and tool traces.
+          OnePilot answers questions from the knowledge base with citations,
+          ranks leads, and prepares emails and meeting proposals. External
+          sends stay behind human approval.
         </p>
         <p className="flex items-center justify-center gap-1.5 text-xs text-slate-600">
           <ShieldCheck

@@ -161,6 +161,11 @@ describe("WorkspacePage mobile navigation", () => {
         name: "Show this week's meetings",
       }),
     ).toBeInTheDocument();
+    expect(
+      within(list).getByRole("button", {
+        name: "Find open meeting times",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("switches between Chat, History, and Details panels", async () => {
@@ -195,7 +200,7 @@ describe("WorkspacePage mobile navigation", () => {
       "true",
     );
     expect(screen.getByText(/response details/i)).toBeInTheDocument();
-    expect(screen.getByText(/ai transparency/i)).toBeInTheDocument();
+    expect(screen.getByText(/sources and steps/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: /^chat$/i }));
     expect(screen.getByRole("textbox", { name: /message/i })).toBeInTheDocument();

@@ -22,7 +22,7 @@ describe("Dashboard provider diagnostics errors", () => {
     renderWithProviders(<DashboardPage />);
 
     await waitFor(() => {
-      expect(screen.getByText("Provider diagnostics unavailable")).toBeInTheDocument();
+      expect(screen.getByText("Integrations unavailable")).toBeInTheDocument();
     });
     expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
   });

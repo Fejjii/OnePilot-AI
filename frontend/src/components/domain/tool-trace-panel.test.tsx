@@ -33,7 +33,7 @@ describe("ToolTracePanel", () => {
     );
 
     expect(screen.getByText("Understanding request")).toBeInTheDocument();
-    expect(screen.getByText("Retrieving RAG evidence")).toBeInTheDocument();
+    expect(screen.getByText("Finding cited sources")).toBeInTheDocument();
     expect(screen.getByText("Knowledge")).toBeInTheDocument();
     expect(screen.queryByText(/rag\.answer/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/ignore previous/i)).not.toBeInTheDocument();

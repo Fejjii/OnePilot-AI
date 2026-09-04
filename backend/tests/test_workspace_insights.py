@@ -76,12 +76,9 @@ def test_starter_prompt_chip_focus_modes_are_distinct(db_session) -> None:
     leads_answer = str(leads["answer"])
 
     assert "Recent workspace activity:" in overview_answer
-    assert "Source: pending ApprovalRequest rows in this organization." in (
-        approvals_answer
-    )
-    assert (
-        "Source: Lead records in this organization, ranked by urgency and stage."
-        in leads_answer
+    assert "Source: pending approvals in this workspace." in approvals_answer
+    assert "Source: leads in this workspace, ranked by urgency and stage." in (
+        leads_answer
     )
 
     # And they should not collapse into the same output.
@@ -92,3 +89,64 @@ def test_starter_prompt_chip_focus_modes_are_distinct(db_session) -> None:
     # Deterministic: same inputs -> same outputs.
     overview2 = tool.run(ctx, message=overview_prompt).output
     assert str(overview2["answer"]) == overview_answer
+
+
+def test_most_promising_lead_matches_crm_email_ranking(db_session) -> None:
+    """Workspace insights and email drafting must name the same top lead."""
+    from onepilot.core.ids import new_id
+    from onepilot.demo_data.seed import CURATED_DEMO_LEADS
+    from onepilot.repositories.models import Organization, Subscription
+    from onepilot.services import lead_service
+    from onepilot.services.crm_email_grounding import select_most_promising_lead
+
+    org_id = "org_insights_rank"
+    db_session.add(Organization(id=org_id, name="Insights Rank", slug="insights-rank"))
+    db_session.add(
+        Subscription(
+            id=new_id("sub"),
+            organization_id=org_id,
+            plan_code=PlanCode.FREE,
+            status="active",
+        )
+    )
+    db_session.flush()
+    principal = _principal(org_id, "usr_insights_rank")
+    for row in CURATED_DEMO_LEADS:
+        lead_service.create_lead(
+            db_session,
+            principal=principal,
+            name=row["name"],
+            company=row.get("company"),
+            email=row.get("email"),
+            source=row.get("source"),
+            status=row.get("status"),
+            urgency=row.get("urgency"),
+            intent=row.get("intent"),
+            pain_point=row.get("pain_point"),
+            summary=row.get("summary"),
+            recommended_next_action=row.get("recommended_next_action"),
+            enforce_quota=False,
+        )
+
+    leads, _total = lead_service.list_leads(
+        db_session, principal=principal, offset=0, limit=50
+    )
+    chosen = select_most_promising_lead(leads)
+    assert chosen is not None
+    assert chosen.name == "Sarah Chen"
+    assert chosen.company == "Brightline Analytics"
+
+    ctx = ToolContext(session=db_session, principal=principal, settings=get_settings())
+    leads_answer = str(
+        WorkspaceInsightsTool()
+        .run(
+            ctx,
+            message="Analyze our current leads and highlight the most promising ones.",
+        )
+        .output["answer"]
+    )
+    assert "Sarah Chen (Brightline Analytics)" in leads_answer
+    first_lead_line = next(
+        line for line in leads_answer.splitlines() if line.startswith("- ") and "urgency" in line
+    )
+    assert first_lead_line.startswith("- Sarah Chen")

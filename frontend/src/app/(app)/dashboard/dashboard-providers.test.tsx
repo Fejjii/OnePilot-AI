@@ -81,11 +81,11 @@ vi.mock("@/lib/queries", () => ({
 }));
 
 describe("DashboardPage", () => {
-  it("renders provider diagnostics card", async () => {
+  it("renders integrations card", async () => {
     renderWithProviders(<DashboardPage />);
 
     await waitFor(() => {
-      expect(screen.getByText("Provider diagnostics")).toBeInTheDocument();
+      expect(screen.getByText("Integrations")).toBeInTheDocument();
     });
   });
 
@@ -94,9 +94,7 @@ describe("DashboardPage", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/Mixed provider modes/i) ||
-          screen.getByText(/Some providers are using fallback/i) ||
-          screen.getByText(/some SaaS providers are using mock adapters/i)
+        screen.getByText(/some connections are live/i),
       ).toBeInTheDocument();
     });
   });
@@ -114,7 +112,9 @@ describe("DashboardPage", () => {
     renderWithProviders(<DashboardPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Show SaaS provider status/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Show email, calendar, and other connections/i),
+      ).toBeInTheDocument();
     });
   });
 

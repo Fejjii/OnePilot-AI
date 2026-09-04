@@ -413,7 +413,7 @@ function WorkspaceInner() {
     <div className="flex min-h-0 flex-col gap-3 sm:gap-4 lg:h-[calc(100vh-7rem)] max-lg:h-[calc(100dvh-11rem)]">
       <PageHeader
         title="AI Workspace"
-        description="Grounded chat with intent routing, citations, tool traces, and human approval gates."
+        description="Ask about the business, review cited answers, and approve emails or meetings before anything goes out."
         actions={
           <Button
             variant="outline"
@@ -986,7 +986,7 @@ function DetailsPanel({ data, sending }: DetailsPanelProps) {
       <CardHeader>
         <CardTitle>Response details</CardTitle>
         <span className="text-[11px] text-slate-500">
-          AI transparency
+          Sources and steps
         </span>
       </CardHeader>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-3 py-3 sm:px-5 sm:py-4 thin-scrollbar">
@@ -1016,29 +1016,31 @@ function DetailsPanel({ data, sending }: DetailsPanelProps) {
               </div>
             )}
 
-            <section
-              className="rounded-md border border-slate-200 bg-slate-50/60 px-3 py-2 text-xs text-slate-700"
-              data-testid="language-details"
-            >
-              <p>
-                <span className="text-slate-500">Detected language:</span>{" "}
-                {LANGUAGE_LABELS[data.detectedLanguage ?? ""] ??
-                  data.detectedLanguage ??
-                  "—"}
-              </p>
-              <p>
-                <span className="text-slate-500">Response language:</span>{" "}
-                {LANGUAGE_LABELS[data.responseLanguage ?? ""] ??
-                  data.responseLanguage ??
-                  "—"}
-              </p>
-              <p>
-                <span className="text-slate-500">Preference:</span>{" "}
-                {LANGUAGE_LABELS[data.languagePreference ?? ""] ??
-                  data.languagePreference ??
-                  "—"}
-              </p>
-            </section>
+            <details className="rounded-md border border-slate-200 bg-slate-50/60 px-3 py-2 text-xs text-slate-700">
+              <summary className="cursor-pointer select-none font-medium text-slate-800">
+                Engineering details
+              </summary>
+              <div className="mt-2 space-y-1" data-testid="language-details">
+                <p>
+                  <span className="text-slate-500">Detected language:</span>{" "}
+                  {LANGUAGE_LABELS[data.detectedLanguage ?? ""] ??
+                    data.detectedLanguage ??
+                    "—"}
+                </p>
+                <p>
+                  <span className="text-slate-500">Response language:</span>{" "}
+                  {LANGUAGE_LABELS[data.responseLanguage ?? ""] ??
+                    data.responseLanguage ??
+                    "—"}
+                </p>
+                <p>
+                  <span className="text-slate-500">Preference:</span>{" "}
+                  {LANGUAGE_LABELS[data.languagePreference ?? ""] ??
+                    data.languagePreference ??
+                    "—"}
+                </p>
+              </div>
+            </details>
 
             {data.approvalRequired && (
               <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
@@ -1046,8 +1048,8 @@ function DetailsPanel({ data, sending }: DetailsPanelProps) {
                   <ShieldAlert className="h-3.5 w-3.5" /> Approval gated
                 </p>
                 <p className="mt-1">
-                  This action will not execute until an admin approves it on the
-                  Approvals page.
+                  This action waits on the Approvals page until a teammate
+                  reviews it.
                 </p>
               </div>
             )}
@@ -1078,7 +1080,7 @@ function DetailsPanel({ data, sending }: DetailsPanelProps) {
 
             <section>
               <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                <Wrench className="h-3.5 w-3.5" /> Trace & tools
+                <Wrench className="h-3.5 w-3.5" /> What the assistant did
               </h4>
               <ToolTracePanel
                 toolCalls={data.toolCalls}

@@ -111,7 +111,7 @@ describe("DashboardPage", () => {
       expect(screen.getByText("7")).toBeInTheDocument(); // leads
     });
 
-    expect(screen.getByText(/provider diagnostics/i)).toBeInTheDocument();
+    expect(screen.getByText(/^integrations$/i)).toBeInTheDocument();
     expect(screen.getByText(/quick actions/i)).toBeInTheDocument();
   });
 });

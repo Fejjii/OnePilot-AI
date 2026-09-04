@@ -38,6 +38,11 @@ STARTER_PROMPTS: list[tuple[str, Intent, str]] = [
         Intent.CALENDAR_AVAILABILITY,
         "calendar_assistant",
     ),
+    (
+        "Check my calendar availability for a 30-minute intro call this week.",
+        Intent.CALENDAR_AVAILABILITY,
+        "calendar_assistant",
+    ),
 ]
 
 

@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
   BookOpen,
+  CalendarClock,
   CalendarDays,
   Mail,
   ShieldCheck,
@@ -20,10 +21,9 @@ export interface PromptSuggestion {
 }
 
 /**
- * Starter prompts for first-time reviewers. Each one exercises a real agent
- * capability against seeded demo data; none of them trigger un-gated external
- * actions (email drafting stays behind the human-approval workflow, and
- * Gmail/Calendar are mock providers in the public demo).
+ * Starter prompts for first-time reviewers. Each chip exercises a distinct
+ * capability against seeded demo data. Email drafting stays behind human
+ * approval; Gmail/Calendar side effects are simulated in the public demo.
  */
 export const PROMPT_SUGGESTIONS: readonly PromptSuggestion[] = [
   {
@@ -58,6 +58,12 @@ export const PROMPT_SUGGESTIONS: readonly PromptSuggestion[] = [
     prompt: "Show my meetings this week.",
     icon: CalendarDays,
   },
+  {
+    label: "Find open meeting times",
+    prompt:
+      "Check my calendar availability for a 30-minute intro call this week.",
+    icon: CalendarClock,
+  },
 ];
 
 interface PromptSuggestionsProps {
@@ -80,19 +86,22 @@ export function PromptSuggestions({
   return (
     <ul
       aria-label="Suggested prompts"
-      className={cn("flex flex-wrap justify-center gap-2", className)}
+      className={cn(
+        "flex flex-wrap justify-center gap-2 max-sm:justify-stretch",
+        className,
+      )}
     >
       {PROMPT_SUGGESTIONS.map(({ label, prompt, icon: Icon }) => (
-        <li key={label}>
+        <li key={label} className="max-sm:min-w-0">
           <button
             type="button"
             disabled={disabled}
             title={prompt}
             onClick={() => onSelect(prompt)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <Icon className="h-3.5 w-3.5 text-indigo-500" aria-hidden="true" />
-            {label}
+            <Icon className="h-3.5 w-3.5 shrink-0 text-indigo-500" aria-hidden="true" />
+            <span className="truncate">{label}</span>
           </button>
         </li>
       ))}

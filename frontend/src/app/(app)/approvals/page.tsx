@@ -30,6 +30,7 @@ import {
   approvalActionLabel,
   formatDateTime,
   formatRelativeTime,
+  isTechnicalIdentifier,
   titleize,
 } from "@/lib/utils";
 import type { ApprovalResponse, ApprovalStatus } from "@/types/api";
@@ -98,7 +99,7 @@ function ApprovalsInner() {
     <div className="space-y-6">
       <PageHeader
         title="Approvals"
-        description="Human-in-the-loop gating for risky actions proposed by the agent."
+        description="Review emails and meetings the assistant prepared. Nothing is sent until someone here says yes."
         badge={
           <Badge tone="warning">
             {approvals.data?.pending_count ?? 0} pending
@@ -189,7 +190,7 @@ function ApprovalDetail({ approval, isAdmin, onClear }: ApprovalDetailProps) {
           <EmptyState
             icon={MessageSquare}
             title="Select a request"
-            description="Pick a request from the inbox to inspect its proposed payload and take action."
+            description="Pick a request from the inbox to review the draft and take action."
           />
         </CardContent>
       </Card>
@@ -234,23 +235,10 @@ function ApprovalDetail({ approval, isAdmin, onClear }: ApprovalDetailProps) {
               </p>
               <p className="mt-1">
                 Status:{" "}
-                <span className="font-medium">{execution.status ?? "—"}</span>
+                <span className="font-medium">
+                  {titleize(execution.status) || "—"}
+                </span>
               </p>
-              {execution.draft_id && (
-                <p className="mt-1 font-mono text-[11px]">
-                  Draft ID: {execution.draft_id}
-                </p>
-              )}
-              {execution.message_id && (
-                <p className="mt-1 font-mono text-[11px]">
-                  Message ID: {execution.message_id}
-                </p>
-              )}
-              {execution.event_id && (
-                <p className="mt-1 font-mono text-[11px]">
-                  Event ID: {execution.event_id}
-                </p>
-              )}
               {execution.safe_error_message && (
                 <p className="mt-1 text-amber-800">
                   {execution.safe_error_message}
@@ -260,20 +248,7 @@ function ApprovalDetail({ approval, isAdmin, onClear }: ApprovalDetailProps) {
           );
         })()}
 
-        <section>
-          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Proposed payload
-          </h4>
-          <pre className="max-h-72 overflow-auto rounded-md border border-slate-200 bg-slate-950 px-3 py-2 text-[11px] leading-relaxed text-slate-200 thin-scrollbar">
-            {JSON.stringify(
-              stripExecutionFromPayload(approval.proposed_payload),
-              null,
-              2,
-            )}
-          </pre>
-        </section>
-
-        <div className="grid grid-cols-2 gap-3 text-[11px]">
+        <div className="grid grid-cols-1 gap-3 text-[11px] sm:grid-cols-2">
           <Field label="Created" value={formatRelativeTime(approval.created_at)} />
           <Field
             label="Reviewed"
@@ -285,13 +260,9 @@ function ApprovalDetail({ approval, isAdmin, onClear }: ApprovalDetailProps) {
                 : "—"
             }
           />
-          <Field label="Created by" value={approval.created_by} mono />
-          <Field
-            label="Reviewed by"
-            value={approval.reviewed_by ?? "—"}
-            mono
-          />
         </div>
+
+        <ApprovalEngineeringDetails approval={approval} />
 
         {approval.reason && (
           <div className="rounded-md border border-slate-200 bg-white p-3 text-xs">
@@ -347,6 +318,61 @@ interface ApprovalExecution {
   message_id?: string;
   event_id?: string;
   safe_error_message?: string;
+}
+
+function ApprovalEngineeringDetails({
+  approval,
+}: {
+  approval: ApprovalResponse;
+}) {
+  const [open, setOpen] = useState(false);
+  const execution = getExecution(approval.proposed_payload);
+  const createdBy = isTechnicalIdentifier(approval.created_by)
+    ? null
+    : approval.created_by;
+  const reviewedBy = isTechnicalIdentifier(approval.reviewed_by)
+    ? null
+    : approval.reviewed_by;
+
+  return (
+    <details
+      className="rounded-md border border-slate-200 bg-slate-50/60 p-3"
+      onToggle={(event) =>
+        setOpen((event.currentTarget as HTMLDetailsElement).open)
+      }
+    >
+      <summary className="cursor-pointer select-none text-xs font-medium text-slate-800">
+        Engineering details
+      </summary>
+      {open && (
+        <div className="mt-3 space-y-3">
+          <section>
+            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Proposed payload
+            </h4>
+            <pre className="max-h-72 overflow-auto rounded-md border border-slate-200 bg-slate-950 px-3 py-2 text-[11px] leading-relaxed text-slate-200 thin-scrollbar">
+              {JSON.stringify(
+                stripExecutionFromPayload(approval.proposed_payload),
+                null,
+                2,
+              )}
+            </pre>
+          </section>
+          {(execution || createdBy || reviewedBy) && (
+            <div className="space-y-1 text-[11px] text-slate-600">
+              {createdBy && <p>Created by: {createdBy}</p>}
+              {reviewedBy && <p>Reviewed by: {reviewedBy}</p>}
+              {execution?.draft_id && <p>Draft reference: {execution.draft_id}</p>}
+              {execution?.message_id && (
+                <p>Message reference: {execution.message_id}</p>
+              )}
+              {execution?.event_id && <p>Event reference: {execution.event_id}</p>}
+            </div>
+          )}
+        </div>
+      )}
+    </details>
+  );
 }
 
 function getExecution(payload: Record<string, unknown>): ApprovalExecution | null {
@@ -540,19 +566,19 @@ function DecisionModal({ approval, decision, onClose }: DecisionModalProps) {
       <div className="space-y-3">
         <div className="rounded-md border border-slate-200 bg-slate-50/40 p-3 text-xs text-slate-700">
           <p>
-            This will record an audit-log entry on the approval and mark its
-            status as <span className="font-semibold">{titleize(decision)}</span>.
+            This records the decision as{" "}
+            <span className="font-semibold">{titleize(decision)}</span>.
             {decision === "approved" &&
             (approval.action_type === "gmail_create_draft" ||
               approval.action_type === "gmail_send_email" ||
               approval.action_type === "send_email")
-              ? "If Gmail is configured, the approved action will create a Gmail draft (or send when enabled)."
+              ? " In the public demo, the approved email stays simulated and is not sent to a real inbox."
               : decision === "approved" &&
                   (approval.action_type === "calendar_create_event" ||
                     approval.action_type === "google_calendar_create_event" ||
                     approval.action_type === "schedule_meeting")
-                ? "If Google Calendar is configured, the approved action will create a calendar event in mock or live mode."
-                : "No external systems will be touched."}
+                ? " In the public demo, the approved meeting stays simulated and is not written to a live calendar."
+                : " No external systems will be changed."}
           </p>
         </div>
         <div>

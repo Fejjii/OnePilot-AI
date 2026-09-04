@@ -45,7 +45,7 @@ _STEP_LABELS: dict[str, str] = {
     UNDERSTANDING_REQUEST: "Understanding request",
     READING_CRM_CONTEXT: "Reading CRM context",
     SEARCHING_COMPANY_KNOWLEDGE: "Searching company knowledge",
-    RETRIEVING_RAG_EVIDENCE: "Retrieving RAG evidence",
+    RETRIEVING_RAG_EVIDENCE: "Finding cited sources",
     SEARCHING_THE_WEB: "Searching the web",
     DRAFTING_EMAIL: "Drafting email",
     READING_CALENDAR: "Reading calendar",

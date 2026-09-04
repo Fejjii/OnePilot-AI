@@ -37,8 +37,8 @@ export function LandingFooter() {
                 </a>
               </li>
               <li>
-                <a href="#architecture" className="text-slate-600 hover:text-slate-900">
-                  Architecture
+                <a href="#whats-real" className="text-slate-600 hover:text-slate-900">
+                  What&apos;s real
                 </a>
               </li>
             </ul>

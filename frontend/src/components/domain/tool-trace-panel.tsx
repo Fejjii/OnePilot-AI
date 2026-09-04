@@ -37,32 +37,37 @@ export function ToolTracePanel({
 
   return (
     <div className="space-y-4" data-testid="execution-trace">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-slate-500">Trace mode:</span>
-          <span
-            className={
-              "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide " +
-              (traceMode === "langsmith"
-                ? "bg-indigo-100 text-indigo-700"
-                : "bg-slate-100 text-slate-700")
-            }
-          >
-            {traceMode === "langsmith" ? "LangSmith" : "Local"}
-          </span>
+      <details className="rounded-md border border-slate-200 bg-white px-3 py-2">
+        <summary className="cursor-pointer select-none text-xs font-medium text-slate-800">
+          Engineering details
+        </summary>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-slate-500">Trace mode:</span>
+            <span
+              className={
+                "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide " +
+                (traceMode === "langsmith"
+                  ? "bg-indigo-100 text-indigo-700"
+                  : "bg-slate-100 text-slate-700")
+              }
+            >
+              {traceMode === "langsmith" ? "LangSmith" : "Local"}
+            </span>
+          </div>
+          {traceMode === "langsmith" && traceUrl && (
+            <a
+              href={traceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100"
+            >
+              <ExternalLink className="h-3 w-3" />
+              Open LangSmith trace
+            </a>
+          )}
         </div>
-        {traceMode === "langsmith" && traceUrl && (
-          <a
-            href={traceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100"
-          >
-            <ExternalLink className="h-3 w-3" />
-            Open LangSmith trace
-          </a>
-        )}
-      </div>
+      </details>
 
       {hasSteps && (
         <div>

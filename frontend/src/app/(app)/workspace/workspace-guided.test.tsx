@@ -185,8 +185,38 @@ describe("WorkspacePage guided experience", () => {
     await user.click(chip);
 
     await waitFor(() => {
-      expect(capturedBody?.message).toBe("Show my meetings this week.");
+    expect(capturedBody?.message).toBe("Show my meetings this week.");
+  });
+
+  it("submits the availability prompt from the starter chip", async () => {
+    let capturedBody: Record<string, unknown> | null = null;
+    restoreFetch = installFetchMock([
+      CONV_NEW_DETAIL,
+      EMPTY_CONVERSATIONS,
+      {
+        method: "POST",
+        url: "/chat",
+        response: ({ body }) => {
+          capturedBody = body as Record<string, unknown>;
+          return { body: CHAT_RESPONSE };
+        },
+      },
+    ]);
+
+    const user = userEvent.setup();
+    renderWithProviders(<WorkspacePage />);
+
+    const chip = await screen.findByRole("button", {
+      name: "Find open meeting times",
     });
+    await user.click(chip);
+
+    await waitFor(() => {
+      expect(capturedBody?.message).toBe(
+        "Check my calendar availability for a 30-minute intro call this week.",
+      );
+    });
+  });
   });
 
   it("supports keyboard activation of prompt chips", async () => {
