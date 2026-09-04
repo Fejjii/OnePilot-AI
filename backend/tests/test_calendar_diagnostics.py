@@ -36,8 +36,9 @@ class TestCalendarScopeDiagnostics:
         }
         text = format_availability_response(raw)
         assert "No open slots" not in text
-        assert "unhealthy" in text.lower()
-        assert "diagnostics" in text.lower()
+        assert "couldn't check availability" in text.lower()
+        assert "unhealthy" not in text.lower()
+        assert "diagnostics" not in text.lower()
 
 
 class TestGoogleCalendarProviderStatus:

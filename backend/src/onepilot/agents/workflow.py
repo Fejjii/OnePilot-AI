@@ -56,7 +56,12 @@ from onepilot.services import (
     gmail_service,
     memory_service,
 )
-from onepilot.services.calendar_format import format_availability_response, format_suggestion_response
+from onepilot.services.calendar_format import (
+    format_availability_response,
+    format_meetings_response,
+    format_proposal_response,
+    format_suggestion_response,
+)
 from onepilot.tools import registry as _tools_bootstrap  # noqa: F401  ensures tool registration
 from onepilot.schemas.web_search import WebSearchCitation, WebSearchResponse
 from onepilot.services import web_synthesis
@@ -909,7 +914,7 @@ def _branch_to_tool_name(branch: str) -> str:
         "web_search": "external.web_search",
         "web_and_knowledge": "external.web_search",
         "email_assistant": "email.draft",
-        "calendar_assistant": "calendar.check_availability",
+        "calendar_assistant": "calendar.list_events",
         "calendar_and_email": "calendar.create_event_request",
         "compound_workflow": "external.web_search",
         "workspace_insights": "workspace.insights",
@@ -989,23 +994,16 @@ def _format_email(draft: dict, tool_output: dict | None = None) -> str:
 
 def _format_calendar_output(result: ToolResult) -> str:
     output = result.output if isinstance(result.output, dict) else {}
+    if result.tool_name == "calendar.list_events":
+        return format_meetings_response(output)
+
     if result.tool_name == "calendar.check_availability":
         return format_availability_response(output)
 
     if result.tool_name == "calendar.suggest_slots":
         return format_suggestion_response(output)
 
-    payload = output.get("approval_payload") or {}
-    slot = output.get("selected_slot") or {}
-    lines = [
-        f"Title: {payload.get('summary', 'Meeting')}",
-        f"Date and time: {slot.get('start_time')} – {slot.get('end_time')}",
-        f"Timezone: {payload.get('timezone')}",
-        f"Approval status: {output.get('approval_status', 'pending')}",
-        f"Provider mode: {output.get('provider_mode', output.get('mode'))}",
-        "Next action: Review and approve to create the calendar event.",
-    ]
-    return "\n".join(lines)
+    return format_proposal_response(output)
 
 
 def _format_lead(lead: dict) -> str:

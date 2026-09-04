@@ -196,6 +196,7 @@ class GoogleCalendarProvider(CalendarProvider):
             scope_check_ok=self._scope_check_ok,
             capabilities={
                 "availability_check": ok,
+                "list_events": ok,
                 "suggest_slots": ok,
                 "create_event": self._create_enabled and ok,
                 "requires_approval_for_create": True,
@@ -265,6 +266,7 @@ class GoogleCalendarProvider(CalendarProvider):
         items: list[dict],
         *,
         default_timezone: str,
+        include_details: bool = False,
     ) -> list[CalendarEvent]:
         events: list[CalendarEvent] = []
 
@@ -279,14 +281,34 @@ class GoogleCalendarProvider(CalendarProvider):
             events.append(
                 CalendarEvent(
                     id=str(item.get("id", "")),
-                    summary="Busy",
+                    summary=str(item.get("summary") or "Meeting")[:200]
+                    if include_details
+                    else "Busy",
                     start_time=start,
                     end_time=end,
-                    attendees=[],
+                    attendees=self._attendee_labels(item) if include_details else [],
+                    location=str(item.get("location") or "").strip() or None
+                    if include_details
+                    else None,
                 )
             )
 
         return events
+
+    @staticmethod
+    def _attendee_labels(item: dict) -> list[str]:
+        labels: list[str] = []
+        for row in item.get("attendees") or []:
+            if not isinstance(row, dict):
+                continue
+            name = str(row.get("displayName") or "").strip()
+            if name:
+                labels.append(name)
+                continue
+            email = str(row.get("email") or "").strip()
+            if email and "@" in email:
+                labels.append(email.split("@", 1)[0].replace(".", " ").replace("_", " ").title())
+        return labels[:10]
 
     def _fetch_selected_calendar_ids(self) -> list[str]:
         data = self._api_request("GET", "/users/me/calendarList", params={"maxResults": 50})
@@ -317,6 +339,7 @@ class GoogleCalendarProvider(CalendarProvider):
         time_max: datetime,
         *,
         timezone: str,
+        include_details: bool = False,
     ) -> list[dict]:
         encoded = quote(cal_id, safe="@._-")
         params = {
@@ -331,7 +354,9 @@ class GoogleCalendarProvider(CalendarProvider):
         data = self._api_request("GET", f"/calendars/{encoded}/events", params=params)
         items = data.get("items") or []
         raw_items = items if isinstance(items, list) else []
-        return self._normalize_events(raw_items, default_timezone=timezone)
+        return self._normalize_events(
+            raw_items, default_timezone=timezone, include_details=include_details
+        )
 
     def list_events(
         self,
@@ -347,7 +372,11 @@ class GoogleCalendarProvider(CalendarProvider):
         for cal_id in calendar_ids:
             try:
                 for event in self._list_events_for_calendar(
-                    cal_id, time_min, time_max, timezone=timezone
+                    cal_id,
+                    time_min,
+                    time_max,
+                    timezone=timezone,
+                    include_details=True,
                 ):
                     merged[event.id] = event
             except ProviderUnavailableError:
@@ -364,7 +393,8 @@ class GoogleCalendarProvider(CalendarProvider):
                 "summary": event.summary,
                 "start": event.start_time.isoformat(),
                 "end": event.end_time.isoformat(),
-                "attendees": [],
+                "attendees": event.attendees,
+                "location": event.location,
             }
             for event in merged.values()
         ]

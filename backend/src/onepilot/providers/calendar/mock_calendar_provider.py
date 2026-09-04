@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from onepilot.providers.calendar.base import CalendarProvider
 from onepilot.providers.calendar.slot_utils import (
@@ -14,6 +15,14 @@ from onepilot.schemas.calendar import (
     CalendarEvent,
     CalendarProviderStatus,
     CalendarSlotSuggestionResult,
+)
+
+# Weekday-relative demo meetings (Monday=0). Times are local wall-clock.
+_DEMO_MEETING_TEMPLATES: tuple[tuple[int, int, int, int, str, tuple[str, ...], str | None], ...] = (
+    (0, 10, 0, 30, "Discovery call with Sarah Chen", ("Sarah Chen",), "Brightline Analytics"),
+    (1, 14, 0, 45, "Proposal review with Marcus Webb", ("Marcus Webb",), "Northwind Legal"),
+    (2, 11, 0, 30, "Product demo with Elena Rossi", ("Elena Rossi",), "Helio Commerce"),
+    (3, 9, 30, 30, "Internal pipeline review", ("NovaEdge sales",), None),
 )
 
 
@@ -36,34 +45,64 @@ class MockCalendarProvider(CalendarProvider):
             scope_check_ok=None,
             capabilities={
                 "availability_check": True,
+                "list_events": True,
                 "suggest_slots": True,
                 "create_event": True,
                 "requires_approval_for_create": True,
             },
         )
 
-    def _seed_busy_block(self, time_min: datetime, time_max: datetime) -> None:
-        """Insert a deterministic busy block on the second weekday afternoon."""
-        midpoint = time_min + (time_max - time_min) / 2
-        busy_start = midpoint.replace(hour=14, minute=0, second=0, microsecond=0)
-        busy_end = busy_start + timedelta(hours=1)
-        event_id = "evt_mock_busy_01"
-        if event_id not in self._events:
-            self._events[event_id] = {
-                "id": event_id,
-                "summary": "Mock internal sync",
-                "start": busy_start,
-                "end": busy_end,
-                "attendees": [],
-            }
+    def _seed_demo_meetings(
+        self,
+        time_min: datetime,
+        time_max: datetime,
+        *,
+        timezone: str = "Europe/Berlin",
+    ) -> None:
+        """Insert a realistic, deterministic week of recruiter-facing meetings."""
+        tz = ZoneInfo(timezone)
+        start_aware = time_min.replace(tzinfo=UTC) if time_min.tzinfo is None else time_min
+        end_aware = time_max.replace(tzinfo=UTC) if time_max.tzinfo is None else time_max
+        start_local = start_aware.astimezone(tz)
+        end_local = end_aware.astimezone(tz)
+        week_monday = start_local.date() - timedelta(days=start_local.weekday())
+        last_date = end_local.date()
+        cursor = week_monday
+        while cursor <= last_date:
+            for weekday, hour, minute, duration, summary, attendees, company in (
+                _DEMO_MEETING_TEMPLATES
+            ):
+                day = cursor + timedelta(days=weekday)
+                event_id = f"evt_demo_{day.isoformat()}_{hour:02d}{minute:02d}"
+                start = datetime(day.year, day.month, day.day, hour, minute, tzinfo=tz)
+                end = start + timedelta(minutes=duration)
+                start_utc = start.astimezone(UTC).replace(tzinfo=None)
+                end_utc = end.astimezone(UTC).replace(tzinfo=None)
+                if start_utc < time_max and end_utc > time_min and event_id not in self._events:
+                    self._events[event_id] = {
+                        "id": event_id,
+                        "summary": summary,
+                        "start": start_utc,
+                        "end": end_utc,
+                        "attendees": list(attendees),
+                        "company": company,
+                    }
+            cursor += timedelta(days=7)
 
-    def _busy_events(self, time_min: datetime, time_max: datetime) -> list[CalendarEvent]:
-        self._seed_busy_block(time_min, time_max)
+    def _busy_events(
+        self,
+        time_min: datetime,
+        time_max: datetime,
+        *,
+        timezone: str = "Europe/Berlin",
+    ) -> list[CalendarEvent]:
+        self._seed_demo_meetings(time_min, time_max, timezone=timezone)
         events: list[CalendarEvent] = []
         for raw in self._events.values():
             start = raw["start"]
             end = raw["end"]
             if start < time_max and end > time_min:
+                company = raw.get("company")
                 events.append(
                     CalendarEvent(
                         id=str(raw["id"]),
@@ -71,8 +110,10 @@ class MockCalendarProvider(CalendarProvider):
                         start_time=start,
                         end_time=end,
                         attendees=list(raw.get("attendees") or []),
+                        company=str(company) if company else None,
                     )
                 )
+        events.sort(key=lambda event: event.start_time)
         return events
 
     def list_events(
@@ -89,6 +130,7 @@ class MockCalendarProvider(CalendarProvider):
                 "start": event.start_time.isoformat(),
                 "end": event.end_time.isoformat(),
                 "attendees": event.attendees,
+                "company": event.company,
             }
             for event in self._busy_events(time_min, time_max)
         ]
@@ -105,7 +147,7 @@ class MockCalendarProvider(CalendarProvider):
         calendar_id: str | None = None,
         query_type: str = "range",
     ) -> dict:
-        busy = self._busy_events(time_min, time_max)
+        busy = self._busy_events(time_min, time_max, timezone=timezone)
         slots = build_available_slots(
             time_min,
             time_max,
@@ -138,7 +180,7 @@ class MockCalendarProvider(CalendarProvider):
         workday_end: str,
         calendar_id: str | None = None,
     ) -> dict:
-        busy = self._busy_events(time_min, time_max)
+        busy = self._busy_events(time_min, time_max, timezone=timezone)
         available = build_available_slots(
             time_min,
             time_max,

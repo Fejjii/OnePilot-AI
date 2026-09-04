@@ -34,7 +34,7 @@ STARTER_PROMPTS: list[tuple[str, Intent, str]] = [
         "email_assistant",
     ),
     (
-        "What meetings are on the calendar this week?",
+        "Show my meetings this week.",
         Intent.CALENDAR_AVAILABILITY,
         "calendar_assistant",
     ),

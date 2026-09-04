@@ -322,10 +322,11 @@ _WORKFLOW_PATTERNS = [
             r"|\b(approve|reject).*(request|action|proposal)"
             r"|\b(summarize|key points).*(document|report|this)"
             r"|\b(am i free|are we free|check (my )?(calendar )?availability"
-            r"|free tomorrow|busy tomorrow)"
+            r"|free tomorrow|busy tomorrow|open (time )?slots?"
+            r"|find (an? )?(open|available|free))"
             r"|\b(suggest|propose|offer|recommend).*(slot|time|times|meeting)\b"
             r"|\b(on the calendar|calendar this week|what meetings|check my calendar"
-            r"|meetings (are |on ))\b",
+            r"|meetings (are |on )|show (me )?(my )?(upcoming )?meetings)\b",
             re.IGNORECASE,
         ),
         3.0,

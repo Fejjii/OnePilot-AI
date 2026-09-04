@@ -426,7 +426,7 @@ export default function LandingPage() {
                   {[
                     "Ask the agent about company policies and get cited answers",
                     "Draft a customer email and watch it stop at the approval gate",
-                    "Check calendar availability with the simulated provider",
+                    "Review this week's meetings — nothing is booked on a live calendar",
                   ].map((item) => (
                     <li
                       key={item}

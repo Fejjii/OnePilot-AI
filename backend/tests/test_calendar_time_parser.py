@@ -49,6 +49,20 @@ class TestCalendarTimeParser:
         assert parsed.label == "next week"
         assert (parsed.time_max - parsed.time_min).days >= 4
 
+    def test_this_week_range(self) -> None:
+        parsed = parse_calendar_window(
+            "Show my meetings this week.",
+            timezone="Europe/Berlin",
+            lookahead_days=14,
+            slot_duration_minutes=30,
+            reference=_REF,
+        )
+        assert parsed.label == "this week"
+        assert parsed.query_type == "range"
+        # Wednesday 20 May 2026 → week starts Monday 18 May
+        assert parsed.time_min.day == 17 or parsed.time_min.day == 18
+        assert (parsed.time_max - parsed.time_min).days == 7
+
     def test_tomorrow_at_3pm_berlin_specific(self) -> None:
         parsed = parse_calendar_window(
             "Schedule a 30 minute meeting demo call tomorrow at 3 p.m.",

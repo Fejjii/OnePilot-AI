@@ -27,6 +27,19 @@ describe("execution-trace", () => {
     expect(mapped.every((step) => step.detail == null)).toBe(true);
   });
 
+  it("maps calendar tools to recruiter-facing steps", () => {
+    const mapped = mapInternalTraceSteps([
+      { step: "execute_tool:calendar.list_events", duration_ms: 5 },
+      { step: "execute_tool:calendar.check_availability", duration_ms: 6 },
+      { step: "execute_tool:calendar.create_event_request", duration_ms: 7 },
+    ]);
+    expect(mapped.map((step) => step.label)).toEqual([
+      "Reading calendar",
+      "Checking availability",
+      "Preparing meeting",
+    ]);
+  });
+
   it("drops unknown or unsafe persisted traces", () => {
     const safe = sanitizeExecutionTrace([
       {
@@ -79,6 +92,7 @@ describe("execution-trace", () => {
   it("labels tools without leaking identifiers", () => {
     expect(toolBadgeLabel("rag.answer")).toBe("Knowledge");
     expect(toolBadgeLabel("calendar.create_event_request")).toBe("Calendar");
+    expect(toolBadgeLabel("calendar.list_events")).toBe("Calendar");
     expect(toolBadgeLabel("mystery.tool")).toBe("Tool");
     expect(
       uniqueToolLabels([

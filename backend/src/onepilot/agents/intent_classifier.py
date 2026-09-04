@@ -121,12 +121,14 @@ _EMAIL_DRAFT_BLOCK = re.compile(
 _CALENDAR_AVAILABILITY_PATTERNS = [
     re.compile(
         r"\b(am i free|are we free|check (my )?(calendar )?availability|availability|"
+        r"open (time )?slots?|find (an? )?(open|available|free)|"
         r"busy tomorrow|free tomorrow|free next)\b",
         re.IGNORECASE,
     ),
     re.compile(
         r"\b(on the calendar|calendar this week|what meetings|check my calendar|"
-        r"meetings (are |on )|what's on (my |the )?calendar)\b",
+        r"meetings (are |on )|what's on (my |the )?calendar|"
+        r"show (me )?(my )?(upcoming )?meetings|upcoming meetings)\b",
         re.IGNORECASE,
     ),
 ]

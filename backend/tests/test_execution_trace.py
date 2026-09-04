@@ -7,6 +7,8 @@ from onepilot.schemas.chat import ToolCallTrace, TraceStep
 from onepilot.services.execution_trace import (
     CREATING_APPROVAL,
     DRAFTING_EMAIL,
+    PREPARING_MEETING,
+    READING_CALENDAR,
     READING_CRM_CONTEXT,
     RETRIEVING_RAG_EVIDENCE,
     SAFETY_CHECK,
@@ -89,6 +91,7 @@ def test_compound_nodes_expand_from_tool_calls() -> None:
         "Understanding request",
         "Searching the web",
         "Drafting email",
+        "Preparing meeting",
         "Creating approval",
     ]
 
@@ -140,6 +143,40 @@ def test_sanitize_tool_calls_replaces_query_text() -> None:
     assert sanitized[0].output_summary == "Retrieved knowledge evidence"
     assert "JWT" not in sanitized[0].input_summary
     assert "gpt-5-nano" not in sanitized[0].output_summary
+
+
+def test_calendar_list_and_schedule_trace_labels() -> None:
+    listed = build_execution_trace(
+        trace_steps=[
+            TraceStep(step="classify_intent"),
+            TraceStep(step="execute_tool:calendar.list_events"),
+        ]
+    )
+    assert [step.label for step in listed] == [
+        "Understanding request",
+        "Reading calendar",
+    ]
+    assert listed[1].key == READING_CALENDAR
+
+    scheduled = build_execution_trace(
+        trace_steps=[
+            TraceStep(step="classify_intent"),
+            TraceStep(step="execute_tool:calendar.create_event_request"),
+        ],
+        approval_required=True,
+    )
+    assert [step.label for step in scheduled] == [
+        "Understanding request",
+        "Preparing meeting",
+        "Creating approval",
+    ]
+    assert scheduled[1].key == PREPARING_MEETING
+    assert scheduled[2].key == CREATING_APPROVAL
+
+    available = build_execution_trace(
+        trace_steps=[TraceStep(step="execute_tool:calendar.check_availability")]
+    )
+    assert available[0].label == "Checking availability"
 
 
 def test_tool_label_covers_calendar_family() -> None:

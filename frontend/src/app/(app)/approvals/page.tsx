@@ -235,13 +235,6 @@ function ApprovalDetail({ approval, isAdmin, onClear }: ApprovalDetailProps) {
               <p className="mt-1">
                 Status:{" "}
                 <span className="font-medium">{execution.status ?? "—"}</span>
-                {execution.mode && (
-                  <>
-                    {" "}
-                    · Provider mode:{" "}
-                    <span className="font-medium">{execution.mode}</span>
-                  </>
-                )}
               </p>
               {execution.draft_id && (
                 <p className="mt-1 font-mono text-[11px]">
@@ -423,7 +416,6 @@ function CalendarApprovalSummary({
   const attendeeDisplay = Array.isArray(attendees)
     ? attendees.join(", ")
     : undefined;
-  const providerMode = payload.provider_mode as string | undefined;
 
   if (!summary && !startTime && !endTime) return null;
 
@@ -459,9 +451,6 @@ function CalendarApprovalSummary({
         <p className="max-h-32 overflow-auto whitespace-pre-wrap text-xs leading-relaxed text-slate-700">
           {description}
         </p>
-      )}
-      {providerMode && (
-        <p className="text-[11px] text-slate-500">Provider mode: {providerMode}</p>
       )}
     </section>
   );

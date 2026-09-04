@@ -11,6 +11,7 @@ from onepilot.tools.base import Tool, ToolContext, ToolResult
 from onepilot.tools.calendar_tool import (
     CalendarCheckAvailabilityTool,
     CalendarCreateEventRequestTool,
+    CalendarListEventsTool,
     CalendarSuggestSlotsTool,
 )
 from onepilot.tools.email_tool import EmailDraftTool
@@ -27,6 +28,7 @@ def _bootstrap() -> None:
         RAGTool(),
         WebSearchTool(),
         EmailDraftTool(),
+        CalendarListEventsTool(),
         CalendarCheckAvailabilityTool(),
         CalendarSuggestSlotsTool(),
         CalendarCreateEventRequestTool(),
@@ -43,6 +45,7 @@ _bootstrap()
 __all__ = [
     "CalendarCheckAvailabilityTool",
     "CalendarCreateEventRequestTool",
+    "CalendarListEventsTool",
     "CalendarSuggestSlotsTool",
     "EmailDraftTool",
     "GeneralChatTool",

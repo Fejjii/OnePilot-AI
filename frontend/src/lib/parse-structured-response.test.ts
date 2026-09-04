@@ -39,19 +39,48 @@ describe("parseStructuredResponse", () => {
     const parsed = parseStructuredResponse(
       [
         "Title: Demo call",
-        "Date and time: 2026-06-13T15:00:00 – 2026-06-13T15:30:00",
+        "Date and time: Friday, 13 June, 15:00 to 15:30",
         "Timezone: Europe/Berlin",
         "Approval status: pending",
-        "Provider mode: live",
-        "Next action: Review and approve to create the calendar event.",
+        "Next action: Review and approve to create this meeting.",
+        "This meeting will be created only after you approve it.",
       ].join("\n"),
     );
     expect(parsed.kind).toBe("meeting-proposal");
     if (parsed.kind !== "meeting-proposal") return;
     expect(parsed.proposal.title).toBe("Demo call");
-    expect(parsed.proposal.startTime).toContain("15:00:00");
+    expect(parsed.proposal.startTime).toContain("15:00");
     expect(parsed.proposal.timezone).toBe("Europe/Berlin");
     expect(parsed.proposal.approvalStatus).toBe("pending");
+    expect(parsed.proposal).not.toHaveProperty("providerMode");
+  });
+
+  it("parses upcoming meetings separately from available slots", () => {
+    const meetings = parseStructuredResponse(
+      [
+        "Upcoming meetings this week:",
+        "1. Discovery call with Sarah Chen — Friday, 5 September, 10:00 to 10:30",
+        "   Sarah Chen · Brightline Analytics",
+        "Times shown in Europe/Berlin.",
+      ].join("\n"),
+    );
+    expect(meetings.kind).toBe("meetings-list");
+    if (meetings.kind !== "meetings-list") return;
+    expect(meetings.list.items[0]?.title).toContain("Sarah Chen");
+    expect(meetings.list.items[0]?.detail).toContain("Brightline Analytics");
+
+    const slots = parseStructuredResponse(
+      [
+        "Available time slots:",
+        "These are open times, not existing meetings.",
+        "1. Friday, 5 September, 09:00 to 09:30",
+        "Times shown in Europe/Berlin.",
+      ].join("\n"),
+    );
+    expect(slots.kind).toBe("availability-slots");
+    if (slots.kind !== "availability-slots") return;
+    expect(slots.list.notice).toMatch(/open times/i);
+    expect(slots.list.items[0]?.title).toContain("Friday");
   });
 
   it("parses email drafts without markdown headings", () => {

@@ -22,6 +22,8 @@ from onepilot.schemas.calendar import (
     CalendarAvailabilityRequest,
     CalendarCreateEventRequest,
     CalendarCreateEventResult,
+    CalendarEvent,
+    CalendarEventsResult,
     CalendarSlotSuggestionRequest,
 )
 from onepilot.security.auth import Principal
@@ -29,38 +31,75 @@ from onepilot.services import audit_service, usage_service
 
 log = get_logger(__name__)
 
+_LIST_EVENTS_INTENT = re.compile(
+    r"\b("
+    r"show (me )?(my )?(upcoming )?meetings"
+    r"|list (my )?(upcoming )?meetings"
+    r"|what meetings"
+    r"|meetings (are |on )"
+    r"|on the calendar"
+    r"|calendar this week"
+    r"|check my calendar"
+    r"|what'?s on (my |the )?calendar"
+    r"|upcoming meetings"
+    r"|my (upcoming )?meetings"
+    r")\b",
+    re.IGNORECASE,
+)
 _AVAILABILITY_INTENT = re.compile(
-    r"\b(am i free|are we free|availability|available|busy|free tomorrow|free next|"
-    r"on the calendar|calendar this week|what meetings|check my calendar|"
-    r"meetings (are |on ))\b",
+    r"\b("
+    r"am i free|are we free"
+    r"|check (my )?(calendar )?availability"
+    r"|availability|available"
+    r"|open (time )?slots?"
+    r"|find (an? )?(open|available|free)"
+    r"|when am i free"
+    r"|busy tomorrow|free tomorrow|free next|free this"
+    r")\b",
     re.IGNORECASE,
 )
 _SUGGEST_SLOTS_INTENT = re.compile(
-    r"\b(suggest|propose|offer|recommend).{0,30}\b(slot|time|times)\b",
+    r"\b(suggest|propose|offer|recommend).{0,40}\b(slots?|times?)\b",
     re.IGNORECASE,
 )
 _SCHEDULE_INTENT = re.compile(
     r"\b(schedule|book a|book (the|an?)|set up a|create a).{0,40}\b(meeting|call|appointment)\b",
     re.IGNORECASE,
 )
+_CALENDAR_TOOLS = frozenset(
+    {"list_events", "check_availability", "suggest_slots", "create_event_request"}
+)
 _DURATION_MINUTES = re.compile(r"\b(\d{1,3})\s*(?:minute|min)\b", re.IGNORECASE)
 _MAX_SLOTS = re.compile(r"\b(\d{1,2})\s+(?:meeting )?slots?\b", re.IGNORECASE)
 
 
 def infer_calendar_tool(message: str, context: dict | None = None) -> str:
-    """Return tool name suffix: check_availability, suggest_slots, or create_event_request."""
+    """Return list_events, check_availability, suggest_slots, or create_event_request."""
     ctx = context or {}
     explicit = ctx.get("calendar_tool")
-    if explicit in {"check_availability", "suggest_slots", "create_event_request"}:
+    if explicit in _CALENDAR_TOOLS:
         return str(explicit)
 
-    if _SUGGEST_SLOTS_INTENT.search(message):
-        return "suggest_slots"
-    if _AVAILABILITY_INTENT.search(message) and not _SCHEDULE_INTENT.search(message):
-        return "check_availability"
-    if _SCHEDULE_INTENT.search(message):
+    schedule_hit = bool(_SCHEDULE_INTENT.search(message))
+    list_hit = bool(_LIST_EVENTS_INTENT.search(message))
+    availability_hit = bool(_AVAILABILITY_INTENT.search(message))
+    suggest_hit = bool(_SUGGEST_SLOTS_INTENT.search(message))
+
+    if schedule_hit:
         return "create_event_request"
-    return "suggest_slots"
+    if suggest_hit and not list_hit:
+        return "suggest_slots"
+    if availability_hit and not list_hit:
+        return "check_availability"
+    if list_hit and availability_hit:
+        return "check_availability"
+    if list_hit:
+        return "list_events"
+    if availability_hit:
+        return "check_availability"
+    if suggest_hit:
+        return "suggest_slots"
+    return "list_events"
 
 
 def resolve_approval_action_type() -> str:
@@ -217,6 +256,75 @@ def get_availability(
         result=raw,
     )
     return raw
+
+
+def list_events(
+    session: Session,
+    *,
+    principal: Principal,
+    message: str,
+    context: dict | None = None,
+    settings: Settings | None = None,
+) -> dict:
+    cfg = settings or get_settings()
+    time_min, time_max, query_type, window_label = _parse_time_window(message, cfg)
+    timezone = _default_timezone(cfg)
+    provider = get_calendar_provider(cfg)
+    raw_events = provider.list_events(
+        time_min,
+        time_max,
+        calendar_id=cfg.GOOGLE_CALENDAR_ID or "primary",
+    )
+    events = [_event_from_provider_row(row, timezone=timezone) for row in raw_events]
+    result = CalendarEventsResult(
+        mode=_resolve_calendar_provider_mode(provider),
+        timezone=timezone,
+        events=events,
+        fallback_used=isinstance(provider, MockCalendarProvider),
+    )
+    payload = result.model_dump(mode="json")
+    payload["query_type"] = query_type
+    payload["window_label"] = window_label
+    payload["time_min"] = time_min.isoformat()
+    payload["time_max"] = time_max.isoformat()
+    _track_usage(
+        session,
+        principal,
+        UsageFeature.CALENDAR_LIST_EVENTS.value,
+        payload,
+        settings=cfg,
+    )
+    _record_audit(
+        session,
+        principal,
+        event="calendar.events_listed",
+        result={"status": payload.get("status"), "mode": payload.get("mode")},
+    )
+    return payload
+
+
+def _parse_event_datetime(value: object) -> datetime:
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=None) if value.tzinfo else value
+    text = str(value).replace("Z", "+00:00")
+    parsed = datetime.fromisoformat(text)
+    return parsed.replace(tzinfo=None) if parsed.tzinfo else parsed
+
+
+def _event_from_provider_row(row: dict, *, timezone: str) -> CalendarEvent:
+    start_raw = row.get("start_time") or row.get("start")
+    end_raw = row.get("end_time") or row.get("end")
+    company = row.get("company")
+    return CalendarEvent(
+        id=str(row.get("id", "")),
+        summary=str(row.get("summary") or "Meeting"),
+        start_time=_parse_event_datetime(start_raw),
+        end_time=_parse_event_datetime(end_raw),
+        timezone=timezone,
+        attendees=[str(item) for item in (row.get("attendees") or []) if str(item).strip()],
+        company=str(company).strip() if company else None,
+        location=str(row["location"]).strip() if row.get("location") else None,
+    )
 
 
 def suggest_slots(
