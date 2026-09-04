@@ -1,6 +1,6 @@
 # Cloud agent handoff (sanitized)
 
-Generated: 2026-09-03 22:11 UTC  
+Generated: 2026-09-04 10:17 UTC  
 Generator: Cloud agent (manual, sanitized; merged `origin/main` into `polish/op-031`; no local `HANDOFF.md`)
 
 This file is the **only** committed project-state brief for Cursor Cloud / phone agents.
@@ -21,7 +21,7 @@ It is intentionally smaller than any local `HANDOFF.md` and contains **no secret
 
 | Ref | SHA | Notes |
 |-----|-----|-------|
-| `origin/main` (canonical) | `cd51a901242873c3357d89af3b174bd5090541d7` | Includes PR #25 (OP-028 CRM-grounded email) |
+| `origin/main` (canonical) | `ee043038d96ff08b406387f584df973bbeede747` | Includes PR #25 (OP-028) and PR #27 (handoff: OP-028 complete) |
 | `origin/deployment/public-demo` | `1c3dd0172250891d71f89c21a4a57e6002a5119d` | Thin deploy pointer; **behind `main`**. Do not fast-forward |
 | `origin/deployment/live-google-demo` | `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332` | Private live-Google pointer; **do not modify** |
 | `polish/op-031` (this work) | see latest commit on that branch | OP-031 PR #26 into `main`; do not merge unless asked |
@@ -46,7 +46,7 @@ It is intentionally smaller than any local `HANDOFF.md` and contains **no secret
 
 - **OP-031** implemented on `polish/op-031` (PR #26). Awaits review; do not merge unless asked.
 - OP-028 is on `main` (PR #25): tenant-scoped CRM lead resolution, no invented customer facts, no `[recipient]` / `[relevant outcome]` placeholders, HITL approval still required, public Gmail mock/send-disabled.
-- Public infrastructure is essentially complete (OP-026 COMPLETE; public demo Qdrant cleaned).
+- Public infrastructure is essentially complete (OP-026 COMPLETE; public demo Qdrant cleaned). Public demo deploy pointer is still behind `main`.
 - Recruiter-facing public demo polish continues after OP-031 (wording, checklist alignment) when the operator names the next item.
 - Private live-Google demo remains a later user-gated track (Cloud must not assume OAuth or live Google access).
 - Product work belongs on a feature/fix branch off `main`, never on a deployment branch.
@@ -74,7 +74,7 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 ## Tests / status
 
 - OP-031 validation: backend **765 passed, 3 skipped**; frontend **155 passed**; `pnpm typecheck` and `pnpm build` passed.
-- OP-028 on `main` (PR #25): CRM-email grounding plus email/Gmail/approval/workflow tests; CI green (backend 766 passed / 3 skipped; frontend 131 passed).
+- OP-028 CI on PR #25 was green (backend 766 passed / 3 skipped; frontend 131 passed).
 - Documented counts in README (2026-07-20): **703** backend tests (3 skipped), **126** frontend tests. Later merges added Qdrant/OpenAI/CRM-email/execution-trace coverage — trust current CI on `main` / PR #26.
 - CI (`.github/workflows/ci.yml`) runs backend pytest + frontend typecheck/tests/build on PRs to `main` and `deployment/**`.
 - Public-demo smoke: `python scripts/smoke_test_public_demo.py --base-url <public-api>` (never print tokens).
@@ -94,7 +94,7 @@ Cloud (and any agent) must **not** touch:
 
 ## Recommended next task
 
-After OP-031 is reviewed/merged: remaining recruiter-facing public-demo polish (copy, checklist alignment, starter-prompt vs CRM ranking) **or** a named item from the near-term list in `docs/limitations_roadmap.md` (HTTP-only cookie auth). Operator should name the next OP/task.
+After OP-031 is reviewed/merged: remaining recruiter-facing public-demo polish (copy, checklist alignment, starter-prompt vs CRM ranking) **or** a named item from the near-term list in `docs/limitations_roadmap.md` (HTTP-only cookie auth). Operator should name the next OP/task. Public-demo pointer stays behind `main` unless explicitly authorized.
 
 Do not re-run live Qdrant or modify deployment branches unless the operator explicitly authorizes that exact branch.
 
