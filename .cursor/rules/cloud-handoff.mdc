@@ -8,6 +8,8 @@ Read `docs/agent/CLOUD_HANDOFF.md` first on Cloud or phone sessions.
 - `main` is canonical. Product work uses a feature/fix branch and a PR into `main`.
 - Never modify `deployment/live-google-demo` or `deployment/public-demo` unless the operator explicitly authorizes that exact branch.
 - Never assume access to local stash, `.ai/`, `HANDOFF.md`, `CHANGELOG_SESSION.md`, iCloud, or `.env`.
+- Cloud must not write iCloud. GitHub (`agent/cloud-state`) is the report bridge.
 - Never print or commit secrets, JWTs, tokens, connection strings, or raw env values.
 - Do not touch live Qdrant, Railway, Vercel, production env, or OP-026.
 - Update `docs/agent/CLOUD_HANDOFF.md` before finishing when project state changed. The sync script does not auto-commit.
+- Before finishing a Cloud session, publish a sanitized agent report to `agent/cloud-state` when that infrastructure is available. Do not use a product PR merely to publish a runtime report.

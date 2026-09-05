@@ -204,8 +204,9 @@ Screenshot capture checklist: [docs/screenshots/](docs/screenshots/)
 | [Security](docs/security.md) | Auth, RBAC, guardrails |
 | [Evaluation](docs/evaluation.md) | Offline eval harness |
 | [Deployment](docs/deployment.md) | Docker / host runbooks |
-| [Cloud handoff](docs/agent/CLOUD_HANDOFF.md) | Sanitized Cloud/phone agent context |
+| [Cloud handoff](docs/agent/CLOUD_HANDOFF.md) | Sanitized Cloud/phone project-state context |
 | [Cloud workflow](docs/agent/CLOUD_WORKFLOW.md) | Local Mac ↔ phone Cloud Agent loop |
+| [Cloud agent reports](docs/agent/AGENT_REPORTS.md) | `agent/cloud-state` execution/result bridge |
 
 ---
 

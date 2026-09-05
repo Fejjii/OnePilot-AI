@@ -11,7 +11,8 @@
         docker-build docker-up docker-down docker-logs docker-migrate docker-seed \
         check-stack reset-demo \
         test lint \
-        sync-cloud-handoff scripts-test sync-handoffs
+        sync-cloud-handoff scripts-test sync-handoffs \
+        publish-agent-report import-agent-report
 
 # ── Default ───────────────────────────────────────────────────────────────────
 help: ## Show this help
@@ -88,10 +89,16 @@ lint: backend-lint frontend-lint ## Run all linters (backend + frontend)
 sync-cloud-handoff: ## Generate docs/agent/CLOUD_HANDOFF.md (does not commit or push)
 	python3 scripts/sync_cloud_handoff.py
 
-sync-handoffs: ## Local -> iCloud -> Cloud (does not commit or push)
+sync-handoffs: ## GitHub report -> local HANDOFF -> iCloud -> Cloud (does not commit or push)
 	bash scripts/sync_all_handoffs.sh
 
-scripts-test: ## Run sanitizer / fail-closed tests for the cloud-handoff script
+publish-agent-report: ## Validate/publish a sanitized report (set REPORT=path; does not default-push from make)
+	python3 scripts/publish_cloud_agent_report.py --input "$(REPORT)" --check
+
+import-agent-report: ## Import origin/agent/cloud-state report into local HANDOFF.md (does not commit)
+	python3 scripts/import_cloud_agent_report.py
+
+scripts-test: ## Run sanitizer / report-bridge / fail-closed tests
 	python3 -m pytest -q scripts/tests
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
