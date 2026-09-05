@@ -2,12 +2,15 @@
 set -euo pipefail
 
 # sync_all_handoffs.sh
-# Local -> iCloud -> Cloud (sanitized docs/agent/CLOUD_HANDOFF.md)
+# GitHub Cloud report -> local HANDOFF (generated section)
+#   -> iCloud HANDOFF -> sanitized docs/agent/CLOUD_HANDOFF.md
 #
 # Fail-closed + secret-safe:
 # - Never prints file contents.
 # - Never auto-commits or auto-pushes.
-# - Fails immediately if external sync or sanitization fails.
+# - Fails immediately if import is unsafe, external sync fails, or sanitization fails.
+# - Missing Cloud report is non-fatal (GitHub remains authoritative).
+# - Cloud cannot write iCloud; this Mac-side wrapper is the only import path.
 #
 # Environment overrides (intended for local dev + tests):
 # - SYNC_ONEPILOT_REPO_ROOT: override repository root (default: repo/.. relative to this script)
@@ -18,6 +21,9 @@ set -euo pipefail
 # - SYNC_CLOUD_HANDOFF_PYTHON_SCRIPT: override sanitizer script path (default: "$REPO_ROOT/scripts/sync_cloud_handoff.py")
 # - SYNC_CLOUD_HANDOFF_OUTPUT_PATH: override CLOUD_HANDOFF output path
 # - SYNC_CLOUD_HANDOFF_FETCH: "true" (default) or "false" (adds --no-fetch)
+# - SYNC_CLOUD_AGENT_REPORT_IMPORT: "true" (default) or "false"
+# - SYNC_CLOUD_AGENT_REPORT_SCRIPT: override importer script path
+# - SYNC_CLOUD_AGENT_REPORT_FETCH: "true" (default) or "false"
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="${SYNC_ONEPILOT_REPO_ROOT:-"$(cd -- "$SCRIPT_DIR/.." && pwd)"}"
@@ -32,6 +38,9 @@ SYNC_CMD="${SYNC_ONEPILOT_HANDOFF_CMD:-""}"
 
 SANITIZER_SCRIPT="${SYNC_CLOUD_HANDOFF_PYTHON_SCRIPT:-"$REPO_ROOT/scripts/sync_cloud_handoff.py"}"
 FETCH="${SYNC_CLOUD_HANDOFF_FETCH:-"true"}"
+IMPORT="${SYNC_CLOUD_AGENT_REPORT_IMPORT:-"true"}"
+IMPORT_SCRIPT="${SYNC_CLOUD_AGENT_REPORT_SCRIPT:-"$REPO_ROOT/scripts/import_cloud_agent_report.py"}"
+IMPORT_FETCH="${SYNC_CLOUD_AGENT_REPORT_FETCH:-"true"}"
 
 run_fail() {
   echo "error: $*" >&2
@@ -61,6 +70,19 @@ mtime_epoch_seconds() {
   # GNU stat: %Y = mtime as epoch seconds.
   stat -c %Y "$1" 2>/dev/null || true
 }
+
+if [[ "${IMPORT,,}" == "true" ]]; then
+  echo "sync: GitHub Cloud report -> local HANDOFF (generated section)"
+  [[ -f "$IMPORT_SCRIPT" ]] || run_fail "importer script not found: $IMPORT_SCRIPT"
+  IMPORT_ARGS=(
+    --repo-root "$REPO_ROOT"
+    --handoff "$LOCAL_HANDOFF_PATH"
+  )
+  if [[ "${IMPORT_FETCH,,}" == "false" ]]; then
+    IMPORT_ARGS+=(--no-fetch)
+  fi
+  python3 "$IMPORT_SCRIPT" "${IMPORT_ARGS[@]}"
+fi
 
 echo "sync: Local -> iCloud (external handoff sync)"
 

@@ -1,10 +1,14 @@
 # Cloud agent handoff (sanitized)
 
-Generated: 2026-09-04 19:20 UTC  
-Generator: Cloud agent (manual, sanitized; OP-032 recruiter polish on `polish/op-032-final-recruiter-polish`; no local `HANDOFF.md`)
+Generated: 2026-09-05 11:20 UTC  
+Generator: Cloud agent (manual, sanitized; reporting bridge on `infra/cloud-agent-report-bridge`; no local `HANDOFF.md`)
 
 This file is the **only** committed project-state brief for Cursor Cloud / phone agents.
 It is intentionally smaller than any local `HANDOFF.md` and contains **no secrets**.
+
+`CLOUD_HANDOFF.md` is project-state context. The latest Cloud execution/result
+lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md` after that ref is
+bootstrapped. Do not conflate the two.
 
 
 ## How to read this file
@@ -16,18 +20,21 @@ It is intentionally smaller than any local `HANDOFF.md` and contains **no secret
 | **Private live-demo** | `deployment/live-google-demo` (live Google OAuth track) | **No** unless the operator names that branch and authorizes the change |
 | **User-gated operations** | Railway / Vercel / Qdrant Cloud / production env vars | **No** — operator does this in host consoles |
 | **Local-only state** | `HANDOFF.md`, `.ai/`, `CHANGELOG_SESSION.md`, git stash, iCloud, local `.env` | **Invisible** to Cloud. Never assume it exists |
+| **Latest Cloud agent report** | `agent/cloud-state` → `docs/agent/LATEST_AGENT_REPORT.md` | Yes — last execution/result only. Not project state and not a product/deploy branch. Ref is not bootstrapped until after this infra PR merges |
 
 ## Canonical and deployment SHAs
 
 | Ref | SHA | Notes |
 |-----|-----|-------|
-| `origin/main` (canonical) | `bafc0557b78a4f937a282413eeb8a99624e824c8` | Includes PR #24 (OP-027/029), #25 (OP-028), #26 (OP-031), #28 (OP-030) |
-| `origin/deployment/public-demo` | `1c3dd0172250891d71f89c21a4a57e6002a5119d` | Thin deploy pointer; **behind `main`**. Do not fast-forward |
-| `origin/deployment/live-google-demo` | `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332` | Private live-Google pointer; **do not modify** |
-| `polish/op-032-final-recruiter-polish` (this work) | see latest commit on that branch | OP-032 PR into `main`; do not merge unless asked |
+| `origin/main` (canonical) | `b87e8ca4aa99c08c3d5d4205b9139eceb7cb2ea8` | Includes PR #29 (OP-032). Public release source |
+| `origin/deployment/public-demo` | `b87e8ca4aa99c08c3d5d4205b9139eceb7cb2ea8` | Matches `main` (thin deploy pointer). Public release succeeded |
+| `origin/deployment/live-google-demo` | `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332` | Private live-Google pointer; **untouched** |
+| `infra/cloud-agent-report-bridge` (this work) | see latest commit on that branch | Reporting infrastructure PR into `main`; do not merge unless asked |
 
 ## Completed
 
+- OP-032 — final recruiter-facing public-demo polish (merged to `main`, PR #29)
+- Public release of `deployment/public-demo` fast-forwarded to `main` at `b87e8ca4aa99c08c3d5d4205b9139eceb7cb2ea8` (succeeded)
 - OP-030 — recruiter-demo meetings vs availability polish (merged to `main`, PR #28)
 - OP-031 — persist/render safe recruiter-facing agent execution traces + complete intent/tool badges (merged to `main`, PR #26)
 - OP-028 — CRM-grounded email drafting + recruiter-facing approval copy (merged to `main`, PR #25)
@@ -45,12 +52,10 @@ It is intentionally smaller than any local `HANDOFF.md` and contains **no secret
 
 ## Current task / in progress
 
-- **OP-032** implemented on `polish/op-032-final-recruiter-polish`. Final recruiter-facing public-demo polish (landing copy, starter prompts, CRM ranking agreement, hidden technical IDs, evaluation wording, mobile overflow). Awaits review; do not merge unless asked.
-- OP-030 is on `main` (PR #28): meetings vs availability demo polish.
-- OP-031 is on `main` (PR #26): sanitized execution traces.
-- OP-028 is on `main` (PR #25): tenant-scoped CRM lead resolution, no invented customer facts, HITL approval still required, public Gmail mock/send-disabled.
-- Public infrastructure is essentially complete (OP-026 COMPLETE; public demo Qdrant cleaned). Public demo deploy pointer is still behind `main`.
-- Private live-Google demo remains a later user-gated track (Cloud must not assume OAuth or live Google access).
+- **Cloud agent report bridge** implemented on `infra/cloud-agent-report-bridge` and **not yet merged**. Adds sanitized Cloud → GitHub (`agent/cloud-state`) → Mac/iCloud import. `agent/cloud-state` is not bootstrapped in this PR.
+- OP-032 is merged to `main` (PR #29). `origin/main` and `origin/deployment/public-demo` are both `b87e8ca4aa99c08c3d5d4205b9139eceb7cb2ea8`. Public release succeeded.
+- `deployment/live-google-demo` remains untouched at `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332`.
+- Public infrastructure is essentially complete (OP-026 COMPLETE). Private live-Google demo remains a later user-gated track (Cloud must not assume OAuth or live Google access).
 - Product work belongs on a feature/fix branch off `main`, never on a deployment branch.
 
 ## Backlog
@@ -73,14 +78,15 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 - Public demo: Vercel frontend + Railway API/Postgres/Redis; Gmail/Calendar **mock**; shared-demo agent memory disabled.
 - Private live-Google track exists on `deployment/live-google-demo` and is **user-gated**. Cloud must not assume OAuth or live Google access.
 - Vectors: Qdrant when configured, in-memory fallback otherwise. Cloud must not target live Qdrant clusters.
+- Cloud execution reports (when the reporting ref exists) are public/sanitized and live only on `agent/cloud-state`. Cloud cannot write iCloud.
 
 ## Tests / status
 
-- OP-032 validation on this branch: backend **795 passed, 3 skipped**; frontend **167 passed**; `pnpm typecheck` and `pnpm build` passed; handoff sanitizer **21 passed**.
-- Documented counts in README (2026-07-20): **703** backend tests (3 skipped), **126** frontend tests. Later merges added Qdrant/OpenAI/CRM-email/execution-trace coverage.
-- CI (`.github/workflows/ci.yml`) runs backend pytest + frontend typecheck/tests/build on PRs to `main` and `deployment/**`.
+- Reporting-bridge validation on this branch: `python -m pytest -q scripts/tests` — **53 passed**.
+- Documented counts in README (2026-07-20): **703** backend tests (3 skipped), **126** frontend tests. Later merges added Qdrant/OpenAI/CRM-email/execution-trace/OP-032 coverage.
+- CI (`.github/workflows/ci.yml`) runs backend pytest + frontend typecheck/tests/build on PRs to `main` and `deployment/**`, plus `scripts/tests`.
 - Public-demo smoke: `python scripts/smoke_test_public_demo.py --base-url <public-api>` (never print tokens).
-- Cloud-handoff sync tests: `python -m pytest -q scripts/tests`
+- Cloud-handoff / report-bridge tests: `python -m pytest -q scripts/tests`
 
 ## Protected branches and do-not-touch
 
@@ -94,13 +100,15 @@ Cloud (and any agent) must **not** touch:
 
 `main` is canonical. All product changes go on a feature/fix branch, then a PR into `main`. Do not merge unless asked.
 
+`agent/cloud-state` is a reporting ref, not a product branch. Publish reports with `scripts/publish_cloud_agent_report.py` only. Never force-push.
+
 ## Recommended next task
 
-After OP-032 is reviewed/merged: operator-authorized fast-forward of `deployment/public-demo` to `main` for production deployment and acceptance testing. Do not touch that branch unless explicitly authorized. Private live-Google demo remains later and user-gated.
+After `infra/cloud-agent-report-bridge` is reviewed/merged: bootstrap `agent/cloud-state` once with `python scripts/publish_cloud_agent_report.py --bootstrap --input <sanitized-report.md>`. Do not create that ref during the infrastructure PR. Do not touch deployment branches unless explicitly authorized. Private live-Google demo remains later and user-gated.
 
 Do not re-run live Qdrant or modify deployment branches unless the operator explicitly authorizes that exact branch.
 
-Suggested model: the same Cloud-capable coding model used for OP-032, on a scoped feature/fix branch off `main`.
+Suggested model: a Cloud-capable coding model, on a scoped feature/fix branch off `main` for product work. Read-only audits publish only to `agent/cloud-state`.
 
 ## Local-only reminder
 
