@@ -447,7 +447,7 @@ function recruiterFacingReason(provider: ProviderDiagnostic): string | null {
       return "Calendar is simulated for this demo. Google Calendar is not connected.";
     }
   }
-  return provider.reason;
+  return provider.reason ?? null;
 }
 
 function ProviderCard({ provider }: { provider: ProviderDiagnostic }) {
