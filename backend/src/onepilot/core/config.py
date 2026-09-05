@@ -346,11 +346,13 @@ def calendar_runtime_status(settings: Settings) -> dict[str, bool | str | None]:
     }
 
     if mode_setting == "mock":
+        # Intentional mock is a safe simulated mode, not a missing-OAuth outage.
         return {
             **base,
             "calendar_mode": "mock",
             "calendar_active": False,
             "calendar_fallback_used": True,
+            "calendar_status_reason": None,
         }
 
     if mode_setting == "missing":

@@ -81,3 +81,65 @@ class TestSpeechTranscription:
         assert resp.status_code == 503
         body = resp.json()
         assert "requires OpenAI configuration" in body["message"]
+
+    def test_public_demo_rejects_speech_without_calling_provider(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Public demo must never reach the live speech provider."""
+        from onepilot.core.config import get_settings
+
+        token = _register(client, suffix="_public_demo")
+        monkeypatch.setenv("PUBLIC_DEMO_ENABLED", "true")
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test-not-used")
+        get_settings.cache_clear()
+
+        audio_data = b"fake audio data"
+        files = {"audio": ("test.webm", BytesIO(audio_data), "audio/webm")}
+
+        with patch(
+            "onepilot.api.routers.speech.OpenAISpeechProvider"
+        ) as provider_cls:
+            resp = client.post(
+                "/speech/transcribe", files=files, headers=_h(token)
+            )
+
+        assert resp.status_code == 403
+        body = resp.json()
+        assert body["error"] == "SPEECH_DISABLED"
+        assert "disabled in the public demo" in body["message"]
+        provider_cls.assert_not_called()
+
+    def test_non_public_demo_still_reaches_provider_path(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Normal environments keep speech available when OpenAI is configured."""
+        from onepilot.core.config import get_settings
+
+        token = _register(client, suffix="_normal_speech")
+        monkeypatch.setenv("PUBLIC_DEMO_ENABLED", "false")
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test-not-used")
+        get_settings.cache_clear()
+
+        mock_provider = Mock()
+        mock_provider.transcribe.return_value = TranscriptionResponse(
+            transcript="hello from speech",
+            language="en",
+            duration=1.2,
+            model="whisper-1",
+        )
+
+        audio_data = b"fake audio data"
+        files = {"audio": ("test.webm", BytesIO(audio_data), "audio/webm")}
+
+        with patch(
+            "onepilot.api.routers.speech.OpenAISpeechProvider",
+            return_value=mock_provider,
+        ) as provider_cls:
+            resp = client.post(
+                "/speech/transcribe", files=files, headers=_h(token)
+            )
+
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["transcript"] == "hello from speech"
+        provider_cls.assert_called_once()
+        mock_provider.transcribe.assert_called_once()

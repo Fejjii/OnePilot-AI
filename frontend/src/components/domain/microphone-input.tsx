@@ -247,6 +247,7 @@ export function MicrophoneInput({
       disabled={disabled || isTranscribing}
       loading={isTranscribing}
       title={`Record voice input (max ${MAX_RECORDING_DURATION_SECONDS}s)`}
+      aria-label="Record voice input"
     >
       <Mic className="h-4 w-4" />
     </Button>

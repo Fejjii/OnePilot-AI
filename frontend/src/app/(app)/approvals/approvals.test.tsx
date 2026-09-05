@@ -85,4 +85,102 @@ describe("ApprovalsPage", () => {
     expect(screen.queryByText("usr_1")).not.toBeInTheDocument();
     expect(screen.queryByText(/proposed payload/i)).not.toBeInTheDocument();
   });
+
+  it("renders complete previews for seeded email and calendar payloads", async () => {
+    restoreFetch();
+    restoreFetch = installFetchMock([
+      { method: "GET", url: "/me", response: { body: ME } },
+      {
+        method: "GET",
+        url: "/approvals",
+        response: {
+          body: {
+            items: [
+              {
+                id: "apv_email",
+                organization_id: "org_demo",
+                action_type: "send_email",
+                title: "Send follow-up email to Brightline Analytics",
+                description: "Draft a renewal follow-up to Sarah Chen.",
+                proposed_payload: {
+                  to: "sarah.chen@brightline.io",
+                  subject: "NovaEdge Growth plan — next steps for Brightline",
+                  body: "Hi Sarah — following up on your demo request.",
+                },
+                risk_level: "high",
+                status: "pending",
+                reason: "Seeded demo approval for reviewer walkthrough",
+                created_by: "usr_1",
+                reviewed_by: null,
+                created_at: "2026-05-10T10:00:00Z",
+                reviewed_at: null,
+              },
+              {
+                id: "apv_cal",
+                organization_id: "org_demo",
+                action_type: "schedule_meeting",
+                title: "Schedule discovery call with Northwind Legal",
+                description: "Propose a 30-minute discovery call.",
+                proposed_payload: {
+                  summary: "Discovery call — approvals + knowledge base walkthrough",
+                  start_time: "2026-09-15T09:00:00+00:00",
+                  end_time: "2026-09-15T09:30:00+00:00",
+                  timezone: "Europe/Berlin",
+                  attendees: ["marcus.webb@northwindlegal.com"],
+                },
+                risk_level: "medium",
+                status: "pending",
+                reason: "Seeded demo approval for reviewer walkthrough",
+                created_by: "usr_1",
+                reviewed_by: null,
+                created_at: "2026-05-10T09:00:00Z",
+                reviewed_at: null,
+              },
+            ],
+            total: 2,
+            pending_count: 2,
+          },
+        },
+      },
+    ]);
+
+    const user = userEvent.setup();
+    renderWithProviders(
+      <AuthProvider>
+        <ApprovalsPage />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Send follow-up email to Brightline Analytics/),
+      ).toBeInTheDocument();
+    });
+
+    await user.click(
+      screen.getByRole("button", {
+        name: /send follow-up email to brightline analytics/i,
+      }),
+    );
+    expect(screen.getByText(/Email preview/i)).toBeInTheDocument();
+    expect(screen.getByText(/sarah.chen@brightline.io/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/NovaEdge Growth plan — next steps for Brightline/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Hi Sarah — following up on your demo request/),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", {
+        name: /schedule discovery call with northwind legal/i,
+      }),
+    );
+    expect(screen.getByText(/Calendar preview/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Discovery call — approvals \+ knowledge base walkthrough/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/marcus.webb@northwindlegal.com/i)).toBeInTheDocument();
+    expect(screen.getByText(/2026-09-15T09:00:00\+00:00/)).toBeInTheDocument();
+  });
 });

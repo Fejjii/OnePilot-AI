@@ -899,4 +899,31 @@ describe("WorkspacePage", () => {
       expect(screen.queryByText(/General help chat/i)).not.toBeInTheDocument();
     });
   });
+
+  it("hides the microphone control in public-demo mode", async () => {
+    window.localStorage.setItem("onepilot_demo_mode", "1");
+    renderWithProviders(<WorkspacePage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: /ai workspace/i }),
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByRole("button", { name: /record voice input/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the microphone control outside public-demo mode", async () => {
+    renderWithProviders(<WorkspacePage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: /ai workspace/i }),
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.getByRole("button", { name: /record voice input/i }),
+    ).toBeInTheDocument();
+  });
 });

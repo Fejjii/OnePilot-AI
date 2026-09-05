@@ -7,7 +7,11 @@ import time
 from fastapi import APIRouter, File, Form, UploadFile
 
 from onepilot.api.deps import CurrentPrincipal, DBSession, SettingsDep
-from onepilot.core.errors import ValidationError, ProviderUnavailableError
+from onepilot.core.errors import (
+    PermissionDeniedError,
+    ProviderUnavailableError,
+    ValidationError,
+)
 from onepilot.providers.speech.openai_speech import OpenAISpeechProvider
 from onepilot.schemas.speech import TranscribeResponse
 from onepilot.security.permissions import require_member
@@ -51,6 +55,12 @@ async def transcribe_speech(
         ProviderUnavailableError: If OpenAI is not configured
     """
     require_member(principal)
+
+    if settings.PUBLIC_DEMO_ENABLED:
+        raise PermissionDeniedError(
+            "Speech transcription is disabled in the public demo.",
+            code="SPEECH_DISABLED",
+        )
     
     # Validate MIME type
     content_type = audio.content_type or "application/octet-stream"

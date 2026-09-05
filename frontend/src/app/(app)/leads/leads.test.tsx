@@ -52,6 +52,9 @@ describe("LeadsPage", () => {
     expect(screen.getByText(/Acme Corp/)).toBeInTheDocument();
     expect(screen.getAllByText(/Qualified/).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("High").length).toBeGreaterThan(0);
+    expect(
+      screen.getByText(/same promise ranking the assistant uses/i),
+    ).toBeInTheDocument();
   });
 
   it("shows a loading state while leads are fetching", () => {

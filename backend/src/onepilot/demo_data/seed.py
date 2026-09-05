@@ -228,7 +228,7 @@ CURATED_DEMO_APPROVALS: list[dict] = [
         "payload": {
             "to": "sarah.chen@brightline.io",
             "subject": "NovaEdge Growth plan — next steps for Brightline",
-            "body_preview": (
+            "body": (
                 "Hi Sarah — following up on your demo request with Growth plan pricing "
                 "and two proposed discovery slots next week."
             ),
@@ -244,9 +244,15 @@ CURATED_DEMO_APPROVALS: list[dict] = [
         "status": "pending",
         "risk_level": "medium",
         "payload": {
-            "attendee": "marcus.webb@northwindlegal.com",
-            "duration_minutes": 30,
-            "purpose": "Discovery call — approvals + knowledge base walkthrough",
+            "summary": "Discovery call — approvals + knowledge base walkthrough",
+            "start_time": "2026-09-15T09:00:00+00:00",
+            "end_time": "2026-09-15T09:30:00+00:00",
+            "timezone": "Europe/Berlin",
+            "attendees": ["marcus.webb@northwindlegal.com"],
+            "description": (
+                "30-minute discovery call with Marcus Webb to review approval gates "
+                "and grounded playbook answers."
+            ),
         },
     },
     {
@@ -261,7 +267,7 @@ CURATED_DEMO_APPROVALS: list[dict] = [
         "payload": {
             "to": "priya.nair@atlashealth.org",
             "subject": "NovaEdge Business plan proposal — audit-ready HITL",
-            "body_preview": (
+            "body": (
                 "Priya — attached is the Business plan proposal with approval gates and "
                 "audit logging called out for your compliance review."
             ),
@@ -286,9 +292,12 @@ CURATED_DEMO_APPROVALS: list[dict] = [
         "status": "approved",
         "risk_level": "medium",
         "payload": {
-            "attendee": "amira@cedarlearning.edu",
-            "duration_minutes": 45,
-            "purpose": "Onboarding kickoff",
+            "summary": "Onboarding kickoff",
+            "start_time": "2026-09-16T13:00:00+00:00",
+            "end_time": "2026-09-16T13:45:00+00:00",
+            "timezone": "Europe/Berlin",
+            "attendees": ["amira@cedarlearning.edu"],
+            "description": "Schedule onboarding kickoff after Team plan close.",
         },
     },
     {
@@ -300,7 +309,7 @@ CURATED_DEMO_APPROVALS: list[dict] = [
         "payload": {
             "to": "daniel@pixelforge.studio",
             "subject": "Case study: AI ops for creative studios",
-            "body_preview": "Daniel — sharing a short case study for when budget reopens.",
+            "body": "Daniel — sharing a short case study for when budget reopens.",
         },
     },
     {
@@ -330,7 +339,7 @@ CURATED_DEMO_APPROVALS: list[dict] = [
         "payload": {
             "to": "kevin.park@novastack.dev",
             "subject": "NovaEdge usage visibility walkthrough",
-            "body_preview": "Kevin — proposing two slots to review usage events and quotas.",
+            "body": "Kevin — proposing two slots to review usage events and quotas.",
         },
     },
 ]

@@ -9,10 +9,16 @@ from onepilot.core.constants import PlanCode, Role
 from onepilot.core.ids import new_id
 from onepilot.demo_data.seed import (
     CURATED_DEMO_APPROVALS,
+    CURATED_DEMO_LEADS,
     SEEDED_APPROVAL_REASON,
     ensure_curated_demo_approvals,
     ensure_demo_principal,
     seed_operational_data,
+)
+from onepilot.services import lead_service
+from onepilot.services.crm_email_grounding import (
+    rank_leads,
+    select_most_promising_lead,
 )
 from onepilot.repositories.approvals import ApprovalRequestRepository
 from onepilot.repositories.leads import LeadRepository
@@ -153,3 +159,98 @@ def test_ensure_curated_demo_approvals_replaces_seeded_rows(
     assert "Possimus repudiandae recusandae officia inventore dolorem." not in titles
     assert "Send follow-up email to Brightline Analytics" in titles
     assert "Agent drafted customer email" in titles
+
+
+def _assert_ui_email_preview(payload: dict) -> None:
+    assert payload.get("to") or payload.get("recipient_email")
+    assert payload.get("subject")
+    assert payload.get("body")
+    assert "body_preview" not in payload
+    blob = " ".join(str(v) for v in payload.values()).lower()
+    assert "gmail_" not in blob
+    assert "lead_" not in blob
+
+
+def _assert_ui_calendar_preview(payload: dict) -> None:
+    assert payload.get("summary")
+    assert payload.get("start_time")
+    assert payload.get("end_time")
+    attendees = payload.get("attendees")
+    assert isinstance(attendees, list) and attendees
+    assert "attendee" not in payload
+    assert "duration_minutes" not in payload
+    assert "purpose" not in payload
+    blob = " ".join(str(v) for v in payload.values()).lower()
+    assert "calendar_id" not in blob or payload.get("calendar_id") in {None, "primary"}
+
+
+def test_curated_seed_payloads_match_approvals_ui(db_session: Session) -> None:
+    """Seeded email/calendar payloads must populate Approvals preview cards."""
+    principal = _setup_org(db_session)
+    seed_operational_data(db_session, principal=principal)
+    approval_repo = ApprovalRequestRepository(db_session)
+    rows = approval_repo.list_for_org(principal.organization_id, limit=50)
+
+    email_rows = [row for row in rows if row.action_type == "send_email"]
+    calendar_rows = [row for row in rows if row.action_type == "schedule_meeting"]
+    assert email_rows
+    assert calendar_rows
+
+    for row in email_rows:
+        _assert_ui_email_preview(row.proposed_payload)
+    for row in calendar_rows:
+        _assert_ui_calendar_preview(row.proposed_payload)
+
+    for item in CURATED_DEMO_APPROVALS:
+        if item["action_type"] == "send_email":
+            _assert_ui_email_preview(item["payload"])
+        elif item["action_type"] == "schedule_meeting":
+            _assert_ui_calendar_preview(item["payload"])
+
+
+def test_ensure_curated_approvals_does_not_rewrite_chat_payloads(
+    db_session: Session,
+) -> None:
+    principal = _setup_org(db_session)
+    approval_repo = ApprovalRequestRepository(db_session)
+    chat_payload = {
+        "to": ["customer@example.com"],
+        "subject": "Chat-created draft",
+        "body": "This payload was created by the agent, not the seeder.",
+    }
+    approval_repo.create(
+        ApprovalRequest(
+            id=new_id("apv"),
+            organization_id=principal.organization_id,
+            action_type="send_email",
+            title="Agent drafted customer email",
+            description="created during chat",
+            proposed_payload=chat_payload,
+            risk_level="high",
+            status="pending",
+            reason="Agent proposed gated action",
+            created_by=principal.user_id,
+        )
+    )
+
+    ensure_curated_demo_approvals(db_session, principal=principal)
+    rows = approval_repo.list_for_org(principal.organization_id, limit=50)
+    chat_row = next(row for row in rows if row.title == "Agent drafted customer email")
+    assert chat_row.proposed_payload == chat_payload
+
+
+def test_seeded_leads_list_matches_agent_ranking(db_session: Session) -> None:
+    principal = _setup_org(db_session)
+    seed_operational_data(db_session, principal=principal)
+
+    listed, total = lead_service.list_leads(
+        db_session, principal=principal, offset=0, limit=50
+    )
+    ranked = rank_leads(listed)
+    assert [lead.id for lead in listed] == [lead.id for lead in ranked]
+    assert total == len(CURATED_DEMO_LEADS)
+    top = select_most_promising_lead(listed)
+    assert top is not None
+    assert listed[0].id == top.id
+    assert listed[0].name == "Sarah Chen"
+    assert listed[0].company == "Brightline Analytics"

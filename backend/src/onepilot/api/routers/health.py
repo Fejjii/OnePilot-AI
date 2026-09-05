@@ -87,6 +87,38 @@ def _sanitize_provider_details(
     return out or None
 
 
+_CALENDAR_MOCK_REASON = (
+    "Google Calendar OAuth not configured; using mock provider for safe demos"
+)
+_CALENDAR_PUBLIC_DEMO_REASON = (
+    "Calendar is simulated for this public demo. Google Calendar is not connected."
+)
+_CALENDAR_FORCED_MOCK_REASON = (
+    "Calendar is simulated for safe demos. Google Calendar is not connected."
+)
+_MOCK_CONFIG_REASONS = frozenset(
+    {
+        "missing_google_client_id",
+        "missing_google_client_secret",
+        "missing_refresh_token",
+    }
+)
+
+
+def _calendar_simulated_reason(settings: Settings) -> str:
+    if settings.PUBLIC_DEMO_ENABLED:
+        return _CALENDAR_PUBLIC_DEMO_REASON
+    mode = (settings.GOOGLE_CALENDAR_PROVIDER_MODE or "").strip().lower()
+    if mode == "mock":
+        return _CALENDAR_FORCED_MOCK_REASON
+    return _CALENDAR_MOCK_REASON
+
+
+def _is_intentional_calendar_mock(settings: Settings) -> bool:
+    mode = (settings.GOOGLE_CALENDAR_PROVIDER_MODE or "").strip().lower()
+    return mode == "mock"
+
+
 def _build_calendar_diagnostic(
     *,
     settings: Settings,
@@ -107,7 +139,12 @@ def _build_calendar_diagnostic(
         calendar_mode = ProviderMode.UNHEALTHY
 
     calendar_is_mock = True
-    calendar_healthy = calendar_mode == ProviderMode.LIVE
+    intentional_mock = _is_intentional_calendar_mock(settings)
+    simulated_mode = intentional_mock or calendar_mode in {
+        ProviderMode.MOCK,
+        ProviderMode.MISSING,
+    }
+    calendar_healthy = calendar_mode == ProviderMode.LIVE or simulated_mode
     status_reason: str | None = calendar_status.get("calendar_status_reason")  # type: ignore[assignment]
     calendar_details: dict[str, object] = {
         "purpose": "Availability checks and approval-gated event creation",
@@ -130,8 +167,19 @@ def _build_calendar_diagnostic(
         caps_dict = provider_caps.capabilities
         calendar_id = provider_caps.calendar_id
         masked_calendar_id = calendar_id if calendar_id == "primary" else "configured"
-        status_reason = status_reason or provider_caps.status_reason
-        calendar_healthy = calendar_mode == ProviderMode.LIVE and provider_caps.mode == "live"
+        probe_reason = provider_caps.status_reason
+        if calendar_mode == ProviderMode.LIVE:
+            status_reason = status_reason or probe_reason
+            calendar_healthy = provider_caps.mode == "live"
+        elif simulated_mode or calendar_is_mock:
+            calendar_healthy = True
+            if probe_reason and probe_reason not in _MOCK_CONFIG_REASONS:
+                status_reason = probe_reason
+            else:
+                status_reason = None
+        else:
+            status_reason = status_reason or probe_reason
+            calendar_healthy = False
         calendar_details["calendar_id"] = masked_calendar_id
         if status_reason:
             calendar_details["calendar_status_reason"] = status_reason
@@ -145,20 +193,39 @@ def _build_calendar_diagnostic(
             settings.GOOGLE_CALENDAR_CREATE_ENABLED and caps_dict.get("create_event", False)
         )
     except Exception:
-        calendar_healthy = False
         if calendar_mode == ProviderMode.LIVE:
+            calendar_healthy = False
             calendar_mode = ProviderMode.UNHEALTHY
+            status_reason = status_reason or "unknown"
+        elif simulated_mode:
+            calendar_healthy = True
+            status_reason = None
+        else:
+            calendar_healthy = False
+            status_reason = status_reason or "unknown"
         calendar_details["mock"] = calendar_is_mock
-        calendar_details["calendar_status_reason"] = status_reason or "unknown"
+        if status_reason:
+            calendar_details["calendar_status_reason"] = status_reason
 
     if calendar_mode == ProviderMode.LIVE:
         calendar_reason = "Google Calendar API reachable; event creation after approval"
-    elif status_reason:
+    elif calendar_mode == ProviderMode.UNHEALTHY:
+        calendar_reason = (
+            f"Calendar provider issue: {status_reason}"
+            if status_reason
+            else "Calendar provider issue"
+        )
+    elif simulated_mode or calendar_is_mock:
+        if calendar_status["calendar_configured"] and not intentional_mock:
+            calendar_reason = (
+                "Calendar credentials present but provider running in mock/fallback mode"
+            )
+        else:
+            calendar_reason = _calendar_simulated_reason(settings)
+    elif status_reason and status_reason not in _MOCK_CONFIG_REASONS:
         calendar_reason = f"Calendar provider issue: {status_reason}"
-    elif calendar_is_mock and calendar_status["calendar_configured"]:
-        calendar_reason = "Calendar credentials present but provider running in mock/fallback mode"
     else:
-        calendar_reason = "Google Calendar OAuth not configured; using mock provider for safe demos"
+        calendar_reason = _calendar_simulated_reason(settings)
 
     return ProviderDiagnostic(
         name="Google Calendar",

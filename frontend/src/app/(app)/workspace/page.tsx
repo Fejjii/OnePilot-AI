@@ -866,18 +866,20 @@ function ChatColumn({
             placeholder="Ask the AI assistant…"
             className="block max-h-40 min-h-[44px] w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
           />
-          <MicrophoneInput
-            onTranscript={(transcript, language) => {
-              if (language) {
-                onSpeechLanguage(language);
-              }
-              setDraft((prev) => {
-                const combined = prev ? `${prev} ${transcript}` : transcript;
-                return combined;
-              });
-            }}
-            disabled={isSending}
-          />
+          {!isDemo && (
+            <MicrophoneInput
+              onTranscript={(transcript, language) => {
+                if (language) {
+                  onSpeechLanguage(language);
+                }
+                setDraft((prev) => {
+                  const combined = prev ? `${prev} ${transcript}` : transcript;
+                  return combined;
+                });
+              }}
+              disabled={isSending}
+            />
+          )}
           <Button
             onClick={submit}
             loading={isSending}
