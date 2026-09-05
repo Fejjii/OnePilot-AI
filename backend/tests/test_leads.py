@@ -126,6 +126,51 @@ class TestLeadEndpoints:
         assert listing["total"] == 1
         assert listing["items"][0]["id"] == lead_id
 
+    def test_list_uses_same_ranking_as_agent(self, client: TestClient) -> None:
+        from types import SimpleNamespace
+
+        from onepilot.services.crm_email_grounding import (
+            rank_leads,
+            select_most_promising_lead,
+        )
+
+        token = self._register(client, suffix="_rank")
+        # Recency-unfriendly insert order: Kevin would appear first if listing
+        # were created_at DESC. Ranking must still match rank_leads().
+        client.post(
+            "/leads",
+            json={
+                "name": "Kevin Park",
+                "company": "NovaStack DevTools",
+                "email": "kevin.park@novastack.dev",
+                "status": "qualified",
+                "urgency": "medium",
+            },
+            headers=self._h(token),
+        )
+        client.post(
+            "/leads",
+            json={
+                "name": "Sarah Chen",
+                "company": "Brightline Analytics",
+                "email": "sarah.chen@brightline.io",
+                "status": "qualified",
+                "urgency": "high",
+            },
+            headers=self._h(token),
+        )
+
+        listing = client.get("/leads", headers=self._h(token)).json()
+        names = [item["name"] for item in listing["items"]]
+        synthetic = [
+            SimpleNamespace(name=item["name"], urgency=item["urgency"], status=item["status"])
+            for item in listing["items"]
+        ]
+        ranked_names = [lead.name for lead in rank_leads(synthetic)]
+        assert names == ranked_names
+        assert select_most_promising_lead(synthetic).name == names[0]
+        assert names[0] == "Sarah Chen"
+
     def test_update_lead_writes_audit(self, client: TestClient) -> None:
         token = self._register(client, suffix="_upd")
         lead_id = client.post(

@@ -240,13 +240,19 @@ def list_leads(
     limit: int = 50,
     status: str | None = None,
 ) -> tuple[list[Lead], int]:
+    """List org leads using the same ranking as workspace insights and email grounding."""
+    from onepilot.services.crm_email_grounding import rank_leads
+
     repo = LeadRepository(session)
-    items = repo.list_for_org(
+    page_size = min(limit, 100)
+    matching = repo.list_for_org(
         principal.organization_id,
-        offset=offset,
-        limit=min(limit, 100),
+        offset=0,
+        limit=None,
         status=status,
     )
+    ranked = rank_leads(matching)
+    items = ranked[offset : offset + page_size]
     total = repo.count_for_org(principal.organization_id)
     return items, total
 

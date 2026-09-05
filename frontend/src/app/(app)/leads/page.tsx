@@ -120,7 +120,7 @@ export default function LeadsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Leads"
-        description="Prospects captured from chat, forms, and assistant follow-up."
+        description="Prospects captured from chat, forms, and assistant follow-up. Sorted by the same promise ranking the assistant uses (urgency, then pipeline stage)."
         actions={
           <Button
             leftIcon={<Plus className="h-4 w-4" />}

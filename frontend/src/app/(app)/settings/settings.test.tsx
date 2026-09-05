@@ -168,6 +168,19 @@ vi.mock("@/lib/queries", () => ({
           last_checked_at: "2024-01-01T00:00:00Z",
           details: { mock: true },
         },
+        {
+          name: "Google Calendar",
+          category: "calendar",
+          configured: false,
+          healthy: false,
+          active: false,
+          fallback_used: true,
+          mode: "mock",
+          model: null,
+          reason: "Calendar provider issue: missing_google_client_id",
+          last_checked_at: "2024-01-01T00:00:00Z",
+          details: { mock: true },
+        },
       ],
       checked_at: "2024-01-01T00:00:00Z",
     },
@@ -297,5 +310,21 @@ describe("SettingsPage", () => {
       expect(screen.getByText(/REDIS_URL not set/i)).toBeInTheDocument();
       expect(screen.getByText(/LANGSMITH_API_KEY not set/i)).toBeInTheDocument();
     });
+  });
+
+  it("presents mock Calendar as a healthy simulated demo mode", async () => {
+    renderWithProviders(<SettingsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Google Calendar")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText(/Calendar is simulated for this demo/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/not a broken Google Calendar connection/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/provider issue/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/missing_google_client_id/i)).not.toBeInTheDocument();
   });
 });

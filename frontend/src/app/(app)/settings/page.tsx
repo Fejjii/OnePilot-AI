@@ -226,7 +226,8 @@ export default function SettingsPage() {
           <p className="mb-4 text-xs text-slate-600">
             Provider keys are configured through environment variables. No API
             keys are stored in the frontend. Mock providers are used for
-            safe demos.
+            safe demos. When Calendar shows Mock, it is a safe simulated mode —
+            not a broken Google Calendar connection.
           </p>
           {diagnostics.isLoading ? (
             <div className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -432,6 +433,23 @@ function getModeBadge(mode: ProviderMode) {
   return <Badge tone={toneMap[mode]}>{labelMap[mode]}</Badge>;
 }
 
+function isSimulatedCalendar(provider: ProviderDiagnostic): boolean {
+  return provider.name === "Google Calendar" && provider.mode === "mock";
+}
+
+function recruiterFacingReason(provider: ProviderDiagnostic): string | null {
+  if (isSimulatedCalendar(provider)) {
+    const reason = provider.reason ?? "";
+    if (
+      /provider issue|missing_google|unhealthy/i.test(reason) ||
+      !reason.trim()
+    ) {
+      return "Calendar is simulated for this demo. Google Calendar is not connected.";
+    }
+  }
+  return provider.reason ?? null;
+}
+
 function ProviderCard({ provider }: { provider: ProviderDiagnostic }) {
   const renderIcon = () => {
     const iconClassName = "h-3.5 w-3.5";
@@ -454,6 +472,9 @@ function ProviderCard({ provider }: { provider: ProviderDiagnostic }) {
     return iconMap[provider.name] || <Activity className={iconClassName} />;
   };
   
+  const displayReason = recruiterFacingReason(provider);
+  const displayHealthy = provider.healthy || isSimulatedCalendar(provider);
+
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-3">
       <div className="flex items-start justify-between gap-2">
@@ -482,7 +503,7 @@ function ProviderCard({ provider }: { provider: ProviderDiagnostic }) {
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-slate-500">Healthy:</span>
-          {provider.healthy ? (
+          {displayHealthy ? (
             <CheckCircle2 className="h-3 w-3 text-emerald-500" />
           ) : (
             <AlertTriangle className="h-3 w-3 text-amber-500" />
@@ -504,9 +525,9 @@ function ProviderCard({ provider }: { provider: ProviderDiagnostic }) {
         )}
       </div>
       
-      {provider.reason && (
+      {displayReason && (
         <p className="text-[11px] text-slate-600 italic border-t border-slate-100 pt-2">
-          {provider.reason}
+          {displayReason}
         </p>
       )}
     </div>

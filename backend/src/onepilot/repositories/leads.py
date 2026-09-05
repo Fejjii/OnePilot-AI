@@ -18,13 +18,17 @@ class LeadRepository(BaseRepository[Lead]):
         organization_id: str,
         *,
         offset: int = 0,
-        limit: int = 50,
+        limit: int | None = 50,
         status: str | None = None,
     ) -> list[Lead]:
         stmt = select(Lead).where(Lead.organization_id == organization_id)
         if status:
             stmt = stmt.where(Lead.status == status)
-        stmt = stmt.order_by(Lead.created_at.desc()).offset(offset).limit(limit)
+        stmt = stmt.order_by(Lead.created_at.desc())
+        if offset:
+            stmt = stmt.offset(offset)
+        if limit is not None:
+            stmt = stmt.limit(limit)
         return list(self._session.execute(stmt).scalars().all())
 
     def count_for_org(self, organization_id: str) -> int:

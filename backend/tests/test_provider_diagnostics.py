@@ -216,6 +216,28 @@ def test_provider_diagnostics_no_secrets_in_response(client: TestClient) -> None
         assert "@" not in details_blob or "configured" in details_blob
 
 
+def test_forced_mock_calendar_is_healthy_on_providers(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("GOOGLE_CALENDAR_PROVIDER_MODE", "mock")
+    monkeypatch.setenv("PUBLIC_DEMO_ENABLED", "true")
+    from onepilot.core.config import get_settings
+
+    get_settings.cache_clear()
+    response = client.get("/providers")
+    assert response.status_code == 200
+    calendar = next(p for p in response.json()["providers"] if p["name"] == "Google Calendar")
+    assert calendar["mode"] == "mock"
+    assert calendar["healthy"] is True
+    reason = (calendar.get("reason") or "").lower()
+    assert "provider issue" not in reason
+    assert "missing_google" not in reason
+    assert "simulated" in reason
+    health = client.get("/health").json()
+    assert health["providers"]["calendar_mode"] == "mock"
+    assert health["providers"]["calendar_status_reason"] is None
+
+
 def test_calendar_live_null_status_reason_returns_200(client: TestClient) -> None:
     live_status = CalendarProviderStatus(
         configured=True,
