@@ -1,7 +1,7 @@
 # Cloud agent handoff (sanitized)
 
-Generated: 2026-09-05 12:35 UTC  
-Generator: Cloud agent (manual, sanitized; OP-033 P1 fixes on `fix/op-033-final-audit-p1`; no local `HANDOFF.md`)
+Generated: 2026-09-06 07:20 UTC  
+Generator: Cloud agent (manual, sanitized; OP-034 public-demo approval hygiene on `fix/op-034-demo-approval-hygiene`; no local `HANDOFF.md`)
 
 This file is the **only** committed project-state brief for Cursor Cloud / phone agents.
 It is intentionally smaller than any local `HANDOFF.md` and contains **no secrets**.
@@ -25,16 +25,18 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 
 | Ref | SHA | Notes |
 |-----|-----|-------|
-| `origin/main` (canonical) | `c6edf7c4df1b7689a5ba92249da20c5d18f9262b` | Task-start SHA. Includes PR #29 (OP-032) and PR #30 (Cloud Agent report bridge) |
-| `origin/deployment/public-demo` | `b87e8ca4aa99c08c3d5d4205b9139eceb7cb2ea8` | Previous product release (OP-032). **Behind `main` by the reporting-bridge merge.** Do not fast-forward |
+| `origin/main` (canonical) | `bc07c5595b6a21709be5dea2e271c8b9b4e635c6` | Task-start SHA. Includes PR #31 (OP-033) |
+| `origin/deployment/public-demo` | `bc07c5595b6a21709be5dea2e271c8b9b4e635c6` | Same product SHA as `main` at task start. Do not fast-forward |
 | `origin/deployment/live-google-demo` | `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332` | Private live-Google pointer; **untouched** |
-| `fix/op-033-final-audit-p1` (this work) | see latest commit on that branch | OP-033 P1 PR into `main`; do not merge unless asked |
+| `fix/op-034-demo-approval-hygiene` (this work) | see latest commit on that branch | OP-034 PR into `main`; do not merge unless asked |
 
 ## Completed
 
+- PR #31 — OP-033 final public-demo P1 audit fixes merged to `main`
 - PR #30 — Cloud Agent report bridge merged to `main` (`infra/cloud-agent-report-bridge`)
 - OP-032 — final recruiter-facing public-demo polish (merged to `main`, PR #29)
-- Public release of `deployment/public-demo` at `b87e8ca4aa99c08c3d5d4205b9139eceb7cb2ea8` (previous product release; still the live public pointer)
+- Public release of `deployment/public-demo` at `bc07c5595b6a21709be5dea2e271c8b9b4e635c6` (matches `main` at OP-034 task start)
+- Operator-authorized public-demo mutable-data cleanup restored the Sarah Chen / Brightline Analytics lead narrative in production (Kevin Park and Priya Nair urgency returned to canonical `medium`)
 - OP-030 — recruiter-demo meetings vs availability polish (merged to `main`, PR #28)
 - OP-031 — persist/render safe recruiter-facing agent execution traces + complete intent/tool badges (merged to `main`, PR #26)
 - OP-028 — CRM-grounded email drafting + recruiter-facing approval copy (merged to `main`, PR #25)
@@ -52,9 +54,9 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 
 ## Current task / in progress
 
-- **OP-033** implemented on `fix/op-033-final-audit-p1` and **not merged**. Fixes the four P1 items from the final public-demo audit (Calendar mock diagnostics, public-demo speech disable, seeded approval preview fields, Leads listing aligned with `rank_leads()`).
-- PR #30 / Cloud Agent report bridge is merged. `origin/main` at task start was `c6edf7c4df1b7689a5ba92249da20c5d18f9262b`.
-- Public deployment still corresponds to the previous product release (`origin/deployment/public-demo` = `b87e8ca4aa99c08c3d5d4205b9139eceb7cb2ea8`). It was not updated in this work.
+- **OP-034** implemented on `fix/op-034-demo-approval-hygiene` and **not merged**. Adds automatic public-demo approval hygiene on `/demo/start` and the existing demo-refresh path.
+- Remaining recruiter-demo issue after the production lead restore: the shared public-demo Approvals inbox accumulated stale non-curated demo-visitor residue from previous reviewer sessions. Canonical seeded approvals were already correct. OP-034 removes only stale, non-curated, demo-visitor-created approvals in the public demo organization when `PUBLIC_DEMO_ENABLED=true`, using a 6-hour retention window. No public DELETE endpoint. No production database mutation in this implementation task.
+- `origin/main` and `origin/deployment/public-demo` at task start were `bc07c5595b6a21709be5dea2e271c8b9b4e635c6`.
 - `deployment/live-google-demo` remains untouched at `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332`.
 - Public infrastructure is essentially complete (OP-026 COMPLETE). Private live-Google demo remains a later user-gated track (Cloud must not assume OAuth or live Google access).
 - Product work belongs on a feature/fix branch off `main`, never on a deployment branch.
@@ -77,17 +79,18 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 - Multi-tenant FastAPI + Next.js workspace: LangGraph agent, RAG + citations, HITL approvals, usage/quotas, memory.
 - Assistant messages persist a sanitized `execution_trace` (observable steps only). Internal graph details, prompts, tokens, and secrets are not shown in the recruiter UI.
 - Email drafts resolve org-scoped CRM leads when present and must not invent customer facts. Human approval is still required; public Gmail stays mock/send-disabled.
-- Workspace insights, CRM email drafting, and recruiter-facing lead listing share `rank_leads()`. Seeded demo data makes Sarah Chen at Brightline Analytics the most promising lead.
+- Workspace insights, CRM email drafting, and recruiter-facing lead listing share `rank_leads()`. Seeded demo data makes Sarah Chen at Brightline Analytics the most promising lead. That narrative is restored in production.
 - Public demo: Vercel frontend + Railway API/Postgres/Redis; Gmail/Calendar **mock**; speech transcription disabled; shared-demo agent memory disabled.
 - Forced Calendar mock is reported as healthy simulated mode. Missing OAuth in that mode is not a provider outage.
 - Seeded Approvals email/calendar payloads use the same preview fields as chat-created approvals.
+- Public-demo `/demo/start` refreshes canonical curated approvals and, when `PUBLIC_DEMO_ENABLED=true`, also removes stale non-curated demo-visitor residue older than 6 hours. Recent active-session approvals are preserved. No public approval DELETE route.
 - Private live-Google track exists on `deployment/live-google-demo` and is **user-gated**. Cloud must not assume OAuth or live Google access.
 - Vectors: Qdrant when configured, in-memory fallback otherwise. Cloud must not target live Qdrant clusters.
 - Cloud execution reports are public/sanitized and live only on `agent/cloud-state`. Cloud cannot write iCloud.
 
 ## Tests / status
 
-- OP-033 validation on this branch: backend **806 passed, 3 skipped**; frontend **171 passed**; `pnpm typecheck` and `pnpm build` passed; `python -m pytest -q scripts/tests` — **53 passed**.
+- OP-034 validation on this branch: targeted hygiene/demo-start/approvals tests **45 passed**; full backend **821 passed, 3 skipped**; `python -m pytest -q scripts/tests` — **53 passed**; handoff sanitizer `--check --no-fetch` — **ok**. No frontend changes.
 - Documented counts in README (2026-07-20): **703** backend tests (3 skipped), **126** frontend tests. Later merges added Qdrant/OpenAI/CRM-email/execution-trace/OP-032/OP-033 coverage.
 - CI (`.github/workflows/ci.yml`) runs backend pytest + frontend typecheck/tests/build on PRs to `main` and `deployment/**`, plus `scripts/tests`.
 - Public-demo smoke: `python scripts/smoke_test_public_demo.py --base-url <public-api>` (never print tokens).
@@ -109,7 +112,7 @@ Cloud (and any agent) must **not** touch:
 
 ## Recommended next task
 
-Review and merge OP-033 (`fix/op-033-final-audit-p1`, PR #31) if accepted. After merge, only an operator-authorized fast-forward of `deployment/public-demo` would ship these P1s to the live public demo. Do not touch that branch unless explicitly authorized. Private live-Google demo remains later and user-gated. P2 audit items stay deferred.
+Review and merge OP-034 (`fix/op-034-demo-approval-hygiene`) if accepted. After merge, only an operator-authorized fast-forward of `deployment/public-demo` would ship automatic approval hygiene to the live public demo. Existing leftover rows older than 6 hours are then removed on the next `/demo/start`. Do not touch that branch unless explicitly authorized. Private live-Google demo remains later and user-gated. P2 audit items stay deferred.
 
 Do not re-run live Qdrant or modify deployment branches unless the operator explicitly authorizes that exact branch.
 

@@ -14,13 +14,14 @@ same IDs, so /documents always returns the seeded content.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
 import secrets
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from onepilot.core.config import Settings
+from onepilot.core.config import Settings, get_settings
 from onepilot.core.constants import PlanCode, Role
 from onepilot.core.ids import new_id
 from onepilot.core.logging import get_logger
@@ -213,6 +214,16 @@ CURATED_DEMO_LEADS: list[dict[str, str]] = [
 SEEDED_APPROVAL_REASON = "Seeded demo approval for reviewer walkthrough"
 # Historical seed wording still present on the shared public-demo database.
 LEGACY_SEEDED_APPROVAL_REASON = "Seeded demo approval for capstone review"
+
+# Identities minted by create_demo_visitor_principal(): new_id("usr_demo")
+# plus the derived @demo.onepilot.local email. The deterministic demo owner
+# (DEV_USER_ID / usr_demo_admin) is not a visitor.
+DEMO_VISITOR_ID_PREFIX = "usr_demo"
+DEMO_VISITOR_EMAIL_DOMAIN = "demo.onepilot.local"
+DEMO_VISITOR_FULL_NAME = "Demo Visitor"
+
+# Conservative window so an active recruiter session is not disrupted.
+STALE_PUBLIC_DEMO_APPROVAL_RETENTION = timedelta(hours=6)
 
 # Curated NovaEdge-style approvals (deterministic, recruiter-friendly copy).
 CURATED_DEMO_APPROVALS: list[dict] = [
@@ -409,18 +420,30 @@ def ensure_demo_principal(session: Session, *, settings: Settings) -> Principal:
     )
 
 
+def is_demo_visitor_user_id(user_id: str, *, settings: Settings) -> bool:
+    """True for identities minted by ``create_demo_visitor_principal()``.
+
+    Visitors use ``new_id("usr_demo")`` (``usr_demo_<ULID>``). The deterministic
+    demo owner (``settings.DEV_USER_ID``) is excluded even though it shares the
+    ``usr_demo_`` prefix.
+    """
+    if not user_id or user_id == settings.DEV_USER_ID:
+        return False
+    return user_id.startswith(f"{DEMO_VISITOR_ID_PREFIX}_")
+
+
 def create_demo_visitor_principal(session: Session, *, settings: Settings) -> Principal:
     """Create a unique visitor user in the shared demo org (conversation isolation)."""
     owner = ensure_demo_principal(session, settings=settings)
-    visitor_id = new_id("usr_demo")
-    email = f"{visitor_id.lower()}@demo.onepilot.local"
+    visitor_id = new_id(DEMO_VISITOR_ID_PREFIX)
+    email = f"{visitor_id.lower()}@{DEMO_VISITOR_EMAIL_DOMAIN}"
     user_repo = UserRepository(session)
     user_repo.create(
         User(
             id=visitor_id,
             email=email,
             hashed_password=hash_password(secrets.token_urlsafe(24)),
-            full_name="Demo Visitor",
+            full_name=DEMO_VISITOR_FULL_NAME,
         )
     )
     member_repo = OrganizationMemberRepository(session)
@@ -496,17 +519,92 @@ def _insert_curated_approvals(
     return created
 
 
+def _is_canonical_demo_approval(row: ApprovalRequest) -> bool:
+    """Preserve curated seeds and any row matching canonical seed definitions."""
+    payload = row.proposed_payload if isinstance(row.proposed_payload, dict) else {}
+    if bool(payload.get("curated")):
+        return True
+    reason = row.reason or ""
+    if reason in {SEEDED_APPROVAL_REASON, LEGACY_SEEDED_APPROVAL_REASON}:
+        return True
+    if reason.startswith("Seeded demo approval"):
+        return True
+    canonical_titles = {item["title"][:255] for item in CURATED_DEMO_APPROVALS}
+    return row.title in canonical_titles
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+def cleanup_stale_public_demo_approvals(
+    session: Session,
+    *,
+    principal: Principal,
+    settings: Settings,
+) -> int:
+    """Remove stale non-curated demo-visitor approvals from the public demo org.
+
+    Safety:
+    - no-op unless ``PUBLIC_DEMO_ENABLED``
+    - every query/delete is scoped to ``settings.DEV_ORG_ID``
+    - principal must already be that same public-demo organization
+    - canonical curated / seeded approvals are preserved
+    - recent visitor approvals inside the retention window are preserved
+    - non-visitor and other-org rows are never deleted
+    """
+    if not settings.PUBLIC_DEMO_ENABLED:
+        return 0
+
+    demo_org_id = settings.DEV_ORG_ID
+    if not demo_org_id or principal.organization_id != demo_org_id:
+        return 0
+
+    cutoff = datetime.now(UTC) - STALE_PUBLIC_DEMO_APPROVAL_RETENTION
+    approval_repo = ApprovalRequestRepository(session)
+    existing = approval_repo.list_for_org(demo_org_id, limit=1000)
+    stale_ids: list[str] = []
+    for row in existing:
+        if row.organization_id != demo_org_id:
+            continue
+        if _is_canonical_demo_approval(row):
+            continue
+        if not is_demo_visitor_user_id(row.created_by, settings=settings):
+            continue
+        if row.created_at is None:
+            continue
+        if _as_utc(row.created_at) >= cutoff:
+            continue
+        stale_ids.append(row.id)
+
+    removed = approval_repo.delete_ids_for_org(demo_org_id, stale_ids)
+    logger.info(
+        "public_demo_stale_approvals_cleaned",
+        organization_id=demo_org_id,
+        removed=removed,
+    )
+    return removed
+
+
 def ensure_curated_demo_approvals(
     session: Session,
     *,
     principal: Principal,
+    settings: Settings | None = None,
 ) -> int:
     """Replace seeded demo approvals with curated recruiter-friendly copy.
 
     Safe for the shared public-demo org: only rows tagged with
-    ``SEEDED_APPROVAL_REASON`` are removed. Agent-created approvals are kept.
+    ``SEEDED_APPROVAL_REASON`` are removed. Agent-created approvals are kept
+    unless public-demo hygiene removes stale demo-visitor residue first.
     Returns the number of curated approvals inserted.
     """
+    resolved = settings or get_settings()
+    cleanup_stale_public_demo_approvals(
+        session, principal=principal, settings=resolved
+    )
     approval_repo = ApprovalRequestRepository(session)
     existing = approval_repo.list_for_org(principal.organization_id, limit=500)
     removed = 0
