@@ -132,7 +132,7 @@ Details: [docs/agent_workflow.md](docs/agent_workflow.md) · [docs/rag_system.md
 
 ## Real vs simulated
 
-Verified against the live public demo (`/health`, `/runtime/config`) and GitHub refs `main` == `deployment/public-demo` @ `87eef7d`.
+Verified against the live public demo (`/health`, `/runtime/config`) and matching `main` / `deployment/public-demo` refs.
 
 | Capability | Public demo |
 |------------|-------------|
@@ -168,7 +168,7 @@ Verified from `backend/pyproject.toml`, `frontend/package.json`, `docker-compose
 | **Infrastructure** | Vercel, Railway, Docker Compose, GitHub Actions |
 | **Quality** | pytest, Vitest, Ruff, ESLint, `tsc`, offline evaluation harness |
 
-CI on `main` ([run 34020499895](https://github.com/Fejjii/OnePilot-AI/actions/runs/34020499895) @ `87eef7d`): **800+** backend tests (821 passed, 3 skipped) and **170+** frontend tests (171 passed), plus typecheck and production build. Prefer the ranges; exact counts move with the suite.
+Latest green CI on `main` at the time of this polish: **800+** backend tests (821 passed, 3 skipped) and **170+** frontend tests (171 passed), plus typecheck and production build. Prefer the ranges; exact counts move with the suite.
 
 ---
 
