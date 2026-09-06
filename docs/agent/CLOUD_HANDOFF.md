@@ -90,7 +90,7 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 
 ## Tests / status
 
-- OP-034 validation belongs on this branch (targeted approval/demo-start tests plus full backend and scripts suites). Document results in the latest agent report, not here as guessed counts.
+- OP-034 validation on this branch: targeted hygiene/demo-start/approvals tests **45 passed**; full backend **821 passed, 3 skipped**; `python -m pytest -q scripts/tests` — **53 passed**; handoff sanitizer `--check --no-fetch` — **ok**. No frontend changes.
 - Documented counts in README (2026-07-20): **703** backend tests (3 skipped), **126** frontend tests. Later merges added Qdrant/OpenAI/CRM-email/execution-trace/OP-032/OP-033 coverage.
 - CI (`.github/workflows/ci.yml`) runs backend pytest + frontend typecheck/tests/build on PRs to `main` and `deployment/**`, plus `scripts/tests`.
 - Public-demo smoke: `python scripts/smoke_test_public_demo.py --base-url <public-api>` (never print tokens).
