@@ -13,7 +13,7 @@ from onepilot.core.config import Settings, get_settings
 from onepilot.core.constants import UsageFeature
 from onepilot.core.errors import ValidationError
 from onepilot.core.logging import get_logger
-from onepilot.providers import get_calendar_provider
+from onepilot.providers import resolve_calendar_provider_for_org
 from onepilot.providers.calendar.mock_calendar_provider import MockCalendarProvider
 from onepilot.providers.calendar.time_parser import parse_calendar_window
 from onepilot.repositories.models import ApprovalRequest
@@ -227,7 +227,7 @@ def get_availability(
     except PydanticValidationError as exc:
         raise ValidationError(str(exc)) from exc
 
-    provider = get_calendar_provider(cfg)
+    provider = resolve_calendar_provider_for_org(cfg, principal.organization_id)
     raw = provider.get_availability(
         request.time_min,
         request.time_max,
@@ -269,7 +269,7 @@ def list_events(
     cfg = settings or get_settings()
     time_min, time_max, query_type, window_label = _parse_time_window(message, cfg)
     timezone = _default_timezone(cfg)
-    provider = get_calendar_provider(cfg)
+    provider = resolve_calendar_provider_for_org(cfg, principal.organization_id)
     raw_events = provider.list_events(
         time_min,
         time_max,
@@ -353,7 +353,7 @@ def suggest_slots(
     except PydanticValidationError as exc:
         raise ValidationError(str(exc)) from exc
 
-    provider = get_calendar_provider(cfg)
+    provider = resolve_calendar_provider_for_org(cfg, principal.organization_id)
     raw = provider.suggest_slots(
         request.time_min,
         request.time_max,
@@ -393,7 +393,7 @@ def prepare_event_approval(
     time_min, time_max, query_type, window_label = _parse_time_window(message, cfg)
     duration = _parse_duration_minutes(message, cfg)
     timezone = _default_timezone(cfg)
-    provider = get_calendar_provider(cfg)
+    provider = resolve_calendar_provider_for_org(cfg, principal.organization_id)
 
     provider_mode = _resolve_calendar_provider_mode(provider)
 
@@ -560,7 +560,7 @@ def execute_approval_action(
         _record_audit(session, principal, event="calendar.provider_failed", result=result)
         return result
 
-    provider = get_calendar_provider(cfg)
+    provider = resolve_calendar_provider_for_org(cfg, principal.organization_id)
     raw = provider.create_event(
         req.summary,
         req.start_time,
@@ -609,7 +609,7 @@ def _track_usage(
     *,
     settings: Settings,
 ) -> None:
-    provider = get_calendar_provider(settings)
+    provider = resolve_calendar_provider_for_org(settings, principal.organization_id)
     provider_name = "google_calendar"
     if isinstance(provider, MockCalendarProvider):
         provider_name = "google_calendar_mock"

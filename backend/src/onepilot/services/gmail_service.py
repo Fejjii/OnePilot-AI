@@ -11,7 +11,7 @@ from onepilot.core.config import Settings, get_settings
 from onepilot.core.constants import UsageFeature
 from onepilot.core.errors import ValidationError
 from onepilot.core.logging import get_logger
-from onepilot.providers import get_email_provider
+from onepilot.providers import get_email_provider, resolve_email_provider_for_org
 from onepilot.providers.email.mock_email_provider import MockEmailProvider
 from onepilot.repositories.models import ApprovalRequest
 from onepilot.schemas.gmail import (
@@ -32,12 +32,20 @@ _SEND_INTENT = re.compile(
 )
 
 
-def is_live_gmail_provider(settings: Settings | None = None) -> bool:
-    """Return True when the configured email provider is live Gmail."""
+def is_live_gmail_provider(
+    settings: Settings | None = None,
+    organization_id: str | None = None,
+) -> bool:
+    """Return True when this org is allowed to use live Gmail."""
     from onepilot.providers.email.gmail_provider import GmailProvider
 
     cfg = settings or get_settings()
-    provider = get_email_provider(cfg)
+    if organization_id:
+        provider = resolve_email_provider_for_org(cfg, organization_id)
+    else:
+        if cfg.PUBLIC_DEMO_ENABLED:
+            return False
+        provider = get_email_provider(cfg)
     return isinstance(provider, GmailProvider)
 
 
@@ -160,7 +168,7 @@ def _create_draft_from_payload(
         _record_execution_audit(session, principal, payload, result)
         return result
 
-    provider = get_email_provider(settings)
+    provider = resolve_email_provider_for_org(settings, principal.organization_id)
     to_joined = ", ".join(str(a) for a in req.to)
     raw = provider.create_draft(
         to_joined,
@@ -206,7 +214,7 @@ def _send_from_payload(
         _record_execution_audit(session, principal, payload, result)
         return result
 
-    provider = get_email_provider(settings)
+    provider = resolve_email_provider_for_org(settings, principal.organization_id)
     to_joined = ", ".join(str(a) for a in req.to)
     if hasattr(provider, "send_email"):
         raw = provider.send_email(
@@ -259,7 +267,7 @@ def _track_usage(
     feature: str,
     result: dict,
 ) -> None:
-    provider = get_email_provider()
+    provider = resolve_email_provider_for_org(get_settings(), principal.organization_id)
     provider_name = "gmail"
     if isinstance(provider, MockEmailProvider):
         provider_name = "gmail_mock"

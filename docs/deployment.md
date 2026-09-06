@@ -102,6 +102,10 @@ This stack is designed for a **LinkedIn demo**: frontend on Vercel, backend on a
 
 Do **not** connect personal Gmail or Calendar accounts to a public demo. Use mock providers or an isolated demo Google Workspace account.
 
+Private recruiter/demo hosts with real Gmail + Calendar are a **separate**
+deployment. Do not enable them on the public Railway/Vercel project. Setup
+(variable names only): [private_demo/LIVE_GOOGLE_SETUP.md](private_demo/LIVE_GOOGLE_SETUP.md).
+
 ### Vercel (frontend)
 
 1. Import the GitHub repository and set the root directory to `frontend/`.

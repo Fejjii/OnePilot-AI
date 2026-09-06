@@ -74,8 +74,8 @@ class TestCalendarEventApproval:
 
         monkeypatch.setattr(
             calendar_service,
-            "get_calendar_provider",
-            lambda _settings: _LiveProvider(),
+            "resolve_calendar_provider_for_org",
+            lambda _settings, _organization_id: _LiveProvider(),
         )
 
         result = calendar_service.prepare_event_approval(

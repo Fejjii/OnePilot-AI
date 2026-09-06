@@ -15,7 +15,7 @@ Honest matrix of what OnePilot AI can do, what the **public demo** exposes, and 
 | External web search (Serper) | Live when keyed | Live or mock canned results | Without `SERPER_API_KEY`, mock + clear optional mode |
 | Hybrid web + knowledge answers | Live | Live (web may be mock) | Internal vs external evidence labeled separately |
 | Email drafting (in-app) | Live | Live | Draft text generated in workspace |
-| Gmail draft / send | Live when OAuth configured | **Simulated (mock provider)** | Approval-gated; send off by default (`GMAIL_SEND_ENABLED=false`) |
+| Gmail draft / send | Live when OAuth configured | **Simulated (mock provider)** | Approval-gated; send off by default (`GMAIL_SEND_ENABLED=false`). Private track: [LIVE_GOOGLE_SETUP.md](private_demo/LIVE_GOOGLE_SETUP.md) |
 | Calendar availability / slots | Live when OAuth configured | **Simulated (mock provider)** | Busy/free only — no private event titles |
 | Calendar event creation | Live when OAuth configured | **Simulated after approval** | Creates `ApprovalRequest` first |
 | Approvals (HITL) | Live | Live with seeded + chat-created items | Owner/Admin decide; audited |
@@ -32,6 +32,13 @@ Honest matrix of what OnePilot AI can do, what the **public demo** exposes, and 
 | HubSpot CRM | Mock adapter | Mock | Not a live CRM integration |
 | Twilio | Mock adapter | Mock | Not live telephony |
 | Streaming chat (SSE/WebSocket) | Not implemented | — | Synchronous responses today |
+
+## Private live-Google track
+
+A separate, authenticated host can select live Gmail and Google Calendar for one
+allowlisted organization. That track is opt-in (`PRIVATE_LIVE_GOOGLE_ENABLED`)
+and **cannot** share a process with `PUBLIC_DEMO_ENABLED`. Operator steps
+(variable names only): [private_demo/LIVE_GOOGLE_SETUP.md](private_demo/LIVE_GOOGLE_SETUP.md).
 
 ## Public-demo safety summary
 

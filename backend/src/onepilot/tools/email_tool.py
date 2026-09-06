@@ -66,7 +66,10 @@ class EmailDraftTool(Tool):
 
         live_gmail_draft = (
             action == "draft_only"
-            and gmail_service.is_live_gmail_provider(settings)
+            and gmail_service.is_live_gmail_provider(
+                settings,
+                organization_id=ctx.principal.organization_id,
+            )
             and not settings.GMAIL_SEND_ENABLED
         )
         gmail_result: dict | None = None

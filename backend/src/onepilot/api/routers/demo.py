@@ -93,7 +93,7 @@ def start_public_demo(
     (knowledge base + operational data) and returns a short-lived token
     scoped to that single shared tenant. No password is exposed or required.
     """
-    if not settings.PUBLIC_DEMO_ENABLED:
+    if settings.PRIVATE_LIVE_GOOGLE_ENABLED or not settings.PUBLIC_DEMO_ENABLED:
         raise HTTPException(
             status_code=403,
             detail="The public demo is not enabled on this server.",
