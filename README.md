@@ -324,6 +324,7 @@ scripts/     Public-demo smoke tests, Cloud handoff / reports
 | [Evaluation](docs/evaluation.md) | Offline quality harness |
 | [Security](docs/security.md) | Auth, RBAC, guardrails |
 | [Deployment](docs/deployment.md) | Docker / host runbooks |
+| [Private live-Google setup](docs/private_demo/LIVE_GOOGLE_SETUP.md) | Operator env names for a private Gmail/Calendar host |
 | [Limitations & roadmap](docs/limitations_roadmap.md) | Honest gaps |
 | [Demo script](docs/demo_script.md) | Reviewer walkthrough |
 | [Portfolio kit](docs/portfolio/) | Architecture overview, 3-minute script, recording checklist, interview sheet |

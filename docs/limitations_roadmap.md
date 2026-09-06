@@ -12,8 +12,8 @@ This document is an honest assessment of the current state of OnePilot AI — wh
 | OpenAI Embeddings | Mock fallback available | Fallback uses token-hash embeddings — adequate for demos, not for production semantic quality. |
 | Qdrant Vector DB | Mock fallback available | In-memory vector store used when `QDRANT_URL` is not set. Not persistent across restarts. |
 | HubSpot CRM | Mocked | In-memory, deterministic. No real HubSpot API calls. |
-| Gmail | Live when OAuth configured | Draft creation after human approval; optional send when `GMAIL_SEND_ENABLED=true`. **Mock on the public demo** (`GMAIL_PROVIDER_MODE=mock`). |
-| Google Calendar | Live when OAuth configured | Availability/slots without approval; event creation after approval. **Mock on the public demo** (`GOOGLE_CALENDAR_PROVIDER_MODE=mock`). |
+| Gmail | Live when OAuth configured | Draft creation after human approval; optional send when `GMAIL_SEND_ENABLED=true`. **Mock on the public demo** (`GMAIL_PROVIDER_MODE=mock`). Private live-Google is a separate authenticated host (`PRIVATE_LIVE_GOOGLE_ENABLED`). |
+| Google Calendar | Live when OAuth configured | Availability/slots without approval; event creation after approval. **Mock on the public demo** (`GOOGLE_CALENDAR_PROVIDER_MODE=mock`). Same private-track flag as Gmail. |
 | Stripe Billing | Mocked | `MockStripeProvider` + billing-ready APIs; estimated usage costs; no real payment processing. |
 | Serper Web Search | Live when configured | Real HTTP calls when `SERPER_API_KEY` is set; mock canned results otherwise. |
 

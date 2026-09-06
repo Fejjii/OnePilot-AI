@@ -89,6 +89,12 @@ class Settings(BaseSettings):
     GOOGLE_CALENDAR_WORKDAY_START: str = "09:00"
     GOOGLE_CALENDAR_WORKDAY_END: str = "17:00"
 
+    # Private recruiter/demo track: live Gmail + Calendar on a dedicated host.
+    # Must never be combined with PUBLIC_DEMO_ENABLED. Safe default is false.
+    PRIVATE_LIVE_GOOGLE_ENABLED: bool = False
+    # Only this organization may use the process-level live Google account.
+    PRIVATE_LIVE_GOOGLE_ORG_ID: str = ""
+
     JWT_SECRET: str = "change-me-in-production"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60
@@ -182,6 +188,15 @@ class Settings(BaseSettings):
     def has_calendar_oauth(self) -> bool:
         return self.has_gmail_oauth
 
+    @property
+    def demo_track(self) -> str:
+        """Host track for diagnostics: public, private_live_google, or standard."""
+        if self.PUBLIC_DEMO_ENABLED:
+            return "public"
+        if self.PRIVATE_LIVE_GOOGLE_ENABLED:
+            return "private_live_google"
+        return "standard"
+
     def cors_origins_list(self) -> list[str]:
         """Resolved CORS allowlist. Localhost is always included in dev/test."""
         configured = [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
@@ -198,9 +213,96 @@ class Settings(BaseSettings):
             raise ValueError("Wildcard CORS origin (*) is not allowed in production")
         return configured
 
+    def gmail_provider_mode_normalized(self) -> str:
+        return (self.GMAIL_PROVIDER_MODE or "auto").strip().lower()
+
+    def calendar_provider_mode_normalized(self) -> str:
+        return (self.GOOGLE_CALENDAR_PROVIDER_MODE or "auto").strip().lower()
+
+    def private_live_google_org_id_normalized(self) -> str:
+        return (self.PRIVATE_LIVE_GOOGLE_ORG_ID or "").strip()
+
+    def live_google_allowed_for_org(self, organization_id: str) -> bool:
+        """Return True when this org may use the process-level live Google account.
+
+        Public demo never uses live Google. Private live-Google restricts the
+        dedicated account to PRIVATE_LIVE_GOOGLE_ORG_ID. Standard hosts keep
+        the existing process-wide adapter (one demo Google account).
+        """
+        if self.PUBLIC_DEMO_ENABLED:
+            return False
+        if not self.PRIVATE_LIVE_GOOGLE_ENABLED:
+            return True
+        allowed = self.private_live_google_org_id_normalized()
+        return bool(allowed) and organization_id == allowed
+
+    def _validate_live_google_modes(self) -> None:
+        """Fail closed when live Google is requested without a safe configuration."""
+        gmail_mode = self.gmail_provider_mode_normalized()
+        calendar_mode = self.calendar_provider_mode_normalized()
+
+        if self.PUBLIC_DEMO_ENABLED and self.PRIVATE_LIVE_GOOGLE_ENABLED:
+            raise RuntimeError(
+                "PUBLIC_DEMO_ENABLED and PRIVATE_LIVE_GOOGLE_ENABLED cannot both "
+                "be true. Live Google must never be reachable from anonymous "
+                "public-demo traffic."
+            )
+
+        if gmail_mode == "live" and not (
+            self.has_gmail_oauth or self.has_gmail_legacy_credentials
+        ):
+            raise RuntimeError(
+                "GMAIL_PROVIDER_MODE=live requires GOOGLE_CLIENT_ID, "
+                "GOOGLE_CLIENT_SECRET, and GOOGLE_REFRESH_TOKEN. "
+                "Refusing to start with a silent mock fallback."
+            )
+
+        if calendar_mode == "live" and not self.has_calendar_oauth:
+            raise RuntimeError(
+                "GOOGLE_CALENDAR_PROVIDER_MODE=live requires GOOGLE_CLIENT_ID, "
+                "GOOGLE_CLIENT_SECRET, and GOOGLE_REFRESH_TOKEN. "
+                "Refusing to start with a silent mock fallback."
+            )
+
+        if not self.PRIVATE_LIVE_GOOGLE_ENABLED:
+            return
+
+        if self.DEV_AUTH_ENABLED:
+            raise RuntimeError(
+                "PRIVATE_LIVE_GOOGLE_ENABLED requires DEV_AUTH_ENABLED=false. "
+                "Live Google must not run behind the JWT bypass."
+            )
+
+        if not self.private_live_google_org_id_normalized():
+            raise RuntimeError(
+                "PRIVATE_LIVE_GOOGLE_ENABLED requires PRIVATE_LIVE_GOOGLE_ORG_ID "
+                "so only the dedicated private-demo organization can use live Google."
+            )
+
+        if not self.has_gmail_oauth:
+            raise RuntimeError(
+                "PRIVATE_LIVE_GOOGLE_ENABLED requires GOOGLE_CLIENT_ID, "
+                "GOOGLE_CLIENT_SECRET, and GOOGLE_REFRESH_TOKEN. "
+                "Failing closed because live Google credentials are absent."
+            )
+
+        if gmail_mode not in {"live", "auto"}:
+            raise RuntimeError(
+                "PRIVATE_LIVE_GOOGLE_ENABLED requires GMAIL_PROVIDER_MODE=live "
+                "or auto (not mock/missing)."
+            )
+
+        if calendar_mode not in {"live", "auto"}:
+            raise RuntimeError(
+                "PRIVATE_LIVE_GOOGLE_ENABLED requires "
+                "GOOGLE_CALENDAR_PROVIDER_MODE=live or auto (not mock/missing)."
+            )
+
     def validate_startup_config(self) -> list[str]:
-        """Fail fast on unsafe production configuration. Returns non-fatal warnings."""
+        """Fail fast on unsafe production and live-Google configuration."""
         warnings: list[str] = []
+        self._validate_live_google_modes()
+
         if not self.is_production:
             return warnings
 
@@ -229,8 +331,8 @@ class Settings(BaseSettings):
             )
 
         if self.PUBLIC_DEMO_ENABLED:
-            gmail_mode = (self.GMAIL_PROVIDER_MODE or "").strip().lower()
-            calendar_mode = (self.GOOGLE_CALENDAR_PROVIDER_MODE or "").strip().lower()
+            gmail_mode = self.gmail_provider_mode_normalized()
+            calendar_mode = self.calendar_provider_mode_normalized()
             if gmail_mode != "mock" or calendar_mode != "mock":
                 raise RuntimeError(
                     "PUBLIC_DEMO_ENABLED=true in production requires "
@@ -279,8 +381,24 @@ def gmail_runtime_status(settings: Settings) -> dict[str, bool | str]:
     from onepilot.providers.email.gmail_provider import GmailProvider
     from onepilot.providers.email.mock_email_provider import MockEmailProvider
 
-    mode_setting = (settings.GMAIL_PROVIDER_MODE or "auto").strip().lower()
+    mode_setting = settings.gmail_provider_mode_normalized()
     configured = settings.has_gmail_oauth or settings.has_gmail_legacy_credentials
+
+    if settings.PUBLIC_DEMO_ENABLED:
+        return {
+            "gmail_configured": configured,
+            "gmail_mode": "mock",
+            "gmail_active": False,
+            "gmail_fallback_used": True,
+        }
+
+    if mode_setting == "live" and not configured:
+        return {
+            "gmail_configured": False,
+            "gmail_mode": "missing",
+            "gmail_active": False,
+            "gmail_fallback_used": False,
+        }
 
     if mode_setting == "mock":
         return {
@@ -335,7 +453,7 @@ def calendar_runtime_status(settings: Settings) -> dict[str, bool | str | None]:
     from onepilot.providers.calendar.google_calendar_provider import GoogleCalendarProvider
     from onepilot.providers.calendar.mock_calendar_provider import MockCalendarProvider
 
-    mode_setting = (settings.GOOGLE_CALENDAR_PROVIDER_MODE or "auto").strip().lower()
+    mode_setting = settings.calendar_provider_mode_normalized()
     configured = settings.has_calendar_oauth
     config_reason = _calendar_config_reason(settings)
 
@@ -344,6 +462,23 @@ def calendar_runtime_status(settings: Settings) -> dict[str, bool | str | None]:
         "calendar_create_enabled": settings.GOOGLE_CALENDAR_CREATE_ENABLED,
         "calendar_status_reason": config_reason,
     }
+
+    if settings.PUBLIC_DEMO_ENABLED:
+        return {
+            **base,
+            "calendar_mode": "mock",
+            "calendar_active": False,
+            "calendar_fallback_used": True,
+            "calendar_status_reason": None,
+        }
+
+    if mode_setting == "live" and config_reason:
+        return {
+            **base,
+            "calendar_mode": "missing",
+            "calendar_active": False,
+            "calendar_fallback_used": False,
+        }
 
     if mode_setting == "mock":
         # Intentional mock is a safe simulated mode, not a missing-OAuth outage.

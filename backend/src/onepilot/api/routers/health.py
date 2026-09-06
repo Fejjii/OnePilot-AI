@@ -156,6 +156,12 @@ def _build_calendar_diagnostic(
         "capability_create_event": bool(
             settings.GOOGLE_CALENDAR_CREATE_ENABLED and calendar_mode == ProviderMode.LIVE
         ),
+        "demo_track": settings.demo_track,
+        "private_live_google_enabled": settings.PRIVATE_LIVE_GOOGLE_ENABLED,
+        "live_google_org_restricted": bool(
+            settings.PRIVATE_LIVE_GOOGLE_ENABLED
+            and settings.private_live_google_org_id_normalized()
+        ),
     }
 
     try:
@@ -208,7 +214,11 @@ def _build_calendar_diagnostic(
             calendar_details["calendar_status_reason"] = status_reason
 
     if calendar_mode == ProviderMode.LIVE:
-        calendar_reason = "Google Calendar API reachable; event creation after approval"
+        calendar_reason = (
+            "Live Google Calendar reachable; event creation after approval"
+            if settings.PRIVATE_LIVE_GOOGLE_ENABLED
+            else "Google Calendar API reachable; event creation after approval"
+        )
     elif calendar_mode == ProviderMode.UNHEALTHY:
         calendar_reason = (
             f"Calendar provider issue: {status_reason}"
@@ -326,6 +336,13 @@ def health_check(settings: Settings = Depends(get_settings)) -> dict:
             "calendar_mode": calendar["calendar_mode"],
             "calendar_create_enabled": calendar["calendar_create_enabled"],
             "calendar_status_reason": calendar.get("calendar_status_reason"),
+            "demo_track": settings.demo_track,
+            "public_demo_enabled": settings.PUBLIC_DEMO_ENABLED,
+            "private_live_google_enabled": settings.PRIVATE_LIVE_GOOGLE_ENABLED,
+            "live_google_org_restricted": bool(
+                settings.PRIVATE_LIVE_GOOGLE_ENABLED
+                and settings.private_live_google_org_id_normalized()
+            ),
         },
     }
 
@@ -603,7 +620,19 @@ def provider_diagnostics(
     from onepilot.providers.email.mock_email_provider import MockEmailProvider
 
     gmail_status = gmail_runtime_status(settings)
-    gmail_provider = get_email_provider(settings)
+    try:
+        gmail_provider = get_email_provider(settings)
+    except Exception:
+        from onepilot.providers.email.mock_email_provider import MockEmailProvider as _MockEmail
+
+        gmail_provider = _MockEmail()
+        if str(gmail_status.get("gmail_mode")) == "live":
+            gmail_status = {
+                **gmail_status,
+                "gmail_mode": "unhealthy",
+                "gmail_active": False,
+                "gmail_fallback_used": False,
+            }
     gmail_is_mock = isinstance(gmail_provider, MockEmailProvider)
     gmail_is_live = isinstance(gmail_provider, GmailProvider)
     gmail_mode_str = str(gmail_status["gmail_mode"])
@@ -631,10 +660,22 @@ def provider_diagnostics(
         "capability_send_email": bool(
             settings.GMAIL_SEND_ENABLED and caps_dict.get("send_email", False)
         ),
+        "demo_track": settings.demo_track,
+        "private_live_google_enabled": settings.PRIVATE_LIVE_GOOGLE_ENABLED,
+        "live_google_org_restricted": bool(
+            settings.PRIVATE_LIVE_GOOGLE_ENABLED
+            and settings.private_live_google_org_id_normalized()
+        ),
     }
 
-    if gmail_is_live:
-        gmail_reason = "Gmail OAuth configured; live draft creation after approval"
+    if settings.PUBLIC_DEMO_ENABLED:
+        gmail_reason = "Gmail is simulated for this public demo. Live Gmail is not connected."
+    elif gmail_is_live:
+        gmail_reason = (
+            "Live Gmail OAuth configured; draft/send after approval"
+            if settings.PRIVATE_LIVE_GOOGLE_ENABLED
+            else "Gmail OAuth configured; live draft creation after approval"
+        )
     elif gmail_is_mock and gmail_status["gmail_configured"]:
         gmail_reason = "Gmail credentials present but provider running in mock/fallback mode"
     else:

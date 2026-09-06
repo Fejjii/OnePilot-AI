@@ -28,6 +28,11 @@ Email **draft text** can be generated in-app without approval. **Gmail provider 
 
 Reviewers share one seeded demo organization. Isolation between private tenants remains repository-enforced; shared-demo memory controls prevent cross-reviewer memory leakage on that shared org.
 
+Private live-Google hosts keep `PUBLIC_DEMO_ENABLED=false`. Live Gmail/Calendar
+are restricted to `PRIVATE_LIVE_GOOGLE_ORG_ID`. Other orgs on that host receive
+mock providers and cannot use the dedicated Google account. See
+[private_demo/LIVE_GOOGLE_SETUP.md](private_demo/LIVE_GOOGLE_SETUP.md).
+
 ## Multi-tenant isolation
 
 - Every tenant-scoped row carries `organization_id`.

@@ -1,7 +1,7 @@
 # Cloud agent handoff (sanitized)
 
-Generated: 2026-09-06 10:40 UTC  
-Generator: Cloud agent (manual, sanitized; recruiter demo package on `docs/recruiter-demo-package`; no local `HANDOFF.md`)
+Generated: 2026-09-06 11:20 UTC  
+Generator: Cloud agent (manual, sanitized; private live-Google v1 on `feat/private-live-google-v1`; no local `HANDOFF.md`)
 
 This file is the **only** committed project-state brief for Cursor Cloud / phone agents.
 It is intentionally smaller than any local `HANDOFF.md` and contains **no secrets**.
@@ -16,7 +16,7 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 |-------|------------|-------------------|
 | **Canonical repository** | `main` at the SHA below | Yes — default base for product work |
 | **Deployed public-demo** | `deployment/public-demo` (Vercel + Railway, mock Gmail/Calendar) | Read SHAs only. Do not push/fast-forward unless explicitly authorized |
-| **Private live-demo** | `deployment/live-google-demo` (live Google OAuth track) | **No** unless the operator names that branch and authorizes the change |
+| **Private live-demo** | `deployment/live-google-demo` (legacy pointer) | **No** unless the operator names that branch and authorizes the change. Implementation now lives on `main` via `PRIVATE_LIVE_GOOGLE_ENABLED` |
 | **User-gated operations** | Railway / Vercel / Qdrant Cloud / production env vars | **No** — operator does this in host consoles |
 | **Local-only state** | `HANDOFF.md`, `.ai/`, `CHANGELOG_SESSION.md`, git stash, iCloud, local `.env` | **Invisible** to Cloud. Never assume it exists |
 | **Latest Cloud agent report** | `agent/cloud-state` → `docs/agent/LATEST_AGENT_REPORT.md` | Yes — last execution/result only. Not project state and not a product/deploy branch |
@@ -25,15 +25,16 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 
 | Ref | SHA | Notes |
 |-----|-----|-------|
-| `origin/main` (canonical) | `90abb72cdf2b836bac169069b70431afe81cbf5c` | Includes PR #33 (recruiter README polish) |
+| `origin/main` (canonical) | `1cd9abbc1eaec6022a17826e5fc4269797c40828` | Task-start SHA. Includes PR #34 (recruiter demo package) |
 | `origin/deployment/public-demo` | `87eef7d5c2565181b94aff06be97374b22bdf4f9` | Product SHA behind `main` by docs-only commits. **READY TO SHARE**. Do not fast-forward |
-| `origin/deployment/live-google-demo` | `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332` | Private live-Google pointer; **untouched** |
-| `docs/recruiter-demo-package` (this work) | see latest commit on that branch | Recruiter presentation package PR into `main`; do not merge unless asked |
+| `origin/deployment/live-google-demo` | `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332` | Legacy private pointer; **untouched**. No unique commits vs `main` |
+| `feat/private-live-google-v1` (this work) | see latest commit on that branch | Private live-Google prep PR into `main`; do not merge unless asked |
 
-`main` and `deployment/public-demo` differ by documentation only (PR #33 README/handoff). Do **not** move the public-demo pointer for this docs PR.
+`deployment/live-google-demo` is a stale ancestor of `main` (no unique code). Current `main` is authoritative. Do **not** move that pointer.
 
 ## Completed
 
+- PR #34 — recruiter demo presentation package merged to `main`
 - PR #33 — recruiter-facing README polish merged to `main`
 - Public demo **READY TO SHARE** at `https://one-pilot-ai.vercel.app` (backend `https://onepilot-ai-production.up.railway.app`)
 - OP-034 deployed and accepted (PR #32 merged; public-demo pointer remains `87eef7d5c2565181b94aff06be97374b22bdf4f9`)
@@ -58,12 +59,18 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 
 ## Current task / in progress
 
-- **Recruiter demo package** implemented on `docs/recruiter-demo-package` and **not merged**. Docs-only: architecture overview, 3-minute spoken script, recording checklist, interview cheat sheet, plus this handoff. No product-behavior, backend, frontend, env, or deployment-branch changes.
-- Public demo remains **READY TO SHARE**. Runtime model stays `gpt-5-nano`. Gmail mock/send-disabled; Calendar mock/create-disabled; public speech transcription disabled.
-- `main` is `90abb72cdf2b836bac169069b70431afe81cbf5c`. `deployment/public-demo` stays at `87eef7d5c2565181b94aff06be97374b22bdf4f9` (docs-only delta). Do not fast-forward.
-- OP-034 is **deployed and accepted**. `/demo/start` refreshes curated approvals and removes stale non-curated demo-visitor residue older than 6 hours when `PUBLIC_DEMO_ENABLED=true`.
-- `deployment/live-google-demo` remains untouched at `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332`.
-- Public infrastructure is essentially complete (OP-026 COMPLETE). Private live-Google demo remains a later user-gated track (Cloud must not assume OAuth or live Google access).
+- **Private live-Google v1** implemented on `feat/private-live-google-v1` and **not merged**. Smallest safe delta on current `main`:
+  - `PRIVATE_LIVE_GOOGLE_ENABLED` + `PRIVATE_LIVE_GOOGLE_ORG_ID` select a private authenticated track
+  - Explicit `GMAIL_PROVIDER_MODE=live` / `GOOGLE_CALENDAR_PROVIDER_MODE=live` fail closed without OAuth
+  - `PUBLIC_DEMO_ENABLED` forces mock Gmail/Calendar even if OAuth env is present
+  - Live Google is org-restricted on the private track; other orgs get isolated mocks
+  - `/demo/start` stays off when the private track is enabled
+  - Operator doc: `docs/private_demo/LIVE_GOOGLE_SETUP.md` (variable names only)
+- Public demo behavior is unchanged: mock Gmail/send-disabled, mock Calendar, speech disabled, `gpt-5-nano` on the live public host. Do not change public production env.
+- `origin/main` at task start: `1cd9abbc1eaec6022a17826e5fc4269797c40828`.
+- `deployment/live-google-demo` remains untouched at `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332`. Audit found **no unique commits** vs `main`; nothing was ported from that pointer.
+- Existing main already had real `GmailProvider` / `GoogleCalendarProvider`, shared OAuth refresh-token env, and HITL gates. This PR does not duplicate that architecture.
+- Host configuration (Railway/Vercel/Google Cloud OAuth) remains **user-gated**. Cloud must not assume OAuth or live Google access.
 - Product work belongs on a feature/fix branch off `main`, never on a deployment branch.
 
 ## Backlog
@@ -89,7 +96,7 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 - Forced Calendar mock is reported as healthy simulated mode. Missing OAuth in that mode is not a provider outage.
 - Seeded Approvals email/calendar payloads use the same preview fields as chat-created approvals.
 - Public-demo `/demo/start` refreshes canonical curated approvals and, when `PUBLIC_DEMO_ENABLED=true`, also removes stale non-curated demo-visitor residue older than 6 hours. Recent active-session approvals are preserved. No public approval DELETE route.
-- Private live-Google track exists on `deployment/live-google-demo` and is **user-gated**. Cloud must not assume OAuth or live Google access.
+- Private live-Google is now a **config track on `main`** (`PRIVATE_LIVE_GOOGLE_ENABLED`), not a deployment-branch codebase. The `deployment/live-google-demo` pointer is legacy and still must not be moved unless the operator explicitly authorizes that branch.
 - Vectors: Qdrant when configured, in-memory fallback otherwise. Cloud must not target live Qdrant clusters.
 - Recruiter presentation package lives under `docs/portfolio/` (`ARCHITECTURE_OVERVIEW.md`, `RECRUITER_DEMO_SCRIPT.md`, `RECORDING_CHECKLIST.md`, `INTERVIEW_CHEAT_SHEET.md`).
 - Cloud execution reports are public/sanitized and live only on `agent/cloud-state`. Cloud cannot write iCloud.
@@ -97,7 +104,7 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 ## Tests / status
 
 - Latest green CI on `main` @ `87eef7d5c2565181b94aff06be97374b22bdf4f9` (run 34020499895): backend **821 passed, 3 skipped**; frontend **171 passed** (30 files); scripts **53 passed**. README uses durable wording (**800+** / **170+**).
-- PR #33 CI succeeded on the recruiter README polish (docs-only).
+- This branch (`feat/private-live-google-v1`): targeted provider/HITL/demo/config tests **119 passed**; full backend **846 passed, 3 skipped**; `python3 -m pytest -q scripts/tests` — **53 passed**; sanitizer `--check --no-fetch` — **ok**. No frontend changes.
 - CI (`.github/workflows/ci.yml`) runs backend pytest + frontend typecheck/tests/build on PRs to `main` and `deployment/**`, plus `scripts/tests`.
 - Public-demo smoke: `python scripts/smoke_test_public_demo.py --base-url <public-api>` (never print tokens).
 - Cloud-handoff / report-bridge tests: `python -m pytest -q scripts/tests`
@@ -118,7 +125,7 @@ Cloud (and any agent) must **not** touch:
 
 ## Recommended next task
 
-Review and merge the recruiter demo package PR (`docs/recruiter-demo-package`) if accepted. Then Sofien records the public demo with `docs/portfolio/RECORDING_CHECKLIST.md`. Public demo is already **READY TO SHARE**. Do not touch `deployment/public-demo` or `deployment/live-google-demo` unless explicitly authorized. Keep `gpt-5-nano`. Private live-Google demo remains later and user-gated. Remaining P2 audit items stay deferred.
+Review and merge `feat/private-live-google-v1` if the private-track gates are accepted. After merge, **Sofien** still must create a dedicated Google demo account, enable Gmail + Calendar APIs, generate a refresh token on an operator machine, and set env names from `docs/private_demo/LIVE_GOOGLE_SETUP.md` on a **new** private Railway/Vercel host. Do not change the public production env. Do not move `deployment/public-demo` or `deployment/live-google-demo` unless explicitly authorized. Keep public `gpt-5-nano`. Remaining P2 audit items stay deferred.
 
 Do not re-run live Qdrant or modify deployment branches unless the operator explicitly authorizes that exact branch.
 

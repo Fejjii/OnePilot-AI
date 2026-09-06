@@ -15,6 +15,7 @@ import os
 import structlog
 
 from onepilot.core.config import Settings
+from onepilot.core.errors import ProviderUnavailableError
 from onepilot.providers.billing.base import BillingProvider
 from onepilot.providers.calendar.base import CalendarProvider
 from onepilot.providers.crm.base import CRMProvider
@@ -202,7 +203,12 @@ def get_email_provider(settings: Settings | None = None) -> EmailProvider:
     from onepilot.providers.email.mock_email_provider import MockEmailProvider
 
     cfg = settings or get_settings()
-    mode = (cfg.GMAIL_PROVIDER_MODE or "auto").strip().lower()
+    mode = cfg.gmail_provider_mode_normalized()
+
+    if cfg.PUBLIC_DEMO_ENABLED:
+        log.info("email_provider.init", provider="mock", reason="PUBLIC_DEMO_ENABLED")
+        _email_singleton = MockEmailProvider()
+        return _email_singleton
 
     if mode == "mock":
         log.info("email_provider.init", provider="mock", reason="GMAIL_PROVIDER_MODE=mock")
@@ -213,6 +219,11 @@ def get_email_provider(settings: Settings | None = None) -> EmailProvider:
         log.warning("email_provider.fallback", reason="GMAIL_PROVIDER_MODE=missing")
         _email_singleton = MockEmailProvider()
         return _email_singleton
+
+    if mode == "live" and not (cfg.has_gmail_oauth or cfg.has_gmail_legacy_credentials):
+        raise ProviderUnavailableError(
+            "GMAIL_PROVIDER_MODE=live requires Google OAuth credentials"
+        )
 
     if cfg.has_gmail_oauth:
         try:
@@ -257,7 +268,16 @@ def get_calendar_provider(settings: Settings | None = None) -> CalendarProvider:
     from onepilot.providers.calendar.mock_calendar_provider import MockCalendarProvider
 
     cfg = settings or get_settings()
-    mode = (cfg.GOOGLE_CALENDAR_PROVIDER_MODE or "auto").strip().lower()
+    mode = cfg.calendar_provider_mode_normalized()
+
+    if cfg.PUBLIC_DEMO_ENABLED:
+        log.info(
+            "calendar_provider.init",
+            provider="mock",
+            reason="PUBLIC_DEMO_ENABLED",
+        )
+        _calendar_singleton = MockCalendarProvider(calendar_id=cfg.GOOGLE_CALENDAR_ID or "primary")
+        return _calendar_singleton
 
     if mode == "mock":
         log.info("calendar_provider.init", provider="mock", reason="GOOGLE_CALENDAR_PROVIDER_MODE=mock")
@@ -268,6 +288,11 @@ def get_calendar_provider(settings: Settings | None = None) -> CalendarProvider:
         log.warning("calendar_provider.fallback", reason="GOOGLE_CALENDAR_PROVIDER_MODE=missing")
         _calendar_singleton = MockCalendarProvider(calendar_id=cfg.GOOGLE_CALENDAR_ID or "primary")
         return _calendar_singleton
+
+    if mode == "live" and not cfg.has_calendar_oauth:
+        raise ProviderUnavailableError(
+            "GOOGLE_CALENDAR_PROVIDER_MODE=live requires Google OAuth credentials"
+        )
 
     if cfg.has_calendar_oauth:
         try:
@@ -311,6 +336,39 @@ def get_search_provider(settings: Settings) -> SearchProvider:
     return MockSearchProvider()
 
 
+def resolve_email_provider_for_org(
+    settings: Settings,
+    organization_id: str,
+) -> EmailProvider:
+    """Return the email provider this organization is allowed to use.
+
+    Live Gmail is process-level (one dedicated Google account). Public demo
+    and non-allowlisted orgs on the private track receive an isolated mock
+    so they cannot reach that account.
+    """
+    from onepilot.providers.email.mock_email_provider import MockEmailProvider
+
+    if settings.PUBLIC_DEMO_ENABLED or not settings.live_google_allowed_for_org(
+        organization_id
+    ):
+        return MockEmailProvider()
+    return get_email_provider(settings)
+
+
+def resolve_calendar_provider_for_org(
+    settings: Settings,
+    organization_id: str,
+) -> CalendarProvider:
+    """Return the calendar provider this organization is allowed to use."""
+    from onepilot.providers.calendar.mock_calendar_provider import MockCalendarProvider
+
+    if settings.PUBLIC_DEMO_ENABLED or not settings.live_google_allowed_for_org(
+        organization_id
+    ):
+        return MockCalendarProvider(calendar_id=settings.GOOGLE_CALENDAR_ID or "primary")
+    return get_calendar_provider(settings)
+
+
 # ---------------------------------------------------------------------------
 # Billing
 # ---------------------------------------------------------------------------
@@ -336,6 +394,8 @@ __all__ = [
     "get_crm_provider",
     "get_email_provider",
     "get_calendar_provider",
+    "resolve_email_provider_for_org",
+    "resolve_calendar_provider_for_org",
     "get_search_provider",
     "get_billing_provider",
     "reset_provider_cache",
