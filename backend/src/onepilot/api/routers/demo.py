@@ -109,7 +109,9 @@ def start_public_demo(
     try:
         seed_module.seed_knowledge_base(session, principal=principal, settings=settings)
         seed_module.seed_operational_data(session, principal=principal)
-        seed_module.ensure_curated_demo_approvals(session, principal=principal)
+        seed_module.ensure_curated_demo_approvals(
+            session, principal=principal, settings=settings
+        )
     except Exception:
         logger.exception("demo_start_seed_failed")
         raise HTTPException(
@@ -185,6 +187,7 @@ def _seed_response(
     approvals_refreshed = seed_module.ensure_curated_demo_approvals(
         session,
         principal=principal,
+        settings=settings,
     )
     return SeedResponse(
         documents_created=result.documents_created,

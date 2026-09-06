@@ -49,3 +49,22 @@ class ApprovalRequestRepository(BaseRepository[ApprovalRequest]):
         return self.count_for_org(
             organization_id, status=ApprovalStatus.PENDING.value
         )
+
+    def delete_ids_for_org(self, organization_id: str, ids: list[str]) -> int:
+        """Delete specific approval rows, scoped to one organization.
+
+        Internal helper for public-demo hygiene. Never deletes a row whose
+        ``organization_id`` does not match, even if that id is supplied.
+        """
+        if not organization_id or not ids:
+            return 0
+        stmt = select(ApprovalRequest).where(
+            ApprovalRequest.organization_id == organization_id,
+            ApprovalRequest.id.in_(list(ids)),
+        )
+        rows = list(self._session.execute(stmt).scalars().all())
+        for row in rows:
+            self._session.delete(row)
+        if rows:
+            self._session.flush()
+        return len(rows)
