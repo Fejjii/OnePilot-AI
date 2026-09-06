@@ -1,6 +1,6 @@
 # Demo Script — OnePilot AI
 
-**Duration:** 8–10 minutes (or use the 3-minute cut in [portfolio/demo_narration_3min.md](portfolio/demo_narration_3min.md))  
+**Duration:** 8–10 minutes (or the timed recruiter cut in [portfolio/RECRUITER_DEMO_SCRIPT.md](portfolio/RECRUITER_DEMO_SCRIPT.md) + [portfolio/RECORDING_CHECKLIST.md](portfolio/RECORDING_CHECKLIST.md))  
 **Audience:** Recruiter, hiring manager, or technical reviewer  
 **Live entry:** https://one-pilot-ai.vercel.app → **Try the demo** (no credentials)
 
@@ -150,7 +150,9 @@ Open **Settings → provider diagnostics** (no secrets).
 
 ## Related docs
 
-- [portfolio/demo_narration_3min.md](portfolio/demo_narration_3min.md) — timed narration
+- [portfolio/RECRUITER_DEMO_SCRIPT.md](portfolio/RECRUITER_DEMO_SCRIPT.md) — ~3-minute spoken script
+- [portfolio/RECORDING_CHECKLIST.md](portfolio/RECORDING_CHECKLIST.md) — exact recording sequence
+- [portfolio/demo_narration_3min.md](portfolio/demo_narration_3min.md) — older timed narration
 - [capabilities.md](capabilities.md) — live vs mocked matrix
 - [safety_and_privacy.md](safety_and_privacy.md) — HITL and isolation
 - [screenshots/README.md](screenshots/README.md) — capture list

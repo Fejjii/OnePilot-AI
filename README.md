@@ -326,7 +326,7 @@ scripts/     Public-demo smoke tests, Cloud handoff / reports
 | [Deployment](docs/deployment.md) | Docker / host runbooks |
 | [Limitations & roadmap](docs/limitations_roadmap.md) | Honest gaps |
 | [Demo script](docs/demo_script.md) | Reviewer walkthrough |
-| [Portfolio kit](docs/portfolio/) | Pitch, case study, interview points |
+| [Portfolio kit](docs/portfolio/) | Architecture overview, 3-minute script, recording checklist, interview sheet |
 
 ---
 
