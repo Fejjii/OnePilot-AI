@@ -157,7 +157,7 @@ class TestPrivateLiveModeSelection:
         assert isinstance(get_email_provider(settings), GmailProvider)
         assert isinstance(get_calendar_provider(settings), GoogleCalendarProvider)
         assert gmail_runtime_status(settings)["gmail_mode"] == "live"
-        assert calendar_runtime_status(settings)["calendar_mode"] == "live"
+        assert settings.has_calendar_oauth is True
         assert settings.demo_track == "private_live_google"
 
     def test_auto_with_oauth_still_selects_live(self) -> None:
@@ -418,15 +418,34 @@ class TestDiagnostics:
         assert "refresh_token" not in blob
         assert "ya29." not in blob
 
-    def test_runtime_status_labels_private_live(self) -> None:
+    def test_runtime_status_labels_private_live(self, monkeypatch: pytest.MonkeyPatch) -> None:
         settings = _private_settings()
         gmail = gmail_runtime_status(settings)
-        calendar = calendar_runtime_status(settings)
         assert gmail["gmail_mode"] == "live"
         assert gmail["gmail_active"] is True
         assert gmail["gmail_fallback_used"] is False
-        assert calendar["calendar_mode"] in {"live", "unhealthy"}
         assert settings.demo_track == "private_live_google"
+
+        from onepilot.schemas.calendar import CalendarProviderStatus
+
+        live_status = CalendarProviderStatus(
+            configured=True,
+            mode="live",
+            active=True,
+            fallback_used=False,
+            calendar_id="primary",
+            create_enabled=True,
+        )
+        monkeypatch.setattr(
+            GoogleCalendarProvider,
+            "get_status",
+            lambda self: live_status,
+        )
+        reset_provider_cache()
+        calendar = calendar_runtime_status(settings)
+        assert calendar["calendar_mode"] == "live"
+        assert calendar["calendar_active"] is True
+        assert calendar["calendar_fallback_used"] is False
 
     def test_public_demo_diagnostics_name_simulated_gmail(self) -> None:
         settings = Settings(

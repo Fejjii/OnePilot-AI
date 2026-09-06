@@ -104,7 +104,7 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 ## Tests / status
 
 - Latest green CI on `main` @ `87eef7d5c2565181b94aff06be97374b22bdf4f9` (run 34020499895): backend **821 passed, 3 skipped**; frontend **171 passed** (30 files); scripts **53 passed**. README uses durable wording (**800+** / **170+**).
-- This branch adds `backend/tests/test_private_live_google.py` plus fail-closed provider/startup coverage. Validation counts are recorded after the test run.
+- This branch (`feat/private-live-google-v1`): targeted provider/HITL/demo/config tests **119 passed**; full backend **846 passed, 3 skipped**; `python3 -m pytest -q scripts/tests` — **53 passed**; sanitizer `--check --no-fetch` — **ok**. No frontend changes.
 - CI (`.github/workflows/ci.yml`) runs backend pytest + frontend typecheck/tests/build on PRs to `main` and `deployment/**`, plus `scripts/tests`.
 - Public-demo smoke: `python scripts/smoke_test_public_demo.py --base-url <public-api>` (never print tokens).
 - Cloud-handoff / report-bridge tests: `python -m pytest -q scripts/tests`
