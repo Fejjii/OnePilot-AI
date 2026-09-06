@@ -1,7 +1,7 @@
 # Cloud agent handoff (sanitized)
 
-Generated: 2026-09-06 07:20 UTC  
-Generator: Cloud agent (manual, sanitized; OP-034 public-demo approval hygiene on `fix/op-034-demo-approval-hygiene`; no local `HANDOFF.md`)
+Generated: 2026-09-06 10:15 UTC  
+Generator: Cloud agent (manual, sanitized; recruiter README polish on `docs/recruiter-readme-polish`; no local `HANDOFF.md`)
 
 This file is the **only** committed project-state brief for Cursor Cloud / phone agents.
 It is intentionally smaller than any local `HANDOFF.md` and contains **no secrets**.
@@ -25,17 +25,19 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 
 | Ref | SHA | Notes |
 |-----|-----|-------|
-| `origin/main` (canonical) | `bc07c5595b6a21709be5dea2e271c8b9b4e635c6` | Task-start SHA. Includes PR #31 (OP-033) |
-| `origin/deployment/public-demo` | `bc07c5595b6a21709be5dea2e271c8b9b4e635c6` | Same product SHA as `main` at task start. Do not fast-forward |
+| `origin/main` (canonical) | `87eef7d5c2565181b94aff06be97374b22bdf4f9` | Includes PR #32 (OP-034). Start SHA for this docs work |
+| `origin/deployment/public-demo` | `87eef7d5c2565181b94aff06be97374b22bdf4f9` | Identical to `main`. Final production acceptance: **READY TO SHARE**. Do not fast-forward |
 | `origin/deployment/live-google-demo` | `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332` | Private live-Google pointer; **untouched** |
-| `fix/op-034-demo-approval-hygiene` (this work) | see latest commit on that branch | OP-034 PR into `main`; do not merge unless asked |
+| `docs/recruiter-readme-polish` (this work) | see latest commit on that branch | Recruiter/portfolio README polish PR into `main`; do not merge unless asked |
 
 ## Completed
 
+- Public demo **READY TO SHARE** at `https://one-pilot-ai.vercel.app` (backend `https://onepilot-ai-production.up.railway.app`)
+- `main` == `deployment/public-demo` == `87eef7d5c2565181b94aff06be97374b22bdf4f9`
+- OP-034 deployed and accepted (PR #32 merged; public-demo fast-forwarded in a prior authorized release)
 - PR #31 — OP-033 final public-demo P1 audit fixes merged to `main`
 - PR #30 — Cloud Agent report bridge merged to `main` (`infra/cloud-agent-report-bridge`)
 - OP-032 — final recruiter-facing public-demo polish (merged to `main`, PR #29)
-- Public release of `deployment/public-demo` at `bc07c5595b6a21709be5dea2e271c8b9b4e635c6` (matches `main` at OP-034 task start)
 - Operator-authorized public-demo mutable-data cleanup restored the Sarah Chen / Brightline Analytics lead narrative in production (Kevin Park and Priya Nair urgency returned to canonical `medium`)
 - OP-030 — recruiter-demo meetings vs availability polish (merged to `main`, PR #28)
 - OP-031 — persist/render safe recruiter-facing agent execution traces + complete intent/tool badges (merged to `main`, PR #26)
@@ -54,9 +56,9 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 
 ## Current task / in progress
 
-- **OP-034** implemented on `fix/op-034-demo-approval-hygiene` and **not merged**. Adds automatic public-demo approval hygiene on `/demo/start` and the existing demo-refresh path.
-- Remaining recruiter-demo issue after the production lead restore: the shared public-demo Approvals inbox accumulated stale non-curated demo-visitor residue from previous reviewer sessions. Canonical seeded approvals were already correct. OP-034 removes only stale, non-curated, demo-visitor-created approvals in the public demo organization when `PUBLIC_DEMO_ENABLED=true`, using a 6-hour retention window. No public DELETE endpoint. No production database mutation in this implementation task.
-- `origin/main` and `origin/deployment/public-demo` at task start were `bc07c5595b6a21709be5dea2e271c8b9b4e635c6`.
+- **Recruiter README polish** implemented on `docs/recruiter-readme-polish` and **not merged**. Docs-only: `README.md` plus this handoff. No product-behavior change.
+- Public demo remains **READY TO SHARE**. Runtime model stays `gpt-5-nano`. Gmail mock/send-disabled; Calendar mock/create-disabled; public speech transcription disabled.
+- OP-034 is **deployed and accepted**. `/demo/start` refreshes curated approvals and removes stale non-curated demo-visitor residue older than 6 hours when `PUBLIC_DEMO_ENABLED=true`.
 - `deployment/live-google-demo` remains untouched at `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332`.
 - Public infrastructure is essentially complete (OP-026 COMPLETE). Private live-Google demo remains a later user-gated track (Cloud must not assume OAuth or live Google access).
 - Product work belongs on a feature/fix branch off `main`, never on a deployment branch.
@@ -70,7 +72,7 @@ From `docs/limitations_roadmap.md` (near-term, product — pick explicitly):
 - Background task queue
 - Optional demo-reset endpoint
 
-Audit P2 items remain deferred (demo email display, optional self-register, shared-org Admin, citations-overclaim copy, README test counts).
+Remaining audit P2 items (demo email display, optional self-register, shared-org Admin, citations-overclaim copy). README stale test-count copy is addressed on this branch.
 
 Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Cloud-agent work.
 
@@ -90,8 +92,7 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 
 ## Tests / status
 
-- OP-034 validation on this branch: targeted hygiene/demo-start/approvals tests **45 passed**; full backend **821 passed, 3 skipped**; `python -m pytest -q scripts/tests` — **53 passed**; handoff sanitizer `--check --no-fetch` — **ok**. No frontend changes.
-- Documented counts in README (2026-07-20): **703** backend tests (3 skipped), **126** frontend tests. Later merges added Qdrant/OpenAI/CRM-email/execution-trace/OP-032/OP-033 coverage.
+- Latest green CI on `main` @ `87eef7d5c2565181b94aff06be97374b22bdf4f9` (run 34020499895): backend **821 passed, 3 skipped**; frontend **171 passed** (30 files); scripts **53 passed**. README now uses durable wording (**800+** / **170+**) instead of the stale 2026-07-20 counts (703 / 126).
 - CI (`.github/workflows/ci.yml`) runs backend pytest + frontend typecheck/tests/build on PRs to `main` and `deployment/**`, plus `scripts/tests`.
 - Public-demo smoke: `python scripts/smoke_test_public_demo.py --base-url <public-api>` (never print tokens).
 - Cloud-handoff / report-bridge tests: `python -m pytest -q scripts/tests`
@@ -112,7 +113,7 @@ Cloud (and any agent) must **not** touch:
 
 ## Recommended next task
 
-Review and merge OP-034 (`fix/op-034-demo-approval-hygiene`) if accepted. After merge, only an operator-authorized fast-forward of `deployment/public-demo` would ship automatic approval hygiene to the live public demo. Existing leftover rows older than 6 hours are then removed on the next `/demo/start`. Do not touch that branch unless explicitly authorized. Private live-Google demo remains later and user-gated. P2 audit items stay deferred.
+Review and merge the recruiter README polish PR (`docs/recruiter-readme-polish`) if accepted. Public demo is already **READY TO SHARE**. Do not touch `deployment/public-demo` or `deployment/live-google-demo` unless explicitly authorized. Keep `gpt-5-nano`. Private live-Google demo remains later and user-gated. Remaining P2 audit items stay deferred.
 
 Do not re-run live Qdrant or modify deployment branches unless the operator explicitly authorizes that exact branch.
 
