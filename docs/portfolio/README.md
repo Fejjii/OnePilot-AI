@@ -5,11 +5,15 @@ Recruiter-facing copy and demo narration for OnePilot AI. Keep claims aligned wi
 
 | Asset | File |
 |-------|------|
+| Architecture overview | [ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md) |
+| 3-minute spoken demo script | [RECRUITER_DEMO_SCRIPT.md](RECRUITER_DEMO_SCRIPT.md) |
+| Screen-recording sequence | [RECORDING_CHECKLIST.md](RECORDING_CHECKLIST.md) |
+| Interview cheat sheet | [INTERVIEW_CHEAT_SHEET.md](INTERVIEW_CHEAT_SHEET.md) |
 | LinkedIn post | [linkedin_post.md](linkedin_post.md) |
 | Short portfolio description | [short_description.md](short_description.md) |
 | Longer project case study | [case_study.md](case_study.md) |
 | 30-second pitch | [pitch_30s.md](pitch_30s.md) |
-| 3-minute demo narration | [demo_narration_3min.md](demo_narration_3min.md) |
+| Older 3-minute narration (superseded for recording) | [demo_narration_3min.md](demo_narration_3min.md) |
 | Technical interview talking points | [interview_talking_points.md](interview_talking_points.md) |
 
 **Live demo:** https://one-pilot-ai.vercel.app  

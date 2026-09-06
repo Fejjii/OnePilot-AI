@@ -1,5 +1,7 @@
 # 3-Minute Demo Narration
 
+Superseded for recording by [RECRUITER_DEMO_SCRIPT.md](RECRUITER_DEMO_SCRIPT.md) and [RECORDING_CHECKLIST.md](RECORDING_CHECKLIST.md). Kept as a shorter alternate outline.
+
 Use with the live public demo: https://one-pilot-ai.vercel.app  
 Full step list: [../demo_script.md](../demo_script.md)
 
