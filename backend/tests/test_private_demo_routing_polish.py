@@ -183,7 +183,81 @@ class TestSchedulingDetailsAndContinuation:
 
     def test_go_ahead_without_history_does_not_invent_details(self) -> None:
         assert recover_prior_scheduling_request([]) is None
-        assert resolve_calendar_source_message("Go ahead", []) == "Go ahead"
+        assert resolve_calendar_source_message("Go ahead.", []) == "Go ahead."
+        msg_result = classify_message("Go ahead.", history=[])
+        assert msg_result.message_class == MessageClass.UNCLEAR
+        intent = classify(
+            "Go ahead.",
+            message_class=msg_result.message_class,
+            history=[],
+        )
+        assert intent.intent == Intent.CLARIFICATION
+
+    def test_just_schedule_without_history_is_clarification_not_scheduling(self) -> None:
+        msg_result = classify_message(CONTINUATION_PROMPT, history=[])
+        assert msg_result.message_class == MessageClass.UNCLEAR
+        intent = classify(
+            CONTINUATION_PROMPT,
+            message_class=msg_result.message_class,
+            history=[],
+        )
+        assert intent.intent == Intent.CLARIFICATION
+        assert infer_calendar_tool(CONTINUATION_PROMPT) != "create_event_request"
+
+    def test_just_schedule_empty_history_agent_does_not_create(
+        self, client_with_session, monkeypatch
+    ) -> None:
+        client, session = client_with_session
+        _token, org_id, user_id = _register(client, suffix="_cont_empty")
+
+        def _fail_create(*_args, **_kwargs):
+            raise AssertionError("Calendar create must not run before approval")
+
+        monkeypatch.setattr(MockCalendarProvider, "create_event", _fail_create)
+
+        state = run_agent(
+            session=session,
+            principal=_principal(org_id, user_id),
+            settings=get_settings(),
+            conversation_id="conv_cont_empty",
+            message=CONTINUATION_PROMPT,
+            history=[],
+        )
+        assert state.intent == Intent.CLARIFICATION
+        assert state.approval_required is not True
+        assert not state.approval_id
+        assert not any(
+            tc.tool_name == "calendar.create_event_request" for tc in state.tool_calls
+        )
+        text = (state.final_response or "").lower()
+        assert "title" in text and "date" in text
+        assert "onepilot scheduled meeting" not in text
+
+    def test_go_ahead_empty_history_agent_does_not_create(
+        self, client_with_session, monkeypatch
+    ) -> None:
+        client, session = client_with_session
+        _token, org_id, user_id = _register(client, suffix="_go_empty")
+
+        def _fail_create(*_args, **_kwargs):
+            raise AssertionError("Calendar create must not run before approval")
+
+        monkeypatch.setattr(MockCalendarProvider, "create_event", _fail_create)
+
+        state = run_agent(
+            session=session,
+            principal=_principal(org_id, user_id),
+            settings=get_settings(),
+            conversation_id="conv_go_empty",
+            message="Go ahead.",
+            history=[],
+        )
+        assert state.intent == Intent.CLARIFICATION
+        assert state.approval_required is not True
+        assert not state.approval_id
+        assert not any(
+            tc.tool_name == "calendar.create_event_request" for tc in state.tool_calls
+        )
 
     def test_exact_prompt_creates_approval_with_title_and_berlin_slot(
         self, client_with_session, monkeypatch
@@ -241,6 +315,14 @@ class TestSchedulingDetailsAndContinuation:
         assert "OnePilot Live Calendar Test" in text
         assert "15:00" in text
         assert "15:30" in text
+        assert any(tc.tool_name == "calendar.create_event_request" for tc in state.tool_calls)
+
+    def test_schedule_it_and_yes_book_it_empty_history_clarify(self) -> None:
+        for prompt in ("Schedule it.", "Yes, book it."):
+            msg_result = classify_message(prompt, history=[])
+            intent = classify(prompt, message_class=msg_result.message_class, history=[])
+            assert msg_result.message_class == MessageClass.UNCLEAR, prompt
+            assert intent.intent == Intent.CLARIFICATION, prompt
 
     def test_prepare_event_approval_does_not_call_create(self, monkeypatch) -> None:
         def _fail_create(*_args, **_kwargs):
@@ -264,6 +346,28 @@ class TestWorkspaceRagRouting:
         intent = classify(RAG_PROMPT, message_class=msg_result.message_class)
         assert intent.intent == Intent.KNOWLEDGE_SEARCH
         assert intent.intent != Intent.CLARIFICATION
+
+    def test_generic_world_knowledge_is_not_tenant_rag(self) -> None:
+        prompt = "What is the capital of France?"
+        msg_result = classify_message(prompt)
+        assert msg_result.message_class != MessageClass.BUSINESS_KNOWLEDGE
+        intent = classify(prompt, message_class=msg_result.message_class)
+        assert intent.intent != Intent.KNOWLEDGE_SEARCH
+        assert intent.intent in {Intent.CLARIFICATION, Intent.OUT_OF_SCOPE, Intent.GENERAL_ASSISTANT}
+
+    def test_generic_world_knowledge_agent_skips_rag(self, client_with_session) -> None:
+        client, session = client_with_session
+        _token, org_id, user_id = _register(client, suffix="_france_p1")
+        state = run_agent(
+            session=session,
+            principal=_principal(org_id, user_id),
+            settings=get_settings(),
+            conversation_id="conv_france_p1",
+            message="What is the capital of France?",
+            history=[],
+        )
+        assert state.intent != Intent.KNOWLEDGE_SEARCH
+        assert not any(tc.tool_name == "rag.answer" for tc in state.tool_calls)
 
     def test_casual_hello_is_not_rag(self) -> None:
         msg_result = classify_message("Hello")

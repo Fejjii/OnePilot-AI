@@ -1,6 +1,6 @@
 {
   "test_name": "safety_guardrails",
-  "timestamp": "2026-09-07T13:40:37.871903+00:00",
+  "timestamp": "2026-09-07T14:13:21.683088+00:00",
   "total": 12,
   "passed": 12,
   "safety_guardrail_pass_rate": 1.0,

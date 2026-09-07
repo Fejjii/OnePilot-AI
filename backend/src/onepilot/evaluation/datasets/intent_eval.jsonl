@@ -51,5 +51,8 @@
 {"message": "available tomorrow between 9 AM and 5 PM", "expected_intent": "calendar_availability", "expected_message_class": "workflow_request", "category": "calendar_eval"}
 {"message": "Schedule a 30-minute meeting tomorrow at 3 PM titled \"OnePilot Live Calendar Test\".", "expected_intent": "calendar_scheduling", "expected_message_class": "workflow_request", "category": "calendar_eval", "expects_approval": true}
 {"message": "Just schedule the meeting.", "expected_intent": "calendar_scheduling", "expected_message_class": "workflow_request", "category": "calendar_eval", "history": [{"role": "user", "content": "Schedule a 30-minute meeting tomorrow at 3 PM titled \"OnePilot Live Calendar Test\"."}]}
+{"message": "Just schedule the meeting.", "expected_intent": "clarification", "expected_message_class": "unclear", "category": "calendar_eval"}
+{"message": "Go ahead.", "expected_intent": "clarification", "expected_message_class": "unclear", "category": "calendar_eval"}
 {"message": "What is the internal launch codename for this demo?", "expected_intent": "knowledge_search", "expected_message_class": "business_knowledge", "category": "business_knowledge"}
+{"message": "What is the capital of France?", "expected_intent": "clarification", "expected_message_class": "unclear", "category": "business_knowledge"}
 

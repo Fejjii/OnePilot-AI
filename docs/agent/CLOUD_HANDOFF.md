@@ -28,7 +28,7 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 | `origin/main` (canonical) | `be8d956ea246bab895dd68a7f366b2a1d8ffbefb` | Includes PR #35 (private live-Google track). Do not merge this routing PR unless asked |
 | `origin/deployment/public-demo` | `87eef7d5c2565181b94aff06be97374b22bdf4f9` | Product SHA behind `main`. **READY TO SHARE**. Do not fast-forward |
 | `origin/deployment/live-google-demo` | `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332` | Legacy private pointer; **untouched** |
-| `fix/private-demo-routing-response-polish` (this work) | product `8fcb6884c907461de8c847b0aad5be68232e65a5` + docs/eval snapshot on the same branch | PR #36 into `main`; do not merge unless asked |
+| `fix/private-demo-routing-response-polish` (this work) | see latest commit on that branch | PR #36 into `main`; READY FOR REVIEW; do not merge unless asked |
 
 `deployment/live-google-demo` is a stale ancestor of `main` (no unique code). Current `main` is authoritative. Do **not** move that pointer.
 
@@ -60,10 +60,11 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 
 ## Current task / in progress
 
-- **Private-demo routing + response UX** on `fix/private-demo-routing-response-polish` (PR #36 into `main`, **not merged**). Manual private-host validation found four issues; this PR addresses them in product code only:
+- **Private-demo routing + response UX** on `fix/private-demo-routing-response-polish` (PR #36 into `main`, **READY FOR REVIEW, not merged**). Manual private-host validation found four issues; this PR addresses them in product code only:
   - P0-1: “When am I available tomorrow between 9 AM and 5 PM?” now Stage-1 workflow + Stage-2 `calendar_availability` + `calendar.check_availability` (not General / `chat.general`)
   - P0-2: fully specified scheduling (`titled "OnePilot Live Calendar Test"`, tomorrow 15:00–15:30 Europe/Berlin) creates a pending HITL approval; continuations such as “Just schedule the meeting” recover bounded same-conversation user details; no Calendar write before approval
-  - P0-3: AI Workspace substantive factual questions (e.g. internal launch codename) route to `knowledge_search` / `rag.answer` instead of Clarify
+  - **Review fix:** a scheduling continuation with **no** recoverable prior request (`Just schedule the meeting.` / `Go ahead.` / `Schedule it.` / `Yes, book it.`) is Clarification — no `calendar.create_event_request`, no approval, no default date/time/title. Continuation is evaluated before generic scheduling patterns.
+  - P0-3: AI Workspace substantive factual/work questions (e.g. internal launch codename) route to `knowledge_search` / `rag.answer` instead of Clarify. Generic world-knowledge such as “What is the capital of France?” is **not** treated as tenant RAG.
   - P1-4: recruiter-facing Answer/Summary, sources, calendar/email cards; primary confidence copy is “Grounded in N source(s)” when citations exist (raw % under Engineering details)
 - Private host remains user-gated (`PRIVATE_LIVE_GOOGLE_ENABLED=true`, Gmail send disabled, Calendar create approval-gated). This PR does **not** change Railway/Vercel env, OAuth, or deployment branches.
 - Public demo behavior stays mock Gmail/Calendar if these changes later deploy there. HITL is not bypassed.
@@ -87,7 +88,7 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 ## Architecture state
 
 - Multi-tenant FastAPI + Next.js workspace: LangGraph agent, RAG + citations, HITL approvals, usage/quotas, memory.
-- Two-stage routing: Stage 1 message class, Stage 2 intent. Calendar availability vs meetings vs scheduling are distinct tool inferences. Scheduling continuations use bounded same-conversation user history only.
+- Two-stage routing: Stage 1 message class, Stage 2 intent. Calendar availability vs meetings vs scheduling are distinct tool inferences. Scheduling continuations use bounded same-conversation user history only; a continuation with no recoverable prior request clarifies instead of defaulting date/time/title.
 - Assistant messages persist a sanitized `execution_trace` (observable steps only). Internal graph details, prompts, tokens, and secrets are not shown in the recruiter UI.
 - Email drafts resolve org-scoped CRM leads when present and must not invent customer facts. Human approval is still required; public Gmail stays mock/send-disabled.
 - Workspace insights, CRM email drafting, and recruiter-facing lead listing share `rank_leads()`. Seeded demo data makes Sarah Chen at Brightline Analytics the most promising lead. That narrative is restored in production.
@@ -103,9 +104,8 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 ## Tests / status
 
 - Latest green CI on `main` @ `87eef7d5c2565181b94aff06be97374b22bdf4f9` (run 34020499895): backend **821 passed, 3 skipped**; frontend **171 passed** (30 files); scripts **53 passed**. README uses durable wording (**800+** / **170+**).
-- This branch (`fix/private-demo-routing-response-polish`): targeted private-demo routing tests **passed**; full backend **865 passed, 3 skipped**; frontend **176 passed** (30 files); `pnpm typecheck` **ok**; `pnpm build` **ok**; `python3 -m pytest -q scripts/tests` — **53 passed**; sanitizer `--check --no-fetch` — **ok**.
-- GitHub CI on product commit `8fcb688` (run `34128586331`): **success**.
-- Deterministic eval after new fixtures: intent **54/54 (100%)**, routing **54/54 (100%)**, combined suite **76 cases, 0 failed**. Do not treat these as live-model quality scores. Do not fabricate live RAGAS/model scores.
+- This branch (`fix/private-demo-routing-response-polish`): targeted private-demo routing tests **passed**; full backend **871 passed, 3 skipped**; frontend **176 passed** (30 files); `pnpm typecheck` **ok**; `pnpm build` **ok**; `python3 -m pytest -q scripts/tests` — **53 passed**; sanitizer `--check --no-fetch` — **ok**.
+- Deterministic eval after new fixtures: intent **57/57 (100%)**, routing **57/57 (100%)**, combined suite **79 cases, 0 failed**. Do not treat these as live-model quality scores. Do not fabricate live RAGAS/model scores.
 - CI (`.github/workflows/ci.yml`) runs backend pytest + frontend typecheck/tests/build on PRs to `main` and `deployment/**`, plus `scripts/tests`.
 - Public-demo smoke: `python scripts/smoke_test_public_demo.py --base-url <public-api>` (never print tokens).
 - Cloud-handoff / report-bridge tests: `python -m pytest -q scripts/tests`
@@ -126,7 +126,7 @@ Cloud (and any agent) must **not** touch:
 
 ## Recommended next task
 
-Review PR #36 (`fix/private-demo-routing-response-polish`) and merge only if the private-demo routing/UX fixes are accepted. After merge, deploying to the **private** host is still **user-gated** (Railway/Vercel). Do not change the public production env. Do not move `deployment/public-demo` or `deployment/live-google-demo` unless explicitly authorized. Keep public `gpt-5-nano`. Remaining P2 audit items stay deferred.
+Review PR #36 (`fix/private-demo-routing-response-polish`, READY FOR REVIEW) and merge only if the private-demo routing/UX fixes are accepted. After merge, deploying to the **private** host is still **user-gated** (Railway/Vercel). Do not change the public production env. Do not move `deployment/public-demo` or `deployment/live-google-demo` unless explicitly authorized. Keep public `gpt-5-nano`. Remaining P2 audit items stay deferred.
 
 Do not re-run live Qdrant or modify deployment branches unless the operator explicitly authorizes that exact branch.
 

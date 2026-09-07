@@ -113,7 +113,13 @@ def looks_like_list_events(message: str) -> bool:
 
 
 def looks_like_scheduling(message: str) -> bool:
-    """True when the user wants to book/create a meeting or get slot suggestions."""
+    """True when the user wants to book/create a meeting or get slot suggestions.
+
+    Continuation-only phrases such as "Just schedule the meeting" are not a
+    standalone scheduling spec; they must recover a prior request or clarify.
+    """
+    if is_scheduling_continuation(message):
+        return False
     return bool(_SCHEDULING.search(message or ""))
 
 
@@ -124,6 +130,21 @@ def looks_like_suggest_slots(message: str) -> bool:
 def is_scheduling_continuation(message: str) -> bool:
     """True for short confirmations that should reuse a prior scheduling request."""
     return bool(_CONTINUATION.match((message or "").strip()))
+
+
+def missing_prior_scheduling_request(
+    message: str,
+    history: list[dict] | None,
+    *,
+    max_user_turns: int = _MAX_CONTINUATION_USER_TURNS,
+) -> bool:
+    """True when the user confirmed scheduling but no prior request can be recovered."""
+    if not is_scheduling_continuation(message):
+        return False
+    return (
+        recover_prior_scheduling_request(history, max_user_turns=max_user_turns)
+        is None
+    )
 
 
 def extract_meeting_title(message: str) -> str | None:
@@ -211,6 +232,7 @@ __all__ = [
     "looks_like_list_events",
     "looks_like_scheduling",
     "looks_like_suggest_slots",
+    "missing_prior_scheduling_request",
     "parse_duration_minutes",
     "recover_prior_scheduling_request",
     "resolve_calendar_source_message",

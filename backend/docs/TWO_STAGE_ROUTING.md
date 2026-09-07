@@ -199,10 +199,14 @@ capability/help signal by itself (`What tools are available?` stays
 Fully specified **scheduling** (action + duration + date + time + title) routes
 to `calendar_scheduling` without a clarification turn. Short continuations such
 as `Just schedule the meeting` or `Go ahead` reuse bounded recent same-conversation
-user turns when those turns already contain the scheduling details. Human
-approval still gates Calendar create.
+user turns when those turns already contain the scheduling details. The same
+continuation **without** a recoverable prior request is `clarification` — it does
+not call `calendar.create_event_request`, create an approval, or invent
+date/time/title. Continuation is evaluated before generic scheduling patterns.
+Human approval still gates Calendar create.
 
 Substantive factual/work questions that are not calendar, email, CRM, web,
-capability, or out-of-scope are eligible for tenant-scoped `knowledge_search`
-instead of immediate `clarification`. Weak retrieval still uses the existing
-weak-evidence response.
+capability, out-of-scope, or generic world-knowledge (for example
+`What is the capital of France?`) are eligible for tenant-scoped
+`knowledge_search` instead of immediate `clarification`. Weak retrieval still
+uses the existing weak-evidence response.

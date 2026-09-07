@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-07T13:40:37.872267+00:00",
+  "generated_at": "2026-09-07T14:13:21.683439+00:00",
   "status": "complete",
   "run_command": "cd backend && uv run python -m onepilot.evaluation.run_all_evals",
   "disclaimer": "These are deterministic evaluation checks for demo-quality gating. They are not a replacement for full production RAGAS or human evaluation.",
@@ -11,19 +11,19 @@
     "source_hit_rate": 0.9,
     "weak_evidence_correctness": 1.0,
     "safety_guardrail_pass_rate": 1.0,
-    "total_cases": 76,
+    "total_cases": 79,
     "failed_cases": 0
   },
   "suites": {
     "routing": {
       "test_name": "intent_and_routing",
-      "timestamp": "2026-09-07T13:40:37.862780+00:00",
-      "total": 54,
-      "correct": 54,
+      "timestamp": "2026-09-07T14:13:21.674142+00:00",
+      "total": 57,
+      "correct": 57,
       "accuracy": 1.0,
       "intent_accuracy": 1.0,
-      "routing_total": 54,
-      "routing_correct": 54,
+      "routing_total": 57,
+      "routing_correct": 57,
       "routing_accuracy": 1.0,
       "per_intent_accuracy": {
         "general_assistant": 1.0,
@@ -63,7 +63,7 @@
           "out_of_scope": 2
         },
         "clarification": {
-          "clarification": 5
+          "clarification": 8
         },
         "document_summary": {
           "document_summary": 2
@@ -667,6 +667,28 @@
           "routing_pass": true
         },
         {
+          "message": "Just schedule the meeting.",
+          "category": "calendar_eval",
+          "expected_intent": "clarification",
+          "predicted_intent": "clarification",
+          "intent_pass": true,
+          "passed": true,
+          "expected_message_class": "unclear",
+          "predicted_message_class": "unclear",
+          "routing_pass": true
+        },
+        {
+          "message": "Go ahead.",
+          "category": "calendar_eval",
+          "expected_intent": "clarification",
+          "predicted_intent": "clarification",
+          "intent_pass": true,
+          "passed": true,
+          "expected_message_class": "unclear",
+          "predicted_message_class": "unclear",
+          "routing_pass": true
+        },
+        {
           "message": "What is the internal launch codename for this demo?",
           "category": "business_knowledge",
           "expected_intent": "knowledge_search",
@@ -676,12 +698,23 @@
           "expected_message_class": "business_knowledge",
           "predicted_message_class": "business_knowledge",
           "routing_pass": true
+        },
+        {
+          "message": "What is the capital of France?",
+          "category": "business_knowledge",
+          "expected_intent": "clarification",
+          "predicted_intent": "clarification",
+          "intent_pass": true,
+          "passed": true,
+          "expected_message_class": "unclear",
+          "predicted_message_class": "unclear",
+          "routing_pass": true
         }
       ]
     },
     "rag": {
       "test_name": "rag_golden",
-      "timestamp": "2026-09-07T13:40:37.868794+00:00",
+      "timestamp": "2026-09-07T14:13:21.680004+00:00",
       "total": 10,
       "rag_golden_pass_rate": 1.0,
       "source_hit_rate": 0.9,
@@ -887,7 +920,7 @@
     },
     "safety": {
       "test_name": "safety_guardrails",
-      "timestamp": "2026-09-07T13:40:37.871903+00:00",
+      "timestamp": "2026-09-07T14:13:21.683088+00:00",
       "total": 12,
       "passed": 12,
       "safety_guardrail_pass_rate": 1.0,

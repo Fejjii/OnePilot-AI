@@ -29,6 +29,7 @@ from onepilot.services.calendar_intent import (
     is_scheduling_continuation,
     looks_like_availability,
     looks_like_scheduling,
+    missing_prior_scheduling_request,
     recover_prior_scheduling_request,
 )
 
@@ -257,13 +258,21 @@ def _classify_from_message_class(
     Returns:
         IntentResult with mapped intent
     """
-    if is_scheduling_continuation(message) and recover_prior_scheduling_request(history):
-        return IntentResult(
-            intent=Intent.CALENDAR_SCHEDULING,
-            confidence=0.86,
-            source="rules",
-            reason="calendar_scheduling_continuation",
-        )
+    if is_scheduling_continuation(message):
+        if missing_prior_scheduling_request(message, history):
+            return IntentResult(
+                intent=Intent.CLARIFICATION,
+                confidence=0.84,
+                source="rules",
+                reason="calendar_scheduling_continuation_missing_details",
+            )
+        if recover_prior_scheduling_request(history):
+            return IntentResult(
+                intent=Intent.CALENDAR_SCHEDULING,
+                confidence=0.86,
+                source="rules",
+                reason="calendar_scheduling_continuation",
+            )
 
     if (
         message_class != MessageClass.OUT_OF_SCOPE

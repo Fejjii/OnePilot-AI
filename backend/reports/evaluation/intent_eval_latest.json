@@ -1,12 +1,12 @@
 {
   "test_name": "intent_and_routing",
-  "timestamp": "2026-09-07T13:40:37.862780+00:00",
-  "total": 54,
-  "correct": 54,
+  "timestamp": "2026-09-07T14:13:21.674142+00:00",
+  "total": 57,
+  "correct": 57,
   "accuracy": 1.0,
   "intent_accuracy": 1.0,
-  "routing_total": 54,
-  "routing_correct": 54,
+  "routing_total": 57,
+  "routing_correct": 57,
   "routing_accuracy": 1.0,
   "per_intent_accuracy": {
     "general_assistant": 1.0,
@@ -46,7 +46,7 @@
       "out_of_scope": 2
     },
     "clarification": {
-      "clarification": 5
+      "clarification": 8
     },
     "document_summary": {
       "document_summary": 2
@@ -650,6 +650,28 @@
       "routing_pass": true
     },
     {
+      "message": "Just schedule the meeting.",
+      "category": "calendar_eval",
+      "expected_intent": "clarification",
+      "predicted_intent": "clarification",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "unclear",
+      "predicted_message_class": "unclear",
+      "routing_pass": true
+    },
+    {
+      "message": "Go ahead.",
+      "category": "calendar_eval",
+      "expected_intent": "clarification",
+      "predicted_intent": "clarification",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "unclear",
+      "predicted_message_class": "unclear",
+      "routing_pass": true
+    },
+    {
       "message": "What is the internal launch codename for this demo?",
       "category": "business_knowledge",
       "expected_intent": "knowledge_search",
@@ -658,6 +680,17 @@
       "passed": true,
       "expected_message_class": "business_knowledge",
       "predicted_message_class": "business_knowledge",
+      "routing_pass": true
+    },
+    {
+      "message": "What is the capital of France?",
+      "category": "business_knowledge",
+      "expected_intent": "clarification",
+      "predicted_intent": "clarification",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "unclear",
+      "predicted_message_class": "unclear",
       "routing_pass": true
     }
   ]

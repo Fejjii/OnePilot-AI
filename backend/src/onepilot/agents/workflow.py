@@ -62,7 +62,10 @@ from onepilot.services.calendar_format import (
     format_proposal_response,
     format_suggestion_response,
 )
-from onepilot.services.calendar_intent import resolve_calendar_source_message
+from onepilot.services.calendar_intent import (
+    missing_prior_scheduling_request,
+    resolve_calendar_source_message,
+)
 from onepilot.tools import registry as _tools_bootstrap  # noqa: F401  ensures tool registration
 from onepilot.schemas.web_search import WebSearchCitation, WebSearchResponse
 from onepilot.services import web_synthesis
@@ -390,6 +393,17 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
         calendar_message = resolve_calendar_source_message(
             state.message, state.history
         )
+        if missing_prior_scheduling_request(state.message, state.history):
+            flags = list(state.safety_flags)
+            if "clarification_requested" not in flags:
+                flags.append("clarification_requested")
+            lang = LanguageCode(state.response_language)
+            update["draft_output"] = i18n_messages.get_message(
+                i18n_messages.SCHEDULING_CONTINUATION_CLARIFICATION, lang
+            )
+            update["safety_flags"] = flags
+            _append_trace(update, "execute_tool:clarification")
+            return update
         tool_key = calendar_service.infer_calendar_tool(calendar_message, state.context)
         tool_name = f"calendar.{tool_key}"
         result = registry.get(tool_name).run(
@@ -746,8 +760,14 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
         if "clarification_requested" not in flags:
             flags.append("clarification_requested")
         lang = LanguageCode(state.response_language)
+        if missing_prior_scheduling_request(state.message, state.history):
+            draft = i18n_messages.get_message(
+                i18n_messages.SCHEDULING_CONTINUATION_CLARIFICATION, lang
+            )
+        else:
+            draft = i18n_messages.get_message(i18n_messages.CLARIFICATION, lang)
         return {
-            "draft_output": i18n_messages.get_message(i18n_messages.CLARIFICATION, lang),
+            "draft_output": draft,
             "safety_flags": flags,
             "trace_steps": list(state.trace_steps)
             + [TraceStep(step="execute_tool:clarification").model_dump()],

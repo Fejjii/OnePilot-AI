@@ -30,6 +30,7 @@ from onepilot.security.auth import Principal
 from onepilot.services import audit_service, usage_service
 from onepilot.services.calendar_intent import (
     extract_meeting_title,
+    is_scheduling_continuation,
     looks_like_availability,
     looks_like_list_events,
     looks_like_scheduling,
@@ -96,6 +97,8 @@ def infer_calendar_tool(message: str, context: dict | None = None) -> str:
     list_hit = list_hit or bool(_LIST_EVENTS_INTENT.search(message))
     availability_hit = availability_hit or bool(_AVAILABILITY_INTENT.search(message))
     suggest_hit = suggest_hit or bool(_SUGGEST_SLOTS_INTENT.search(message))
+    if is_scheduling_continuation(message):
+        schedule_hit = False
 
     if schedule_hit and not suggest_hit:
         return "create_event_request"

@@ -18,7 +18,7 @@ from onepilot.services.calendar_intent import (
     is_scheduling_continuation,
     looks_like_availability,
     looks_like_scheduling,
-    recover_prior_scheduling_request,
+    missing_prior_scheduling_request,
 )
 
 logger = get_logger(__name__)
@@ -543,19 +543,28 @@ def classify_message(
             scores={},
         )
 
+    # Continuation semantics before generic "schedule a meeting" patterns.
+    # "Just schedule the meeting" must not fall through to default date/time/title.
+    if is_scheduling_continuation(cleaned):
+        if missing_prior_scheduling_request(cleaned, history):
+            return MessageClassResult(
+                message_class=MessageClass.UNCLEAR,
+                confidence=0.82,
+                reason="calendar_scheduling_continuation_missing_details",
+                scores={},
+            )
+        return MessageClassResult(
+            message_class=MessageClass.WORKFLOW_REQUEST,
+            confidence=0.88,
+            reason="calendar_scheduling_continuation",
+            scores={},
+        )
+
     if looks_like_scheduling(cleaned):
         return MessageClassResult(
             message_class=MessageClass.WORKFLOW_REQUEST,
             confidence=0.9,
             reason="calendar_scheduling_indicators",
-            scores={},
-        )
-
-    if is_scheduling_continuation(cleaned) and recover_prior_scheduling_request(history):
-        return MessageClassResult(
-            message_class=MessageClass.WORKFLOW_REQUEST,
-            confidence=0.88,
-            reason="calendar_scheduling_continuation",
             scores={},
         )
 
@@ -707,6 +716,20 @@ _SMALL_TALK_QUESTION = re.compile(
     r"\b(how are you|how's it going|what's up|whats up|how was your day)\b",
     re.IGNORECASE,
 )
+_TENANT_OR_WORK_FACTUAL_CUE = re.compile(
+    r"\b("
+    r"internal|handbook|playbook|runbook|knowledge base|"
+    r"this (demo|product|workspace|document)|"
+    r"our|company|tenant|organization|"
+    r"onboarding|policy|procedure|process|"
+    r"plan|plans|pricing|subscription|customer|password|product"
+    r")\b",
+    re.IGNORECASE,
+)
+_GENERIC_WORLD_KNOWLEDGE = re.compile(
+    r"\b(capital of|population of|president of|prime minister of)\b",
+    re.IGNORECASE,
+)
 
 
 def _looks_like_factual_knowledge_question(message: str) -> bool:
@@ -714,7 +737,7 @@ def _looks_like_factual_knowledge_question(message: str) -> bool:
 
     Casual greetings, capability questions, calendar/email, and out-of-scope
     prompts are excluded by earlier priority rules. This only runs as a fallback
-    so we do not turn small talk into retrieval.
+    so we do not turn small talk or generic world-knowledge into retrieval.
     """
     cleaned = (message or "").strip()
     words = [part for part in re.split(r"\s+", cleaned) if part]
@@ -725,6 +748,12 @@ def _looks_like_factual_knowledge_question(message: str) -> bool:
     if looks_like_availability(cleaned) or looks_like_scheduling(cleaned):
         return False
     if _EMAIL_DRAFT_WORKFLOW.search(cleaned):
+        return False
+    if _GENERIC_WORLD_KNOWLEDGE.search(cleaned) and not _TENANT_OR_WORK_FACTUAL_CUE.search(
+        cleaned
+    ):
+        return False
+    if not _TENANT_OR_WORK_FACTUAL_CUE.search(cleaned):
         return False
     if not (_FACTUAL_WH.search(cleaned) or cleaned.endswith("?")):
         return False

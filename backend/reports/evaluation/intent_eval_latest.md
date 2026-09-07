@@ -1,10 +1,10 @@
 # Intent & Routing Evaluation Report
 
-**Generated:** 2026-09-07T13:40:37.862780+00:00
+**Generated:** 2026-09-07T14:13:21.674142+00:00
 
 ## Summary
 
-- **Total cases:** 54
+- **Total cases:** 57
 - **Intent accuracy:** 100.00%
 - **Routing accuracy:** 100.00%
 
@@ -15,7 +15,7 @@
 | calendar_and_email | 1 | 1 | 100% |
 | calendar_availability | 6 | 6 | 100% |
 | calendar_scheduling | 7 | 7 | 100% |
-| clarification | 5 | 5 | 100% |
+| clarification | 8 | 8 | 100% |
 | document_summary | 2 | 2 | 100% |
 | email_drafting | 6 | 6 | 100% |
 | general_assistant | 7 | 7 | 100% |

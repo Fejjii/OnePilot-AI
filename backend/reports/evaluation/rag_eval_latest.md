@@ -1,6 +1,6 @@
 # RAG Golden Evaluation Report
 
-**Generated:** 2026-09-07T13:40:37.868794+00:00
+**Generated:** 2026-09-07T14:13:21.680004+00:00
 
 Offline keyword scoring over demo NovaEdge docs (deterministic).
 
