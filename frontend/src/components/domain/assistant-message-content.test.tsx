@@ -152,6 +152,23 @@ describe("AssistantMessageContent", () => {
     expect(screen.getByText("pending")).toBeInTheDocument();
   });
 
+  it("renders an explicit email address as the recipient", () => {
+    render(
+      <AssistantMessageContent
+        content={[
+          "Recipient: fejjii.sofiene@gmail.com",
+          "Subject: OnePilot Private Demo Test",
+          "",
+          "This is a test of OnePilot's approval-gated Gmail integration.",
+          "",
+          "Approval status: pending",
+        ].join("\n")}
+      />,
+    );
+    expect(screen.getByText("fejjii.sofiene@gmail.com")).toBeInTheDocument();
+    expect(screen.queryByText("Not specified")).not.toBeInTheDocument();
+  });
+
   it("hides provider jargon on meeting proposals", () => {
     render(
       <AssistantMessageContent

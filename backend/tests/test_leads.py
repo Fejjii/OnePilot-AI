@@ -64,6 +64,18 @@ class TestLeadClassifier:
             == "john.doe+test@globex.io"
         )
         assert lead_service.extract_email("no email here") is None
+        assert (
+            lead_service.extract_email("Draft to [fejjii.sofiene@gmail.com] please")
+            == "fejjii.sofiene@gmail.com"
+        )
+        assert (
+            lead_service.extract_email("Send to <ops@example.com> today")
+            == "ops@example.com"
+        )
+        assert (
+            lead_service.extract_email("Recipient is (hello@example.org)")
+            == "hello@example.org"
+        )
 
 
 class TestLeadService:

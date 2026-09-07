@@ -204,7 +204,7 @@ class TestGmailApprovalExecution:
 
 
 class TestEmailDraftToolBehavior:
-    def test_live_gmail_draft_only_creates_draft_without_approval(
+    def test_live_gmail_draft_only_requires_hitl_approval(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         from onepilot.tools.base import ToolContext
@@ -218,12 +218,12 @@ class TestEmailDraftToolBehavior:
             GMAIL_SEND_ENABLED=False,
         )
         draft = MagicMock(
-            subject="Thanks for your interest",
-            body="Hello,\n\nThank you for your interest in NovaEdge.",
+            subject="OnePilot Private Demo Test",
+            body="This is a test of OnePilot's approval-gated Gmail integration.",
             tone="professional",
             model_dump=lambda mode="json": {
-                "subject": "Thanks for your interest",
-                "body": "Hello,\n\nThank you for your interest in NovaEdge.",
+                "subject": "OnePilot Private Demo Test",
+                "body": "This is a test of OnePilot's approval-gated Gmail integration.",
                 "tone": "professional",
             },
         )
@@ -239,14 +239,12 @@ class TestEmailDraftToolBehavior:
             "onepilot.tools.email_tool.gmail_service.is_live_gmail_provider",
             lambda *_args, **_kwargs: True,
         )
+        create_direct = MagicMock(
+            side_effect=AssertionError("Gmail draft must not be created before approval")
+        )
         monkeypatch.setattr(
             "onepilot.tools.email_tool.gmail_service.create_draft_direct",
-            lambda *args, **kwargs: {
-                "status": "success",
-                "draft_id": "draft_123",
-                "mode": "live",
-                "action": "create_draft",
-            },
+            create_direct,
         )
 
         ctx = ToolContext(
@@ -254,12 +252,21 @@ class TestEmailDraftToolBehavior:
             principal=MagicMock(),
             settings=settings,
         )
-        result = EmailDraftTool().run(ctx, context="Draft email to lead", action="draft_only")
+        result = EmailDraftTool().run(
+            ctx,
+            context='Draft an email to [fejjii.sofiene@gmail.com]',
+            action="draft_only",
+            recipient_email="fejjii.sofiene@gmail.com",
+        )
 
-        assert result.tool_name == "email.draft"
-        assert result.approval_required is False
-        assert result.output["gmail_draft_id"] == "draft_123"
-        assert result.output["gmail_status"] == "created"
+        assert result.approval_required is True
+        assert result.approval_action_type == "gmail_create_draft"
+        assert result.approval_payload is not None
+        assert "fejjii.sofiene@gmail.com" in result.approval_payload.get("to", [])
+        assert result.output["recipient_email"] == "fejjii.sofiene@gmail.com"
+        assert result.output["gmail_status"] == "preview_only"
+        create_direct.assert_not_called()
+
 
     def test_send_intent_still_requires_approval(self) -> None:
         from onepilot.tools.base import ToolContext

@@ -76,13 +76,41 @@ _CONTINUATION = re.compile(
     re.IGNORECASE,
 )
 
-_QUOTED_TITLE = re.compile(
-    r"(?:titled|called|named|title\s*[:=])\s+[\"'\u201c\u201d](.+?)[\"'\u201c\u201d]",
-    re.IGNORECASE | re.DOTALL,
+_TITLE_MARKER = re.compile(
+    r"(?:^|[\s,;])(?:titled|called|named|title\s*[:=])\s+",
+    re.IGNORECASE,
 )
 
-_ANY_QUOTED_TITLE = re.compile(
-    r"[\"'\u201c\u201d]([^\"'\u201c\u201d]{3,120})[\"'\u201c\u201d]",
+# Opening/closing quotation marks used in natural title syntax.
+_QUOTE_CHARS = "\"'“”„‟«»‘’‚‛‹›＂＇"
+
+# Preferred closer(s) for a given opener so inner apostrophes are not cut off.
+_QUOTE_CLOSERS = {
+    '"': '"”‟',
+    "'": "'’‛",
+    "“": "”\"",
+    "”": "”\"",
+    "„": "“”\"",
+    "«": "»",
+    "‘": "’'",
+    "’": "’'",
+    "‚": "‘’'",
+    "‹": "›",
+    "＂": "＂\"",
+    "＇": "＇'",
+}
+
+# Unquoted titles must not swallow date/time clauses that belong to scheduling.
+_TITLE_STOP = re.compile(
+    r"\s+(?:"
+    r"tomorrow|today|tonight|yesterday|"
+    r"next\s+week|this\s+week|next\s+month|"
+    r"monday|tuesday|wednesday|thursday|friday|saturday|sunday|"
+    r"at\s+\d{1,2}(?::\d{2})?\s*(?:a\.?\s*m\.?|p\.?\s*m\.?)?|"
+    r"on\s+\d{1,2}(?:[/-]\d{1,2})?|"
+    r"for\s+\d{1,3}\s*-?\s*(?:minutes?|mins?|hours?)"
+    r")\b",
+    re.IGNORECASE,
 )
 
 _DURATION = re.compile(
@@ -148,18 +176,47 @@ def missing_prior_scheduling_request(
 
 
 def extract_meeting_title(message: str) -> str | None:
-    """Return an explicit meeting title from the message, or None if not stated."""
+    """Return an explicit meeting title from the message, or None if not stated.
+
+    Accepts quoted, curly-quoted, unquoted, and accidentally unmatched opening
+    quotes after titled/called/named/title. Unquoted remainder is clipped so
+    date/time clauses are not consumed as part of the title.
+    """
     cleaned = message or ""
-    titled = _QUOTED_TITLE.search(cleaned)
-    if titled:
-        title = " ".join(titled.group(1).split()).strip()
-        return title[:200] or None
-    if re.search(r"\b(titled|called|named|title)\b", cleaned, re.IGNORECASE):
-        quoted = _ANY_QUOTED_TITLE.search(cleaned)
-        if quoted:
-            title = " ".join(quoted.group(1).split()).strip()
-            return title[:200] or None
-    return None
+    marker = _TITLE_MARKER.search(cleaned)
+    if not marker:
+        return None
+    rest = cleaned[marker.end() :].strip()
+    if not rest:
+        return None
+
+    quoted, closed = _split_quoted_title(rest)
+    candidate = quoted if closed else _clip_unquoted_title(quoted)
+    title = " ".join(candidate.split()).strip(" \t.,;:!?-")
+    if len(title) < 3:
+        return None
+    if _TITLE_STOP.match(f" {title}"):
+        return None
+    return title[:200]
+
+
+def _split_quoted_title(rest: str) -> tuple[str, bool]:
+    """Return (body, closed) when ``rest`` starts with a quotation mark."""
+    if not rest or rest[0] not in _QUOTE_CHARS:
+        return rest, False
+    body = rest[1:]
+    closers = _QUOTE_CLOSERS.get(rest[0], _QUOTE_CHARS)
+    for index, char in enumerate(body):
+        if char in closers:
+            return body[:index], True
+    return body, False
+
+
+def _clip_unquoted_title(text: str) -> str:
+    """Take title text until an unrelated date/time clause or end of message."""
+    match = _TITLE_STOP.search(text)
+    clipped = text[: match.start()] if match else text
+    return clipped.strip()
 
 
 def parse_duration_minutes(message: str, default: int) -> int:
