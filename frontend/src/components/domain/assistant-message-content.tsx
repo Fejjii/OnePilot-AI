@@ -112,7 +112,11 @@ function EvidenceSection({ section }: { section: StructuredSection }) {
 
   return (
     <div className="space-y-2">
-      <SectionLabel icon={BookOpen}>Evidence & sources</SectionLabel>
+      <SectionLabel icon={BookOpen}>
+        {/source/i.test(section.title) && !/evidence/i.test(section.title)
+          ? "Sources"
+          : "Evidence & sources"}
+      </SectionLabel>
       {subsections.length > 0 ? (
         <div className="mt-2 space-y-3">
           {subsections.map((subsection) => (
@@ -163,7 +167,9 @@ function StructuredSectionBlock({ section }: { section: StructuredSection }) {
     case "summary":
       return (
         <div>
-          <SectionLabel icon={Sparkles}>Summary</SectionLabel>
+          <SectionLabel icon={Sparkles}>
+            {/answer/i.test(section.title) ? "Answer" : "Summary"}
+          </SectionLabel>
           <p className="mt-1.5 text-sm leading-relaxed text-slate-800">
             {section.content}
           </p>
@@ -172,7 +178,9 @@ function StructuredSectionBlock({ section }: { section: StructuredSection }) {
     case "key-points":
       return (
         <div>
-          <SectionLabel icon={ListChecks}>Key points</SectionLabel>
+          <SectionLabel icon={ListChecks}>
+            {/finding/i.test(section.title) ? "Top findings" : "Key points"}
+          </SectionLabel>
           <KeyPointsList items={section.items} />
         </div>
       );
@@ -305,7 +313,17 @@ function CalendarListCard({
   );
 }
 
-function EmailDraftContent({ subject, body }: { subject: string; body: string }) {
+function EmailDraftContent({
+  subject,
+  body,
+  recipient,
+  approvalStatus,
+}: {
+  subject: string;
+  body: string;
+  recipient?: string;
+  approvalStatus?: string;
+}) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-1.5">
@@ -314,13 +332,28 @@ function EmailDraftContent({ subject, body }: { subject: string; body: string })
           Email draft
         </p>
       </div>
+      {recipient ? (
+        <div className="rounded-md border border-slate-200 bg-slate-50/50 px-3 py-2">
+          <p className="text-[11px] font-medium text-slate-500">Recipient</p>
+          <p className="mt-0.5 text-sm font-medium text-slate-900">{recipient}</p>
+        </div>
+      ) : null}
       <div className="rounded-md border border-slate-200 bg-slate-50/50 px-3 py-2">
         <p className="text-[11px] font-medium text-slate-500">Subject</p>
         <p className="mt-0.5 text-sm font-medium text-slate-900">{subject}</p>
       </div>
-      <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
-        {body}
+      <div>
+        <p className="text-[11px] font-medium text-slate-500">Body</p>
+        <div className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
+          {body}
+        </div>
       </div>
+      {approvalStatus ? (
+        <div className="rounded-md border border-slate-200 bg-slate-50/50 px-3 py-2">
+          <p className="text-[11px] font-medium text-slate-500">Approval status</p>
+          <p className="mt-0.5 text-sm text-slate-800">{approvalStatus}</p>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -334,7 +367,12 @@ function CompoundWorkflowResponse({ sections }: { sections: StructuredSection[] 
           if (email.kind === "email") {
             return (
               <div key={section.id}>
-                <EmailDraftContent subject={email.subject} body={email.body} />
+                <EmailDraftContent
+                  subject={email.subject}
+                  body={email.body}
+                  recipient={email.recipient}
+                  approvalStatus={email.approvalStatus}
+                />
               </div>
             );
           }
@@ -378,7 +416,14 @@ function renderParsedResponse(parsed: ParsedAssistantResponse) {
     case "compound":
       return <CompoundWorkflowResponse sections={parsed.sections} />;
     case "email":
-      return <EmailDraftContent subject={parsed.subject} body={parsed.body} />;
+      return (
+        <EmailDraftContent
+          subject={parsed.subject}
+          body={parsed.body}
+          recipient={parsed.recipient}
+          approvalStatus={parsed.approvalStatus}
+        />
+      );
     case "meeting-proposal":
       return <MeetingProposalCard proposal={parsed.proposal} />;
     case "meetings-list":

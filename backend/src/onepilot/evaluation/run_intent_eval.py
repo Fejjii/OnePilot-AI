@@ -119,9 +119,13 @@ def evaluate(rows: list[dict]) -> EvalReport:
         except ValueError:
             continue
 
-        msg_result = classify_message(message)
+        msg_result = classify_message(message, history=row.get("history") or None)
         predicted_class = msg_result.message_class.value
-        intent_result = classify(message, message_class=msg_result.message_class)
+        intent_result = classify(
+            message,
+            message_class=msg_result.message_class,
+            history=row.get("history") or None,
+        )
         predicted = intent_result.intent.value
 
         report.total += 1

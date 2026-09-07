@@ -251,14 +251,14 @@ class TestCalendarFormat:
             "timezone": _TZ,
             "approval_payload": {
                 "summary": "Follow-up meeting with high priority lead",
-                "start_time": datetime(2026, 5, 25, 8, 0).isoformat(),
-                "end_time": datetime(2026, 5, 25, 8, 30).isoformat(),
+                "start_time": datetime(2026, 5, 25, 10, 0).isoformat(),
+                "end_time": datetime(2026, 5, 25, 10, 30).isoformat(),
                 "timezone": _TZ,
                 "attendees": ["marcus.webb@northwindlegal.com"],
             },
             "selected_slot": {
-                "start_time": datetime(2026, 5, 25, 8, 0).isoformat(),
-                "end_time": datetime(2026, 5, 25, 8, 30).isoformat(),
+                "start_time": datetime(2026, 5, 25, 10, 0).isoformat(),
+                "end_time": datetime(2026, 5, 25, 10, 30).isoformat(),
             },
         }
         text = format_proposal_response(raw)

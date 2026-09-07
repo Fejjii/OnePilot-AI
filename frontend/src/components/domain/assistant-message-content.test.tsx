@@ -120,6 +120,38 @@ describe("AssistantMessageContent", () => {
     expect(screen.queryByText(/Discovery call/i)).not.toBeInTheDocument();
   });
 
+  it("renders Answer headings without raw markdown", () => {
+    render(
+      <AssistantMessageContent
+        content={"## Answer\nThe internal launch codename is ORION-47."}
+      />,
+    );
+    expect(screen.queryByText("## Answer")).not.toBeInTheDocument();
+    expect(screen.getByText("Answer")).toBeInTheDocument();
+    expect(screen.getByText(/ORION-47/i)).toBeInTheDocument();
+  });
+
+  it("renders email recipient and approval status", () => {
+    render(
+      <AssistantMessageContent
+        content={[
+          "Recipient: Sarah Chen",
+          "Subject: Demo follow-up",
+          "",
+          "Hi Sarah,",
+          "",
+          "Thanks again for joining the demo.",
+          "",
+          "Approval status: pending",
+        ].join("\n")}
+      />,
+    );
+    expect(screen.getByText("Recipient")).toBeInTheDocument();
+    expect(screen.getByText("Sarah Chen")).toBeInTheDocument();
+    expect(screen.getByText("Approval status")).toBeInTheDocument();
+    expect(screen.getByText("pending")).toBeInTheDocument();
+  });
+
   it("hides provider jargon on meeting proposals", () => {
     render(
       <AssistantMessageContent

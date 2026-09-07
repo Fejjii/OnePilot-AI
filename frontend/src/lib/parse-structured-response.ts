@@ -49,15 +49,18 @@ export interface CalendarListDetails {
 export type ParsedAssistantResponse =
   | { kind: "structured"; sections: StructuredSection[] }
   | { kind: "compound"; sections: StructuredSection[] }
-  | { kind: "email"; subject: string; body: string }
+  | { kind: "email"; subject: string; body: string; recipient: string; approvalStatus: string }
   | { kind: "meeting-proposal"; proposal: MeetingProposalDetails }
   | { kind: "meetings-list"; list: CalendarListDetails }
   | { kind: "availability-slots"; list: CalendarListDetails }
   | { kind: "plain"; content: string };
 
 const STANDARD_SECTION_TITLES: Record<string, StructuredSectionId> = {
+  answer: "summary",
   summary: "summary",
   "key points": "key-points",
+  "top findings": "key-points",
+  sources: "evidence",
   "evidence or sources": "evidence",
   "suggested next action": "next-action",
 };
@@ -123,7 +126,7 @@ function splitByMarkdownHeaders(
   };
 
   for (const line of lines) {
-    const headerMatch = line.match(/^##\s+(.+?)\s*$/);
+    const headerMatch = line.match(/^#{1,3}\s+(.+?)\s*$/);
     if (headerMatch) {
       const title = headerMatch[1].trim();
       const isBoundary =
@@ -152,13 +155,26 @@ function contentHasCompoundHeaders(content: string): boolean {
   );
 }
 
-function parseEmailDraft(content: string): { subject: string; body: string } | null {
-  const match = content.match(/^Subject:\s*(.+?)(?:\n\n|\n$)([\s\S]*)$/);
+function parseEmailDraft(content: string): {
+  recipient: string;
+  subject: string;
+  body: string;
+  approvalStatus: string;
+} | null {
+  const match = content.match(
+    /^(?:Recipient:\s*(.+)\n)?Subject:\s*(.+?)(?:\n\n|\n$)([\s\S]*)$/,
+  );
   if (!match) return null;
-  return {
-    subject: match[1].trim(),
-    body: match[2].trim(),
-  };
+  const recipient = (match[1] || "").trim();
+  const subject = match[2].trim();
+  let body = match[3].trim();
+  let approvalStatus = "";
+  const approvalMatch = body.match(/\nApproval status:\s*(.+)\s*$/i);
+  if (approvalMatch) {
+    approvalStatus = approvalMatch[1].trim();
+    body = body.replace(/\nApproval status:\s*.+\s*$/i, "").trim();
+  }
+  return { recipient, subject, body, approvalStatus };
 }
 
 function parseMeetingProposal(content: string): MeetingProposalDetails | null {
@@ -295,16 +311,12 @@ export function parseStructuredResponse(content: string): ParsedAssistantRespons
     }
   }
 
-  const sections = splitByMarkdownHeaders(trimmed, STANDARD_SECTION_TITLES);
+  const sections = splitByMarkdownHeaders(trimmed);
   if (sections.length === 0) {
     return { kind: "plain", content: trimmed };
   }
 
-  if (hasStandardKnowledgeSections(sections)) {
-    return { kind: "structured", sections };
-  }
-
-  if (sections.length >= 2) {
+  if (hasStandardKnowledgeSections(sections) || sections.length >= 1) {
     return { kind: "structured", sections };
   }
 

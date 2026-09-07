@@ -14,6 +14,12 @@ from dataclasses import dataclass
 
 from onepilot.core.constants import MessageClass
 from onepilot.core.logging import get_logger
+from onepilot.services.calendar_intent import (
+    is_scheduling_continuation,
+    looks_like_availability,
+    looks_like_scheduling,
+    recover_prior_scheduling_request,
+)
 
 logger = get_logger(__name__)
 
@@ -40,7 +46,16 @@ _CAPABILITY_PATTERNS = [
     (
         re.compile(
             r"\b(help|capability|capabilities|feature|features|tool|tools|function|functions"
-            r"|able to|available)(\s+me|\s+you|\s+do)?\b",
+            r"|able to)(\s+me|\s+you|\s+do)?\b",
+            re.IGNORECASE,
+        ),
+        2.0,
+    ),
+    (
+        re.compile(
+            r"\b(what('s| is) available|"
+            r"(tools?|features?|capabilities?|functions?) (that are |are )?available|"
+            r"available (tools?|features?|capabilities?))\b",
             re.IGNORECASE,
         ),
         2.0,
@@ -65,10 +80,11 @@ _CONVERSATIONAL_PATTERNS = [
         ),
         2.5,
     ),
-    # Testing/checking (do not match email addresses like test@example.com)
+    # Testing/checking the assistant — not "Test" inside a meeting title
     (
         re.compile(
-            r"\b(test|testing)\b(?!@)"
+            r"^\s*(test|testing)(\s|!|\.|\?|$)"
+            r"|\bthis is a test\b"
             r"|\b(can you (hear|read|see) me|are you (there|listening))\b",
             re.IGNORECASE,
         ),
@@ -224,6 +240,14 @@ _BUSINESS_KNOWLEDGE_PATTERNS = [
         ),
         2.5,
     ),
+    # Substantive internal/work knowledge cues — not phrase-hardcoded
+    (
+        re.compile(
+            r"\b(internal|handbook|playbook|runbook|knowledge base)\b",
+            re.IGNORECASE,
+        ),
+        2.0,
+    ),
     # "Your/you" in business context (e.g., "your services", "your pricing")
     (
         re.compile(
@@ -321,7 +345,11 @@ _WORKFLOW_PATTERNS = [
             r"|\b(schedule|book|set up).*(meeting|appointment|call)"
             r"|\b(approve|reject).*(request|action|proposal)"
             r"|\b(summarize|key points).*(document|report|this)"
-            r"|\b(am i free|are we free|check (my )?(calendar )?availability"
+            r"|\b(am i free|are we free|when am i (available|free)"
+            r"|what times? am i (available|free)"
+            r"|check (my )?(calendar )?availability"
+            r"|do i have (any )?availability"
+            r"|available tomorrow|availability tomorrow"
             r"|free tomorrow|busy tomorrow|open (time )?slots?"
             r"|find (an? )?(open|available|free))"
             r"|\b(suggest|propose|offer|recommend).*(slot|time|times|meeting)\b"
@@ -437,7 +465,11 @@ class MessageClassResult:
 # ---------------------------------------------------------------------------
 
 
-def classify_message(message: str) -> MessageClassResult:
+def classify_message(
+    message: str,
+    *,
+    history: list[dict] | None = None,
+) -> MessageClassResult:
     """Classify a user message into a high-level MessageClass.
 
     Uses semantic scoring rather than exact phrase matching for robustness.
@@ -452,6 +484,7 @@ def classify_message(message: str) -> MessageClassResult:
 
     Args:
         message: The user message to classify
+        history: Optional bounded same-conversation turns for continuation routing
 
     Returns:
         MessageClassResult with classification, confidence, and scoring details
@@ -499,6 +532,30 @@ def classify_message(message: str) -> MessageClassResult:
             message_class=MessageClass.WORKFLOW_REQUEST,
             confidence=0.9,
             reason="email_draft_workflow_heuristic",
+            scores={},
+        )
+
+    if looks_like_availability(cleaned) and not looks_like_scheduling(cleaned):
+        return MessageClassResult(
+            message_class=MessageClass.WORKFLOW_REQUEST,
+            confidence=0.9,
+            reason="calendar_availability_indicators",
+            scores={},
+        )
+
+    if looks_like_scheduling(cleaned):
+        return MessageClassResult(
+            message_class=MessageClass.WORKFLOW_REQUEST,
+            confidence=0.9,
+            reason="calendar_scheduling_indicators",
+            scores={},
+        )
+
+    if is_scheduling_continuation(cleaned) and recover_prior_scheduling_request(history):
+        return MessageClassResult(
+            message_class=MessageClass.WORKFLOW_REQUEST,
+            confidence=0.88,
+            reason="calendar_scheduling_continuation",
             scores={},
         )
 
@@ -607,6 +664,16 @@ def classify_message(message: str) -> MessageClassResult:
             scores=scores,
         )
 
+    # Prefer tenant-scoped knowledge retrieval for substantive factual questions
+    # instead of immediately asking for clarification.
+    if _looks_like_factual_knowledge_question(cleaned):
+        return MessageClassResult(
+            message_class=MessageClass.BUSINESS_KNOWLEDGE,
+            confidence=0.72,
+            reason="substantive_factual_question",
+            scores=scores,
+        )
+
     # 8. Fallback: unclear if no strong signals
     max_score = max(scores.values()) if scores else 0.0
     if max_score < _SCORE_THRESHOLD_LOW:
@@ -630,6 +697,38 @@ def classify_message(message: str) -> MessageClassResult:
 # ---------------------------------------------------------------------------
 # Helper functions
 # ---------------------------------------------------------------------------
+
+
+_FACTUAL_WH = re.compile(
+    r"^\s*(what|who|which|where|why|how|tell me|explain|describe)\b",
+    re.IGNORECASE,
+)
+_SMALL_TALK_QUESTION = re.compile(
+    r"\b(how are you|how's it going|what's up|whats up|how was your day)\b",
+    re.IGNORECASE,
+)
+
+
+def _looks_like_factual_knowledge_question(message: str) -> bool:
+    """True for substantive work/factual questions that should try RAG first.
+
+    Casual greetings, capability questions, calendar/email, and out-of-scope
+    prompts are excluded by earlier priority rules. This only runs as a fallback
+    so we do not turn small talk into retrieval.
+    """
+    cleaned = (message or "").strip()
+    words = [part for part in re.split(r"\s+", cleaned) if part]
+    if len(words) < 6:
+        return False
+    if _SMALL_TALK_QUESTION.search(cleaned):
+        return False
+    if looks_like_availability(cleaned) or looks_like_scheduling(cleaned):
+        return False
+    if _EMAIL_DRAFT_WORKFLOW.search(cleaned):
+        return False
+    if not (_FACTUAL_WH.search(cleaned) or cleaned.endswith("?")):
+        return False
+    return True
 
 
 def _looks_like_external_current_facts(message: str) -> bool:

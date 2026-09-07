@@ -101,3 +101,29 @@ class TestCalendarTimeParser:
         )
         assert parsed.query_type == "range"
         assert parsed.label == "tomorrow afternoon"
+
+    def test_production_availability_between_9_and_5(self) -> None:
+        parsed = parse_calendar_window(
+            "When am I available tomorrow between 9 AM and 5 PM?",
+            timezone="Europe/Berlin",
+            lookahead_days=14,
+            slot_duration_minutes=30,
+            reference=_REF,
+        )
+        assert parsed.query_type == "range"
+        assert parsed.label == "tomorrow 09:00-17:00"
+        assert parsed.time_min.hour == 7
+        assert parsed.time_max.hour == 15
+
+    def test_production_schedule_tomorrow_3pm_hyphen_duration(self) -> None:
+        parsed = parse_calendar_window(
+            'Schedule a 30-minute meeting tomorrow at 3 PM titled "OnePilot Live Calendar Test".',
+            timezone="Europe/Berlin",
+            lookahead_days=14,
+            slot_duration_minutes=30,
+            reference=_REF,
+        )
+        assert parsed.query_type == "specific"
+        assert parsed.label == "tomorrow 15:00"
+        assert parsed.time_min.hour == 13
+        assert (parsed.time_max - parsed.time_min).total_seconds() == 30 * 60

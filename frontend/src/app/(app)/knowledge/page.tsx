@@ -21,6 +21,7 @@ import { Modal } from "@/components/ui/modal";
 import { StatusBadge } from "@/components/domain/status-badge";
 import { ConfidenceBadge } from "@/components/domain/confidence-badge";
 import { WeakEvidenceWarning } from "@/components/domain/weak-evidence-warning";
+import { AssistantMessageContent } from "@/components/domain/assistant-message-content";
 import { ApiRequestError } from "@/lib/api-client";
 import {
   useAnswerMutation,
@@ -150,6 +151,7 @@ export default function KnowledgePage() {
                 <ConfidenceBadge
                   value={answer.data.confidence}
                   weakEvidence={answer.data.weak_evidence}
+                  citationCount={answer.data.citations.length}
                 />
                 {answer.data.fallback_used && (
                   <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
@@ -162,9 +164,7 @@ export default function KnowledgePage() {
               </div>
               {answer.data.weak_evidence && <WeakEvidenceWarning />}
               <div className="rounded-lg border border-slate-200 bg-white p-3">
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
-                  {answer.data.answer}
-                </p>
+                <AssistantMessageContent content={answer.data.answer} />
               </div>
               {answer.data.citations.length > 0 && (
                 <div>

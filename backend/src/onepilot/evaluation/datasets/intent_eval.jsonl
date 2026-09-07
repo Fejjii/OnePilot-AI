@@ -5,7 +5,7 @@
 {"message": "That's not what I asked — wrong answer.", "expected_intent": "general_assistant", "expected_message_class": "correction_or_meta", "category": "correction_meta"}
 {"message": "Never mind, forget that — different topic.", "expected_intent": "general_assistant", "expected_message_class": "correction_or_meta", "category": "correction_meta"}
 {"message": "What is our refund policy?", "expected_intent": "knowledge_search", "expected_message_class": "business_knowledge", "category": "business_knowledge"}
-{"message": "Tell me about our SOC 2 controls.", "expected_intent": "clarification", "expected_message_class": "unclear", "category": "business_knowledge"}
+{"message": "Tell me about our SOC 2 controls.", "expected_intent": "knowledge_search", "expected_message_class": "business_knowledge", "category": "business_knowledge"}
 {"message": "How does NovaEdge handle data privacy?", "expected_intent": "knowledge_search", "expected_message_class": "business_knowledge", "category": "business_knowledge"}
 {"message": "Draft an email to Acme thanking them for the meeting.", "expected_intent": "email_drafting", "expected_message_class": "workflow_request", "category": "email_drafting"}
 {"message": "Write a follow-up email to a prospect who went silent.", "expected_intent": "email_drafting", "expected_message_class": "workflow_request", "category": "email_drafting"}
@@ -19,14 +19,14 @@
 {"message": "ok", "expected_intent": "clarification", "expected_message_class": "conversational", "category": "ambiguous_clarification"}
 {"message": "Summarize the Q3 plan document for me.", "expected_intent": "document_summary", "expected_message_class": "workflow_request", "category": "document_summary"}
 {"message": "Give me a tl;dr of the SOC 2 report.", "expected_intent": "document_summary", "expected_message_class": "workflow_request", "category": "document_summary"}
-{"message": "Explain the difference between Pro and Team plans.", "expected_intent": "clarification", "expected_message_class": "unclear", "category": "business_knowledge"}
+{"message": "Explain the difference between Pro and Team plans.", "expected_intent": "knowledge_search", "expected_message_class": "business_knowledge", "category": "business_knowledge"}
 {"message": "Where can I find the onboarding guide?", "expected_intent": "knowledge_search", "expected_message_class": "business_knowledge", "category": "business_knowledge"}
 {"message": "Compose a reply to this support ticket apologizing for the delay.", "expected_intent": "email_drafting", "expected_message_class": "workflow_request", "category": "email_drafting"}
 {"message": "Capture this lead: Sara, sara@beta.io, interested in a demo.", "expected_intent": "lead_support", "expected_message_class": "workflow_request", "category": "lead_qualification"}
 {"message": "Book a 30-minute slot with engineering.", "expected_intent": "calendar_scheduling", "expected_message_class": "workflow_request", "category": "calendar_eval"}
 {"message": "Give me a stocks tip for Monday.", "expected_intent": "clarification", "expected_message_class": "unclear", "category": "out_of_scope"}
 {"message": "Yes", "expected_intent": "clarification", "expected_message_class": "unclear", "category": "ambiguous_clarification"}
-{"message": "How do I reset a customer's password?", "expected_intent": "clarification", "expected_message_class": "workflow_request", "category": "business_knowledge"}
+{"message": "How do I reset a customer's password?", "expected_intent": "knowledge_search", "expected_message_class": "business_knowledge", "category": "business_knowledge"}
 {"message": "Let's plan the next quarter together.", "expected_intent": "clarification", "expected_message_class": "unclear", "category": "small_talk"}
 {"message": "What can you do for me?", "expected_intent": "general_assistant", "expected_message_class": "capability_or_help", "category": "web_search_eval"}
 {"message": "What services does NovaEdge Solutions offer?", "expected_intent": "knowledge_search", "expected_message_class": "business_knowledge", "category": "web_search_eval"}
@@ -44,3 +44,12 @@
 {"message": "Suggest three meeting slots next week.", "expected_intent": "calendar_scheduling", "expected_message_class": "workflow_request", "category": "calendar_eval"}
 {"message": "Schedule a 30 minute meeting with a high priority lead next week.", "expected_intent": "calendar_scheduling", "expected_message_class": "workflow_request", "category": "calendar_eval", "expects_approval": true}
 {"message": "Draft an email and schedule a meeting with a high priority lead next week.", "expected_intent": "calendar_and_email", "expected_message_class": "workflow_request", "category": "calendar_eval", "expects_approval": true}
+{"message": "When am I available tomorrow between 9 AM and 5 PM?", "expected_intent": "calendar_availability", "expected_message_class": "workflow_request", "category": "calendar_eval"}
+{"message": "When am I free?", "expected_intent": "calendar_availability", "expected_message_class": "workflow_request", "category": "calendar_eval"}
+{"message": "What times am I available?", "expected_intent": "calendar_availability", "expected_message_class": "workflow_request", "category": "calendar_eval"}
+{"message": "Do I have availability tomorrow?", "expected_intent": "calendar_availability", "expected_message_class": "workflow_request", "category": "calendar_eval"}
+{"message": "available tomorrow between 9 AM and 5 PM", "expected_intent": "calendar_availability", "expected_message_class": "workflow_request", "category": "calendar_eval"}
+{"message": "Schedule a 30-minute meeting tomorrow at 3 PM titled \"OnePilot Live Calendar Test\".", "expected_intent": "calendar_scheduling", "expected_message_class": "workflow_request", "category": "calendar_eval", "expects_approval": true}
+{"message": "Just schedule the meeting.", "expected_intent": "calendar_scheduling", "expected_message_class": "workflow_request", "category": "calendar_eval", "history": [{"role": "user", "content": "Schedule a 30-minute meeting tomorrow at 3 PM titled \"OnePilot Live Calendar Test\"."}]}
+{"message": "What is the internal launch codename for this demo?", "expected_intent": "knowledge_search", "expected_message_class": "business_knowledge", "category": "business_knowledge"}
+
