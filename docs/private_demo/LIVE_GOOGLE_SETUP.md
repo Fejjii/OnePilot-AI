@@ -199,9 +199,12 @@ The current JWT + RBAC model is sufficient. Do **not** enable
 3. `/demo/start` returns 403 on this host.
 4. Other organizations on the same host receive mock Gmail/Calendar and cannot
    read or write the dedicated Google account.
-5. Gmail send/draft provider execution and Calendar create/update still require
-   Owner/Admin approval. Calendar availability/list/slots are read-only and
-   still require an authenticated principal in the allowlisted org.
+5. Gmail send **and Gmail draft creation** are external side effects and still
+   require Owner/Admin approval (`gmail_create_draft`). A draft-only chat prompt
+   prepares a preview and a pending ApprovalRequest; the Gmail API draft is
+   created only after approval. `GMAIL_SEND_ENABLED=false` means nothing is sent.
+   Calendar create/update still require approval. Calendar availability/list/slots
+   are read-only and still require an authenticated principal in the allowlisted org.
 
 ---
 
@@ -219,8 +222,9 @@ After env is set on the **private** host only:
 4. Login with the dedicated owner (not Try the demo).
 5. Calendar availability / upcoming meetings return live busy/free data (no
    private event titles in API responses).
-6. “Draft and send” or schedule-meeting prompts create an **ApprovalRequest**.
-   Nothing hits Gmail send or Calendar insert until Owner/Admin approves.
+6. “Draft an email”, “Draft and send”, or schedule-meeting prompts create an
+   **ApprovalRequest**. Nothing hits Gmail draft/send or Calendar insert until
+   Owner/Admin approves.
 7. A second registered org cannot see the first org’s approvals or live Google
    data.
 8. Public demo URL is unchanged: Gmail mock, Calendar mock, speech disabled,

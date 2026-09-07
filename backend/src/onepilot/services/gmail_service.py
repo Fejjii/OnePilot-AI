@@ -60,7 +60,11 @@ def create_draft_direct(
     bcc: list[str] | None = None,
     settings: Settings | None = None,
 ) -> dict:
-    """Create a Gmail draft immediately (demo mode with send disabled)."""
+    """Create a Gmail draft from an already-approved payload.
+
+    Chat/tool paths must not call this. Use the ``gmail_create_draft`` HITL
+    execution path (``execute_approval_action``) after Owner/Admin approval.
+    """
     payload = build_approval_payload(
         subject=subject,
         body=body,
@@ -108,7 +112,8 @@ def build_approval_payload(
     cc: list[str] | None = None,
     bcc: list[str] | None = None,
 ) -> dict:
-    to_addr = (recipient_email or "").strip() or _DEFAULT_RECIPIENT
+    cleaned = (recipient_email or "").strip().strip("[]<>()\"'")
+    to_addr = cleaned or _DEFAULT_RECIPIENT
     try:
         payload = EmailApprovalPayload(
             action_type=action_type,  # type: ignore[arg-type]

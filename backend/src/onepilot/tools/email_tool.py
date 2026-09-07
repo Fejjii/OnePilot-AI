@@ -64,54 +64,29 @@ class EmailDraftTool(Tool):
             action_type=approval_action,
         )
 
-        live_gmail_draft = (
-            action == "draft_only"
-            and gmail_service.is_live_gmail_provider(
-                settings,
-                organization_id=ctx.principal.organization_id,
-            )
-            and not settings.GMAIL_SEND_ENABLED
-        )
-        gmail_result: dict | None = None
-        if live_gmail_draft:
-            gmail_result = gmail_service.create_draft_direct(
-                ctx.session,
-                principal=ctx.principal,
-                subject=outcome.draft.subject,
-                body=outcome.draft.body,
-                recipient_email=recipient_email,
-                settings=settings,
-            )
-
-        approval_required = action != "draft_only" or (
-            action == "draft_only" and not live_gmail_draft
-        )
-        if live_gmail_draft and gmail_result and gmail_result.get("status") == "success":
-            approval_required = False
-
+        # Gmail draft creation is an external side effect. Always HITL-gate it.
+        # Public mock stays approval-safe; live Gmail uses gmail_create_draft
+        # execution after Owner/Admin approval. Send remains separately disabled.
+        approval_required = True
         approval_title, approval_description = build_approval_copy(
             action_type=approval_action,
             recipient_name=recipient_name,
             company=company,
             facts=crm_facts,
+            recipient_email=recipient_email,
         )
 
         output: dict = {
             "draft": outcome.draft.model_dump(),
             "model": outcome.model,
             "fallback_used": outcome.fallback_used,
-            "gmail_action_pending": approval_required,
+            "gmail_action_pending": True,
             "crm_grounded": bool(crm_facts),
             "recipient_name": recipient_name,
+            "recipient_email": recipient_email,
             "recipient_company": company,
+            "gmail_status": "preview_only",
         }
-        if live_gmail_draft and gmail_result:
-            output["gmail_result"] = gmail_result
-            output["gmail_status"] = (
-                "created" if gmail_result.get("status") == "success" else "preview_only"
-            )
-            if gmail_result.get("draft_id"):
-                output["gmail_draft_id"] = gmail_result["draft_id"]
 
         return ToolResult(
             tool_name=self.name,

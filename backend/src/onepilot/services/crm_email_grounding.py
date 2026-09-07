@@ -160,12 +160,19 @@ def resolve_email_recipient(
     explicit_email = _clean(ctx.get("recipient_email")) or lead_service.extract_email(
         message
     )
+    explicit_name = _clean(ctx.get("recipient_name"))
     if explicit_email:
         matched = _lead_by_email(leads, explicit_email)
         if matched is not None:
             return _from_lead(matched, match_reason="email", context=ctx)
+        return ResolvedEmailRecipient(
+            recipient_name=explicit_name,
+            recipient_email=explicit_email,
+            company=_clean(ctx.get("company")),
+            facts={},
+            match_reason="explicit_email",
+        )
 
-    explicit_name = _clean(ctx.get("recipient_name"))
     if explicit_name:
         matched = _lead_by_name(leads, explicit_name)
         if matched is not None:
@@ -211,13 +218,19 @@ def resolve_email_recipient(
     )
 
 
-def audience_label(*, recipient_name: str | None, company: str | None) -> str | None:
-    """Human-readable 'who' for approval titles. No IDs."""
+def audience_label(
+    *,
+    recipient_name: str | None,
+    company: str | None,
+    recipient_email: str | None = None,
+) -> str | None:
+    """Human-readable 'who' for approval titles. No IDs. Never invents an address."""
     name = _clean(recipient_name)
     org = _clean(company)
+    email = _clean(recipient_email)
     if name and org:
         return f"{name} at {org}"
-    return name or org
+    return name or org or email
 
 
 def build_approval_copy(
@@ -226,11 +239,16 @@ def build_approval_copy(
     recipient_name: str | None,
     company: str | None,
     facts: dict[str, str] | None = None,
+    recipient_email: str | None = None,
 ) -> tuple[str, str]:
     """Recruiter-friendly approval title and description. No raw IDs."""
     is_send = action_type == "gmail_send_email"
     verb = "Send" if is_send else "Draft"
-    who = audience_label(recipient_name=recipient_name, company=company)
+    who = audience_label(
+        recipient_name=recipient_name,
+        company=company,
+        recipient_email=recipient_email,
+    )
     facts = facts or {}
 
     title = f"{verb} follow-up email to {who}" if who else f"{verb} follow-up email"

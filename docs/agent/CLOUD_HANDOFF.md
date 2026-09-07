@@ -1,7 +1,7 @@
 # Cloud agent handoff (sanitized)
 
-Generated: 2026-09-07 13:45 UTC  
-Generator: Cloud agent (manual, sanitized; private-demo routing + response UX on `fix/private-demo-routing-response-polish`; no local `HANDOFF.md`)
+Generated: 2026-09-07 15:50 UTC  
+Generator: Cloud agent (manual, sanitized; last-mile recruiter-demo quality on `fix/release-last-mile-demo-quality`; no local `HANDOFF.md`)
 
 This file is the **only** committed project-state brief for Cursor Cloud / phone agents.
 It is intentionally smaller than any local `HANDOFF.md` and contains **no secrets**.
@@ -25,15 +25,16 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 
 | Ref | SHA | Notes |
 |-----|-----|-------|
-| `origin/main` (canonical) | `be8d956ea246bab895dd68a7f366b2a1d8ffbefb` | Includes PR #35 (private live-Google track). Do not merge this routing PR unless asked |
+| `origin/main` (canonical) | `611bcbdf7e480aa10b5d8a8295af770dc21b717b` | Includes PR #36 (private-demo routing + response polish). Task-start SHA for this last-mile work |
 | `origin/deployment/public-demo` | `87eef7d5c2565181b94aff06be97374b22bdf4f9` | Product SHA behind `main`. **READY TO SHARE**. Do not fast-forward |
 | `origin/deployment/live-google-demo` | `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332` | Legacy private pointer; **untouched** |
-| `fix/private-demo-routing-response-polish` (this work) | see latest commit on that branch | PR #36 into `main`; READY FOR REVIEW; do not merge unless asked |
+| `fix/release-last-mile-demo-quality` (this work) | see latest commit on that branch | Last-mile demo quality PR into `main`; do not merge unless asked |
 
 `deployment/live-google-demo` is a stale ancestor of `main` (no unique code). Current `main` is authoritative. Do **not** move that pointer.
 
 ## Completed
 
+- PR #36 — private-demo routing + response UX merged to `main`
 - PR #35 — private live-Google v1 track merged to `main` (`PRIVATE_LIVE_GOOGLE_ENABLED`)
 - PR #34 — recruiter demo presentation package merged to `main`
 - PR #33 — recruiter-facing README polish merged to `main`
@@ -60,15 +61,13 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 
 ## Current task / in progress
 
-- **Private-demo routing + response UX** on `fix/private-demo-routing-response-polish` (PR #36 into `main`, **READY FOR REVIEW, not merged**). Manual private-host validation found four issues; this PR addresses them in product code only:
-  - P0-1: “When am I available tomorrow between 9 AM and 5 PM?” now Stage-1 workflow + Stage-2 `calendar_availability` + `calendar.check_availability` (not General / `chat.general`)
-  - P0-2: fully specified scheduling (`titled "OnePilot Live Calendar Test"`, tomorrow 15:00–15:30 Europe/Berlin) creates a pending HITL approval; continuations such as “Just schedule the meeting” recover bounded same-conversation user details; no Calendar write before approval
-  - **Review fix:** a scheduling continuation with **no** recoverable prior request (`Just schedule the meeting.` / `Go ahead.` / `Schedule it.` / `Yes, book it.`) is Clarification — no `calendar.create_event_request`, no approval, no default date/time/title. Continuation is evaluated before generic scheduling patterns.
-  - P0-3: AI Workspace substantive factual/work questions (e.g. internal launch codename) route to `knowledge_search` / `rag.answer` instead of Clarify. Generic world-knowledge such as “What is the capital of France?” is **not** treated as tenant RAG.
-  - P1-4: recruiter-facing Answer/Summary, sources, calendar/email cards; primary confidence copy is “Grounded in N source(s)” when citations exist (raw % under Engineering details)
-- Private host remains user-gated (`PRIVATE_LIVE_GOOGLE_ENABLED=true`, Gmail send disabled, Calendar create approval-gated). This PR does **not** change Railway/Vercel env, OAuth, or deployment branches.
-- Public demo behavior stays mock Gmail/Calendar if these changes later deploy there. HITL is not bypassed.
-- `origin/main` at task start: `be8d956ea246bab895dd68a7f366b2a1d8ffbefb`.
+- **Last-mile recruiter-demo quality** on `fix/release-last-mile-demo-quality` (one PR into `main`, **not merged**). Manual live validation after PR #36 found three remaining issues; this PR fixes them in product code only:
+  - **P0-1 Calendar title:** preserve explicit titles (`titled "…"`, curly quotes, unquoted, unmatched opening quote) through `/chat` → calendar tool → approval payload → formatted proposal. Do not swallow date/time clauses. Approved Google event summary uses the same title.
+  - **P0-2 Gmail recipient + HITL:** extract explicit emails wrapped in `[]<>()`, show that address as Recipient when no CRM name exists, never guess. Live Gmail **draft creation** is now approval-gated (`gmail_create_draft`); no Gmail API draft before Owner/Admin approval. `GMAIL_SEND_ENABLED=false` still means nothing is sent.
+  - **P1-3 Web search quality:** recruiter-facing Summary / Top findings / Sources from retrieved citations. Deterministic synthesis answers the query; LLM polish no longer says “rewrite the brief”; snippet instructions cannot override system behavior; no invented sources.
+  - **Public NovaEdge RAG:** `/demo/start` still seeds NovaEdge knowledge documents; public sessions can obtain a tenant-grounded RAG answer with citations. Public Gmail/Calendar stay mock; no real Google side effects.
+- Private host remains user-gated (`PRIVATE_LIVE_GOOGLE_ENABLED=true`, Gmail send disabled, Calendar create and Gmail draft approval-gated). This PR does **not** change Railway/Vercel env, OAuth, or deployment branches.
+- `origin/main` at task start: `611bcbdf7e480aa10b5d8a8295af770dc21b717b`.
 - `deployment/live-google-demo` remains untouched at `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332`.
 - Product work belongs on a feature/fix branch off `main`, never on a deployment branch.
 
@@ -90,9 +89,9 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 - Multi-tenant FastAPI + Next.js workspace: LangGraph agent, RAG + citations, HITL approvals, usage/quotas, memory.
 - Two-stage routing: Stage 1 message class, Stage 2 intent. Calendar availability vs meetings vs scheduling are distinct tool inferences. Scheduling continuations use bounded same-conversation user history only; a continuation with no recoverable prior request clarifies instead of defaulting date/time/title.
 - Assistant messages persist a sanitized `execution_trace` (observable steps only). Internal graph details, prompts, tokens, and secrets are not shown in the recruiter UI.
-- Email drafts resolve org-scoped CRM leads when present and must not invent customer facts. Human approval is still required; public Gmail stays mock/send-disabled.
+- Email drafts resolve org-scoped CRM leads when present and must not invent customer facts. An explicitly provided email is used as Recipient when no CRM name exists. Human approval is required before Gmail draft **or** send; public Gmail stays mock/send-disabled.
 - Workspace insights, CRM email drafting, and recruiter-facing lead listing share `rank_leads()`. Seeded demo data makes Sarah Chen at Brightline Analytics the most promising lead. That narrative is restored in production.
-- Public demo: Vercel frontend + Railway API/Postgres/Redis; Gmail/Calendar **mock**; speech transcription disabled; shared-demo agent memory disabled.
+- Public demo: Vercel frontend + Railway API/Postgres/Redis; Gmail/Calendar **mock**; speech transcription disabled; shared-demo agent memory disabled. `/demo/start` seeds NovaEdge knowledge-base documents, operational data, and curated approvals.
 - Forced Calendar mock is reported as healthy simulated mode. Missing OAuth in that mode is not a provider outage.
 - Seeded Approvals email/calendar payloads use the same preview fields as chat-created approvals.
 - Public-demo `/demo/start` refreshes canonical curated approvals and, when `PUBLIC_DEMO_ENABLED=true`, also removes stale non-curated demo-visitor residue older than 6 hours. Recent active-session approvals are preserved. No public approval DELETE route.
@@ -103,9 +102,8 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 
 ## Tests / status
 
-- Latest green CI on `main` @ `87eef7d5c2565181b94aff06be97374b22bdf4f9` (run 34020499895): backend **821 passed, 3 skipped**; frontend **171 passed** (30 files); scripts **53 passed**. README uses durable wording (**800+** / **170+**).
-- This branch (`fix/private-demo-routing-response-polish`): targeted private-demo routing tests **passed**; full backend **871 passed, 3 skipped**; frontend **176 passed** (30 files); `pnpm typecheck` **ok**; `pnpm build` **ok**; `python3 -m pytest -q scripts/tests` — **53 passed**; sanitizer `--check --no-fetch` — **ok**.
-- Deterministic eval after new fixtures: intent **57/57 (100%)**, routing **57/57 (100%)**, combined suite **79 cases, 0 failed**. Do not treat these as live-model quality scores. Do not fabricate live RAGAS/model scores.
+- Latest green CI on `main` @ `611bcbdf7e480aa10b5d8a8295af770dc21b717b` includes PR #36. Previous counted CI @ `87eef7d5c2565181b94aff06be97374b22bdf4f9` (run 34020499895): backend **821 passed, 3 skipped**; frontend **171 passed**. README uses durable wording (**800+** / **170+**).
+- This branch (`fix/release-last-mile-demo-quality`): targeted last-mile tests **9 passed**; additional routing/gmail/web/CRM/calendar slices **passed**. Full suite counts are recorded in the Cloud agent report after the run.
 - CI (`.github/workflows/ci.yml`) runs backend pytest + frontend typecheck/tests/build on PRs to `main` and `deployment/**`, plus `scripts/tests`.
 - Public-demo smoke: `python scripts/smoke_test_public_demo.py --base-url <public-api>` (never print tokens).
 - Cloud-handoff / report-bridge tests: `python -m pytest -q scripts/tests`
@@ -126,7 +124,7 @@ Cloud (and any agent) must **not** touch:
 
 ## Recommended next task
 
-Review PR #36 (`fix/private-demo-routing-response-polish`, READY FOR REVIEW) and merge only if the private-demo routing/UX fixes are accepted. After merge, deploying to the **private** host is still **user-gated** (Railway/Vercel). Do not change the public production env. Do not move `deployment/public-demo` or `deployment/live-google-demo` unless explicitly authorized. Keep public `gpt-5-nano`. Remaining P2 audit items stay deferred.
+Review the last-mile PR (`fix/release-last-mile-demo-quality`) and merge only if accepted. After merge, deploying to the **private** host is still **user-gated** (Railway/Vercel). Do not change the public production env. Do not move `deployment/public-demo` or `deployment/live-google-demo` unless explicitly authorized. Keep public `gpt-5-nano`. Keep `GMAIL_SEND_ENABLED=false`. Remaining P2 audit items stay deferred.
 
 Do not re-run live Qdrant or modify deployment branches unless the operator explicitly authorizes that exact branch.
 

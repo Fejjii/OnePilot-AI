@@ -105,6 +105,27 @@ describe("parseStructuredResponse", () => {
     ]);
   });
 
+  it("parses numbered Top findings from web research", () => {
+    const parsed = parseStructuredResponse(
+      [
+        "## Summary",
+        "OpenAI launched GPT-5 and added EU data residency.",
+        "",
+        "## Top findings",
+        "1. OpenAI launched GPT-5 with stronger reasoning.",
+        "2. OpenAI announced EU data residency for ChatGPT Enterprise.",
+        "3. OpenAI expanded a cloud partnership to train on custom chips.",
+        "",
+        "## Sources",
+        "- **OpenAI launches GPT-5** (https://openai.com/index/gpt-5): OpenAI launched GPT-5.",
+      ].join("\n"),
+    );
+    expect(parsed.kind).toBe("structured");
+    if (parsed.kind !== "structured") return;
+    expect(parsed.sections[1].items).toHaveLength(3);
+    expect(parsed.sections[1].items[0]).toContain("GPT-5");
+  });
+
   it("parses email drafts without markdown headings", () => {
     const parsed = parseStructuredResponse(
       "Subject: Follow-up on demo\n\nHi Alex,\n\nThanks for your time today.",

@@ -44,7 +44,12 @@ _INTENT_SUPPORT = ("issue", "bug", "support", "problem", "broken")
 _INTENT_PARTNERSHIP = ("partner", "partnership", "integration", "reseller")
 
 
-_EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+_EMAIL_RE = re.compile(
+    r"(?<![A-Za-z0-9._%+-])"
+    r"([A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,})"
+    r"(?![A-Za-z0-9._%+-])"
+)
+_EMAIL_WRAPPERS = "[]<>()\"'“”«»"
 
 
 @dataclass(slots=True)
@@ -120,8 +125,20 @@ def _recommend_next_action(intent: str | None, urgency: str) -> str:
 
 
 def extract_email(message: str) -> str | None:
-    match = _EMAIL_RE.search(message or "")
-    return match.group(0) if match else None
+    """Extract a valid explicit email from prose, including wrapped addresses.
+
+    Tolerates ``[email]``, ``<email>``, ``(email)``, and a plain address.
+    Never invents an address.
+    """
+    text = message or ""
+    unwrapped = text.translate(str.maketrans({char: " " for char in _EMAIL_WRAPPERS}))
+    match = _EMAIL_RE.search(unwrapped) or _EMAIL_RE.search(text)
+    if not match:
+        return None
+    email = match.group(1).strip(".,;:")
+    if not email or email.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".webp")):
+        return None
+    return email
 
 
 # ---------------------------------------------------------------------------

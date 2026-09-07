@@ -215,6 +215,23 @@ class TestCrmLeadResolution:
         assert resolved.facts == {}
         assert resolved.match_reason == "message_name"
 
+    def test_explicit_wrapped_email_without_crm_is_preserved(
+        self, db_session: Session
+    ) -> None:
+        principal = _setup_org(db_session, suffix="explicit-mail")
+        prompt = (
+            'Draft an email to [fejjii.sofiene@gmail.com] with subject '
+            '"OnePilot Private Demo Test" saying that this is a test of '
+            "OnePilot's approval-gated Gmail integration."
+        )
+        resolved = resolve_email_recipient(
+            db_session, principal=principal, message=prompt
+        )
+        assert resolved.recipient_email == "fejjii.sofiene@gmail.com"
+        assert resolved.lead_id is None
+        assert resolved.facts == {}
+        assert resolved.match_reason == "explicit_email"
+
     def test_tenant_isolation_ignores_other_org_leads(
         self, db_session: Session
     ) -> None:

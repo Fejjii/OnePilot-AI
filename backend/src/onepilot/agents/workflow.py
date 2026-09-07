@@ -1009,8 +1009,9 @@ def _format_email(draft: dict, tool_output: dict | None = None) -> str:
     body = draft.get("body", "")
     recipient = (
         output.get("recipient_name")
-        or draft.get("recipient_placeholder")
         or output.get("recipient_email")
+        or draft.get("recipient_placeholder")
+        or draft.get("recipient_email")
         or ""
     )
     recipient_display = str(recipient).strip() or "Not specified"

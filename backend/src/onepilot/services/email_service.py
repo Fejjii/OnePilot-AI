@@ -10,6 +10,7 @@ The service never invents customer details or emits bracketed placeholders.
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass
 
@@ -33,6 +34,9 @@ logger = get_logger(__name__)
 
 VALID_TONES = ("professional", "friendly", "concise", "warm", "formal")
 DEFAULT_TONE = "professional"
+_SUBJECT_MARKER = re.compile(r"\bsubject\s*[:=]?\s+", re.IGNORECASE)
+_SAYING_MARKER = re.compile(r"\bsaying(?:\s+that)?\s+", re.IGNORECASE)
+_QUOTE_CHARS = "\"'“”„«»‘’＂"
 
 
 @dataclass(slots=True)
@@ -121,33 +125,74 @@ def _fallback_draft(
     next_action = facts.get("recommended_next_action")
 
     greeting = f"Hi {name}," if name else "Hello,"
-    if company:
+    explicit_subject = _explicit_subject(context)
+    if explicit_subject:
+        subject = explicit_subject
+    elif company:
         subject = f"Following up with {company}"
     elif name:
         subject = f"Following up with {name}"
     else:
         subject = "Following up"
 
+    saying = _explicit_saying(context)
     paragraphs: list[str] = [greeting, ""]
-    if company:
+    if saying:
+        sentence = saying[0].upper() + saying[1:] if saying else saying
+        if not sentence.endswith((".", "!", "?")):
+            sentence += "."
+        paragraphs.append(sentence)
+    elif company:
         paragraphs.append(f"I wanted to follow up with you at {company}.")
     else:
         paragraphs.append("I wanted to follow up as you requested.")
 
-    if pain:
+    if pain and not saying:
         paragraphs.append(f"You mentioned {pain[0].lower() + pain[1:] if pain else pain}.")
-    if next_action:
+    if next_action and not saying:
         paragraphs.append(f"Suggested next step: {next_action}")
-    elif "intro" in context.lower() or "call" in context.lower() or "schedul" in context.lower():
+    elif not saying and (
+        "intro" in context.lower() or "call" in context.lower() or "schedul" in context.lower()
+    ):
         paragraphs.append(
             "If a short intro call would help, please share a time that works."
         )
-    else:
+    elif not saying:
         paragraphs.append("Please let me know if a short conversation would be helpful.")
 
     paragraphs.append("\nBest regards,\nThe OnePilot team")
     body = "\n".join(paragraphs)
     return subject, body
+
+
+def _explicit_subject(context: str) -> str | None:
+    match = _SUBJECT_MARKER.search(context or "")
+    if not match:
+        return None
+    rest = (context or "")[match.end() :].strip()
+    if not rest:
+        return None
+    if rest[0] in _QUOTE_CHARS:
+        body = rest[1:]
+        for index, char in enumerate(body):
+            if char in _QUOTE_CHARS:
+                rest = body[:index]
+                break
+        else:
+            rest = re.split(r"\bsaying\b", body, maxsplit=1, flags=re.IGNORECASE)[0]
+    else:
+        rest = re.split(r"\bsaying\b", rest, maxsplit=1, flags=re.IGNORECASE)[0]
+    title = " ".join(rest.split()).strip(" \t.,;:")
+    return title[:200] or None
+
+
+def _explicit_saying(context: str) -> str | None:
+    match = _SAYING_MARKER.search(context or "")
+    if not match:
+        return None
+    rest = (context or "")[match.end() :].strip().strip("\"'")
+    text = " ".join(rest.split()).strip(" \t.,;:")
+    return text or None
 
 
 def _finalize_subject_body(
@@ -253,7 +298,7 @@ def draft_email(
         subject=subject,
         body=body,
         tone=tone,
-        recipient_placeholder=recipient_name or "",
+        recipient_placeholder=recipient_name or recipient_email or "",
         context_used=[context.strip()[:200]],
         citations=[],
         risk_level="medium",
