@@ -1,22 +1,22 @@
 {
   "test_name": "intent_and_routing",
-  "timestamp": "2026-09-03T16:08:46.350028+00:00",
-  "total": 46,
-  "correct": 46,
+  "timestamp": "2026-09-07T13:40:37.862780+00:00",
+  "total": 54,
+  "correct": 54,
   "accuracy": 1.0,
   "intent_accuracy": 1.0,
-  "routing_total": 46,
-  "routing_correct": 46,
+  "routing_total": 54,
+  "routing_correct": 54,
   "routing_accuracy": 1.0,
   "per_intent_accuracy": {
     "general_assistant": 1.0,
     "knowledge_search": 1.0,
-    "clarification": 1.0,
     "email_drafting": 1.0,
     "lead_support": 1.0,
     "calendar_scheduling": 1.0,
     "workflow_action": 1.0,
     "out_of_scope": 1.0,
+    "clarification": 1.0,
     "document_summary": 1.0,
     "web_search": 1.0,
     "web_and_knowledge": 1.0,
@@ -28,10 +28,7 @@
       "general_assistant": 7
     },
     "knowledge_search": {
-      "knowledge_search": 6
-    },
-    "clarification": {
-      "clarification": 8
+      "knowledge_search": 10
     },
     "email_drafting": {
       "email_drafting": 6
@@ -40,13 +37,16 @@
       "lead_support": 3
     },
     "calendar_scheduling": {
-      "calendar_scheduling": 5
+      "calendar_scheduling": 7
     },
     "workflow_action": {
       "workflow_action": 1
     },
     "out_of_scope": {
       "out_of_scope": 2
+    },
+    "clarification": {
+      "clarification": 5
     },
     "document_summary": {
       "document_summary": 2
@@ -58,7 +58,7 @@
       "web_and_knowledge": 1
     },
     "calendar_availability": {
-      "calendar_availability": 1
+      "calendar_availability": 6
     },
     "calendar_and_email": {
       "calendar_and_email": 1
@@ -146,12 +146,12 @@
     {
       "message": "Tell me about our SOC 2 controls.",
       "category": "business_knowledge",
-      "expected_intent": "clarification",
-      "predicted_intent": "clarification",
+      "expected_intent": "knowledge_search",
+      "predicted_intent": "knowledge_search",
       "intent_pass": true,
       "passed": true,
-      "expected_message_class": "unclear",
-      "predicted_message_class": "unclear",
+      "expected_message_class": "business_knowledge",
+      "predicted_message_class": "business_knowledge",
       "routing_pass": true
     },
     {
@@ -300,12 +300,12 @@
     {
       "message": "Explain the difference between Pro and Team plans.",
       "category": "business_knowledge",
-      "expected_intent": "clarification",
-      "predicted_intent": "clarification",
+      "expected_intent": "knowledge_search",
+      "predicted_intent": "knowledge_search",
       "intent_pass": true,
       "passed": true,
-      "expected_message_class": "unclear",
-      "predicted_message_class": "unclear",
+      "expected_message_class": "business_knowledge",
+      "predicted_message_class": "business_knowledge",
       "routing_pass": true
     },
     {
@@ -377,12 +377,12 @@
     {
       "message": "How do I reset a customer's password?",
       "category": "business_knowledge",
-      "expected_intent": "clarification",
-      "predicted_intent": "clarification",
+      "expected_intent": "knowledge_search",
+      "predicted_intent": "knowledge_search",
       "intent_pass": true,
       "passed": true,
-      "expected_message_class": "workflow_request",
-      "predicted_message_class": "workflow_request",
+      "expected_message_class": "business_knowledge",
+      "predicted_message_class": "business_knowledge",
       "routing_pass": true
     },
     {
@@ -570,6 +570,94 @@
       "passed": true,
       "expected_message_class": "workflow_request",
       "predicted_message_class": "workflow_request",
+      "routing_pass": true
+    },
+    {
+      "message": "When am I available tomorrow between 9 AM and 5 PM?",
+      "category": "calendar_eval",
+      "expected_intent": "calendar_availability",
+      "predicted_intent": "calendar_availability",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "workflow_request",
+      "predicted_message_class": "workflow_request",
+      "routing_pass": true
+    },
+    {
+      "message": "When am I free?",
+      "category": "calendar_eval",
+      "expected_intent": "calendar_availability",
+      "predicted_intent": "calendar_availability",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "workflow_request",
+      "predicted_message_class": "workflow_request",
+      "routing_pass": true
+    },
+    {
+      "message": "What times am I available?",
+      "category": "calendar_eval",
+      "expected_intent": "calendar_availability",
+      "predicted_intent": "calendar_availability",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "workflow_request",
+      "predicted_message_class": "workflow_request",
+      "routing_pass": true
+    },
+    {
+      "message": "Do I have availability tomorrow?",
+      "category": "calendar_eval",
+      "expected_intent": "calendar_availability",
+      "predicted_intent": "calendar_availability",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "workflow_request",
+      "predicted_message_class": "workflow_request",
+      "routing_pass": true
+    },
+    {
+      "message": "available tomorrow between 9 AM and 5 PM",
+      "category": "calendar_eval",
+      "expected_intent": "calendar_availability",
+      "predicted_intent": "calendar_availability",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "workflow_request",
+      "predicted_message_class": "workflow_request",
+      "routing_pass": true
+    },
+    {
+      "message": "Schedule a 30-minute meeting tomorrow at 3 PM titled \"OnePilot Live Calendar Test\".",
+      "category": "calendar_eval",
+      "expected_intent": "calendar_scheduling",
+      "predicted_intent": "calendar_scheduling",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "workflow_request",
+      "predicted_message_class": "workflow_request",
+      "routing_pass": true
+    },
+    {
+      "message": "Just schedule the meeting.",
+      "category": "calendar_eval",
+      "expected_intent": "calendar_scheduling",
+      "predicted_intent": "calendar_scheduling",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "workflow_request",
+      "predicted_message_class": "workflow_request",
+      "routing_pass": true
+    },
+    {
+      "message": "What is the internal launch codename for this demo?",
+      "category": "business_knowledge",
+      "expected_intent": "knowledge_search",
+      "predicted_intent": "knowledge_search",
+      "intent_pass": true,
+      "passed": true,
+      "expected_message_class": "business_knowledge",
+      "predicted_message_class": "business_knowledge",
       "routing_pass": true
     }
   ]

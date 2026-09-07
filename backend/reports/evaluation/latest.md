@@ -1,6 +1,6 @@
 # OnePilot AI — Evaluation & Quality Summary
 
-**Generated:** 2026-09-03T16:08:46.372539+00:00
+**Generated:** 2026-09-07T13:40:37.872267+00:00
 
 These are deterministic evaluation checks for demo-quality gating. They are not a replacement for full production RAGAS or human evaluation.
 
@@ -15,7 +15,7 @@ These are deterministic evaluation checks for demo-quality gating. They are not 
 | Source hit rate | 90.0% |
 | Weak-evidence correctness | 100.0% |
 | Safety guardrail pass rate | 100.0% |
-| Total cases | 68 |
+| Total cases | 76 |
 | Failed cases | 0 |
 
 ## How to regenerate
