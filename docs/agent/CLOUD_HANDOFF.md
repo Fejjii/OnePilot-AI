@@ -103,7 +103,14 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 ## Tests / status
 
 - Latest green CI on `main` @ `611bcbdf7e480aa10b5d8a8295af770dc21b717b` includes PR #36. Previous counted CI @ `87eef7d5c2565181b94aff06be97374b22bdf4f9` (run 34020499895): backend **821 passed, 3 skipped**; frontend **171 passed**. README uses durable wording (**800+** / **170+**).
-- This branch (`fix/release-last-mile-demo-quality`): targeted last-mile tests **9 passed**; additional routing/gmail/web/CRM/calendar slices **passed**. Full suite counts are recorded in the Cloud agent report after the run.
+- This branch (`fix/release-last-mile-demo-quality`):
+  - targeted last-mile e2e (3 live prompts + NovaEdge RAG + public Google isolation): **9 passed**
+  - full backend: **883 passed, 3 skipped**
+  - frontend vitest: **178 passed** (30 files)
+  - `pnpm typecheck` **ok**; `pnpm build` **ok**
+  - `python3 -m pytest -q scripts/tests` — **53 passed**
+  - sanitizer `--check --no-fetch` — **ok**
+  - deterministic eval: intent **57/57 (100%)**, routing **57/57 (100%)**, combined **79 cases, 0 failed**. Harness scores, not live-model quality.
 - CI (`.github/workflows/ci.yml`) runs backend pytest + frontend typecheck/tests/build on PRs to `main` and `deployment/**`, plus `scripts/tests`.
 - Public-demo smoke: `python scripts/smoke_test_public_demo.py --base-url <public-api>` (never print tokens).
 - Cloud-handoff / report-bridge tests: `python -m pytest -q scripts/tests`
