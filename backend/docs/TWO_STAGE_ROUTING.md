@@ -187,3 +187,26 @@ RAG Called: No
 - Fine-tune thresholds based on production data
 - Add more sophisticated workflow disambiguation
 - Support multi-class classification for hybrid requests
+
+## Private-demo routing notes
+
+Calendar **availability** (`when am I available/free`, `availability tomorrow`,
+windows like `between 9 AM and 5 PM`) is a Stage-1 workflow request and Stage-2
+`calendar_availability` intent. The word `available` is not treated as a
+capability/help signal by itself (`What tools are available?` stays
+`capability_or_help`).
+
+Fully specified **scheduling** (action + duration + date + time + title) routes
+to `calendar_scheduling` without a clarification turn. Short continuations such
+as `Just schedule the meeting` or `Go ahead` reuse bounded recent same-conversation
+user turns when those turns already contain the scheduling details. The same
+continuation **without** a recoverable prior request is `clarification` — it does
+not call `calendar.create_event_request`, create an approval, or invent
+date/time/title. Continuation is evaluated before generic scheduling patterns.
+Human approval still gates Calendar create.
+
+Substantive factual/work questions that are not calendar, email, CRM, web,
+capability, out-of-scope, or generic world-knowledge (for example
+`What is the capital of France?`) are eligible for tenant-scoped
+`knowledge_search` instead of immediate `clarification`. Weak retrieval still
+uses the existing weak-evidence response.

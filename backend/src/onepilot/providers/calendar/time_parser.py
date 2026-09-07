@@ -22,6 +22,11 @@ _TOMORROW = re.compile(r"\btomorrow\b", re.IGNORECASE)
 _NEXT_WEEK = re.compile(r"\b(next week|following week)\b", re.IGNORECASE)
 _THIS_WEEK = re.compile(r"\bthis week\b", re.IGNORECASE)
 _AMPM = r"a\.?\s*m\.?|p\.?\s*m\.?"
+_TIME_TOKEN = rf"(\d{{1,2}})(?::(\d{{2}}))?\s*({_AMPM})"
+_BETWEEN_TIMES = re.compile(
+    rf"\b(?:between|from)\s+{_TIME_TOKEN}\s+(?:and|to)\s+{_TIME_TOKEN}\b",
+    re.IGNORECASE,
+)
 _SCHEDULE_CUE = re.compile(
     r"\b(schedule|book|set up|create|meeting|call|demo|appointment)\b",
     re.IGNORECASE,
@@ -32,7 +37,7 @@ _WEEKDAY_AT_TIME = re.compile(
     re.IGNORECASE,
 )
 _AT_TIME = re.compile(
-    rf"\b(?:at\s+)?(\d{{1,2}})(?::(\d{{2}}))?\s*({_AMPM})\b",
+    rf"\b(?:at\s+)?{_TIME_TOKEN}\b",
     re.IGNORECASE,
 )
 
@@ -91,6 +96,43 @@ def _next_weekday(local_now: datetime, weekday: int) -> datetime.date:
     return (local_now + timedelta(days=days_ahead)).date()
 
 
+def _local_window_from_between(
+    message: str,
+    *,
+    target_date: datetime.date,
+    tz: ZoneInfo,
+) -> tuple[datetime, datetime, str] | None:
+    match = _BETWEEN_TIMES.search(message)
+    if not match:
+        return None
+    start_hour, start_minute = _parse_hour(
+        int(match.group(1)), int(match.group(2) or 0), match.group(3)
+    )
+    end_hour, end_minute = _parse_hour(
+        int(match.group(4)), int(match.group(5) or 0), match.group(6)
+    )
+    start_local = datetime(
+        target_date.year,
+        target_date.month,
+        target_date.day,
+        start_hour,
+        start_minute,
+        tzinfo=tz,
+    )
+    end_local = datetime(
+        target_date.year,
+        target_date.month,
+        target_date.day,
+        end_hour,
+        end_minute,
+        tzinfo=tz,
+    )
+    if end_local <= start_local:
+        return None
+    label = f"{start_hour:02d}:{start_minute:02d}-{end_hour:02d}:{end_minute:02d}"
+    return start_local, end_local, label
+
+
 def parse_calendar_window(
     message: str,
     *,
@@ -134,6 +176,16 @@ def parse_calendar_window(
     # Tomorrow afternoon — 13:00–17:00 local
     if _TOMORROW.search(lower):
         target_date = (local_now + timedelta(days=1)).date()
+        between = _local_window_from_between(message, target_date=target_date, tz=tz)
+        if between:
+            start_local, end_local, span = between
+            return ParsedCalendarWindow(
+                time_min=_to_utc_naive(start_local),
+                time_max=_to_utc_naive(end_local),
+                timezone=timezone,
+                query_type="range",
+                label=f"tomorrow {span}",
+            )
         if _AFTERNOON.search(lower) and not _AT_TIME.search(message):
             start_local = datetime(
                 target_date.year,
@@ -215,6 +267,17 @@ def parse_calendar_window(
             timezone=timezone,
             query_type="range",
             label="this week",
+        )
+
+    between = _local_window_from_between(message, target_date=local_now.date(), tz=tz)
+    if between:
+        start_local, end_local, span = between
+        return ParsedCalendarWindow(
+            time_min=_to_utc_naive(start_local),
+            time_max=_to_utc_naive(end_local),
+            timezone=timezone,
+            query_type="range",
+            label=span,
         )
 
     # Explicit local time for scheduling or availability checks

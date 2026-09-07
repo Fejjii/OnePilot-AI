@@ -1006,13 +1006,14 @@ function DetailsPanel({ data, sending }: DetailsPanelProps) {
           />
         ) : (
           <>
-            {(data.intent || data.confidence > 0) && (
+            {(data.intent || data.confidence > 0 || data.citations.length > 0) && (
               <div className="flex flex-wrap items-center gap-2">
                 {data.intent && <IntentBadge intent={data.intent} />}
-                {data.confidence > 0 && (
+                {(data.confidence > 0 || data.citations.length > 0) && (
                   <ConfidenceBadge
                     value={data.confidence}
                     weakEvidence={data.weakEvidence}
+                    citationCount={data.citations.length}
                   />
                 )}
               </div>
@@ -1041,6 +1042,16 @@ function DetailsPanel({ data, sending }: DetailsPanelProps) {
                     data.languagePreference ??
                     "—"}
                 </p>
+                {data.confidence > 0 && (
+                  <div className="pt-1">
+                    <p className="mb-1 text-slate-500">Internal confidence</p>
+                    <ConfidenceBadge
+                      value={data.confidence}
+                      weakEvidence={data.weakEvidence}
+                      showRawScore
+                    />
+                  </div>
+                )}
               </div>
             </details>
 

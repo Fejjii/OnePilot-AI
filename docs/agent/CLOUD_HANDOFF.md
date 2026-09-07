@@ -1,7 +1,7 @@
 # Cloud agent handoff (sanitized)
 
-Generated: 2026-09-06 11:20 UTC  
-Generator: Cloud agent (manual, sanitized; private live-Google v1 on `feat/private-live-google-v1`; no local `HANDOFF.md`)
+Generated: 2026-09-07 13:45 UTC  
+Generator: Cloud agent (manual, sanitized; private-demo routing + response UX on `fix/private-demo-routing-response-polish`; no local `HANDOFF.md`)
 
 This file is the **only** committed project-state brief for Cursor Cloud / phone agents.
 It is intentionally smaller than any local `HANDOFF.md` and contains **no secrets**.
@@ -16,7 +16,7 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 |-------|------------|-------------------|
 | **Canonical repository** | `main` at the SHA below | Yes — default base for product work |
 | **Deployed public-demo** | `deployment/public-demo` (Vercel + Railway, mock Gmail/Calendar) | Read SHAs only. Do not push/fast-forward unless explicitly authorized |
-| **Private live-demo** | `deployment/live-google-demo` (legacy pointer) | **No** unless the operator names that branch and authorizes the change. Implementation now lives on `main` via `PRIVATE_LIVE_GOOGLE_ENABLED` |
+| **Private live-demo** | `deployment/live-google-demo` (legacy pointer) | **No** unless the operator names that branch and authorizes the change. Implementation lives on `main` via `PRIVATE_LIVE_GOOGLE_ENABLED` |
 | **User-gated operations** | Railway / Vercel / Qdrant Cloud / production env vars | **No** — operator does this in host consoles |
 | **Local-only state** | `HANDOFF.md`, `.ai/`, `CHANGELOG_SESSION.md`, git stash, iCloud, local `.env` | **Invisible** to Cloud. Never assume it exists |
 | **Latest Cloud agent report** | `agent/cloud-state` → `docs/agent/LATEST_AGENT_REPORT.md` | Yes — last execution/result only. Not project state and not a product/deploy branch |
@@ -25,15 +25,16 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 
 | Ref | SHA | Notes |
 |-----|-----|-------|
-| `origin/main` (canonical) | `1cd9abbc1eaec6022a17826e5fc4269797c40828` | Task-start SHA. Includes PR #34 (recruiter demo package) |
-| `origin/deployment/public-demo` | `87eef7d5c2565181b94aff06be97374b22bdf4f9` | Product SHA behind `main` by docs-only commits. **READY TO SHARE**. Do not fast-forward |
-| `origin/deployment/live-google-demo` | `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332` | Legacy private pointer; **untouched**. No unique commits vs `main` |
-| `feat/private-live-google-v1` (this work) | see latest commit on that branch | Private live-Google prep PR into `main`; do not merge unless asked |
+| `origin/main` (canonical) | `be8d956ea246bab895dd68a7f366b2a1d8ffbefb` | Includes PR #35 (private live-Google track). Do not merge this routing PR unless asked |
+| `origin/deployment/public-demo` | `87eef7d5c2565181b94aff06be97374b22bdf4f9` | Product SHA behind `main`. **READY TO SHARE**. Do not fast-forward |
+| `origin/deployment/live-google-demo` | `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332` | Legacy private pointer; **untouched** |
+| `fix/private-demo-routing-response-polish` (this work) | see latest commit on that branch | PR #36 into `main`; READY FOR REVIEW; do not merge unless asked |
 
 `deployment/live-google-demo` is a stale ancestor of `main` (no unique code). Current `main` is authoritative. Do **not** move that pointer.
 
 ## Completed
 
+- PR #35 — private live-Google v1 track merged to `main` (`PRIVATE_LIVE_GOOGLE_ENABLED`)
 - PR #34 — recruiter demo presentation package merged to `main`
 - PR #33 — recruiter-facing README polish merged to `main`
 - Public demo **READY TO SHARE** at `https://one-pilot-ai.vercel.app` (backend `https://onepilot-ai-production.up.railway.app`)
@@ -59,18 +60,16 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 
 ## Current task / in progress
 
-- **Private live-Google v1** implemented on `feat/private-live-google-v1` and **not merged**. Smallest safe delta on current `main`:
-  - `PRIVATE_LIVE_GOOGLE_ENABLED` + `PRIVATE_LIVE_GOOGLE_ORG_ID` select a private authenticated track
-  - Explicit `GMAIL_PROVIDER_MODE=live` / `GOOGLE_CALENDAR_PROVIDER_MODE=live` fail closed without OAuth
-  - `PUBLIC_DEMO_ENABLED` forces mock Gmail/Calendar even if OAuth env is present
-  - Live Google is org-restricted on the private track; other orgs get isolated mocks
-  - `/demo/start` stays off when the private track is enabled
-  - Operator doc: `docs/private_demo/LIVE_GOOGLE_SETUP.md` (variable names only)
-- Public demo behavior is unchanged: mock Gmail/send-disabled, mock Calendar, speech disabled, `gpt-5-nano` on the live public host. Do not change public production env.
-- `origin/main` at task start: `1cd9abbc1eaec6022a17826e5fc4269797c40828`.
-- `deployment/live-google-demo` remains untouched at `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332`. Audit found **no unique commits** vs `main`; nothing was ported from that pointer.
-- Existing main already had real `GmailProvider` / `GoogleCalendarProvider`, shared OAuth refresh-token env, and HITL gates. This PR does not duplicate that architecture.
-- Host configuration (Railway/Vercel/Google Cloud OAuth) remains **user-gated**. Cloud must not assume OAuth or live Google access.
+- **Private-demo routing + response UX** on `fix/private-demo-routing-response-polish` (PR #36 into `main`, **READY FOR REVIEW, not merged**). Manual private-host validation found four issues; this PR addresses them in product code only:
+  - P0-1: “When am I available tomorrow between 9 AM and 5 PM?” now Stage-1 workflow + Stage-2 `calendar_availability` + `calendar.check_availability` (not General / `chat.general`)
+  - P0-2: fully specified scheduling (`titled "OnePilot Live Calendar Test"`, tomorrow 15:00–15:30 Europe/Berlin) creates a pending HITL approval; continuations such as “Just schedule the meeting” recover bounded same-conversation user details; no Calendar write before approval
+  - **Review fix:** a scheduling continuation with **no** recoverable prior request (`Just schedule the meeting.` / `Go ahead.` / `Schedule it.` / `Yes, book it.`) is Clarification — no `calendar.create_event_request`, no approval, no default date/time/title. Continuation is evaluated before generic scheduling patterns.
+  - P0-3: AI Workspace substantive factual/work questions (e.g. internal launch codename) route to `knowledge_search` / `rag.answer` instead of Clarify. Generic world-knowledge such as “What is the capital of France?” is **not** treated as tenant RAG.
+  - P1-4: recruiter-facing Answer/Summary, sources, calendar/email cards; primary confidence copy is “Grounded in N source(s)” when citations exist (raw % under Engineering details)
+- Private host remains user-gated (`PRIVATE_LIVE_GOOGLE_ENABLED=true`, Gmail send disabled, Calendar create approval-gated). This PR does **not** change Railway/Vercel env, OAuth, or deployment branches.
+- Public demo behavior stays mock Gmail/Calendar if these changes later deploy there. HITL is not bypassed.
+- `origin/main` at task start: `be8d956ea246bab895dd68a7f366b2a1d8ffbefb`.
+- `deployment/live-google-demo` remains untouched at `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332`.
 - Product work belongs on a feature/fix branch off `main`, never on a deployment branch.
 
 ## Backlog
@@ -89,6 +88,7 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 ## Architecture state
 
 - Multi-tenant FastAPI + Next.js workspace: LangGraph agent, RAG + citations, HITL approvals, usage/quotas, memory.
+- Two-stage routing: Stage 1 message class, Stage 2 intent. Calendar availability vs meetings vs scheduling are distinct tool inferences. Scheduling continuations use bounded same-conversation user history only; a continuation with no recoverable prior request clarifies instead of defaulting date/time/title.
 - Assistant messages persist a sanitized `execution_trace` (observable steps only). Internal graph details, prompts, tokens, and secrets are not shown in the recruiter UI.
 - Email drafts resolve org-scoped CRM leads when present and must not invent customer facts. Human approval is still required; public Gmail stays mock/send-disabled.
 - Workspace insights, CRM email drafting, and recruiter-facing lead listing share `rank_leads()`. Seeded demo data makes Sarah Chen at Brightline Analytics the most promising lead. That narrative is restored in production.
@@ -96,7 +96,7 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 - Forced Calendar mock is reported as healthy simulated mode. Missing OAuth in that mode is not a provider outage.
 - Seeded Approvals email/calendar payloads use the same preview fields as chat-created approvals.
 - Public-demo `/demo/start` refreshes canonical curated approvals and, when `PUBLIC_DEMO_ENABLED=true`, also removes stale non-curated demo-visitor residue older than 6 hours. Recent active-session approvals are preserved. No public approval DELETE route.
-- Private live-Google is now a **config track on `main`** (`PRIVATE_LIVE_GOOGLE_ENABLED`), not a deployment-branch codebase. The `deployment/live-google-demo` pointer is legacy and still must not be moved unless the operator explicitly authorizes that branch.
+- Private live-Google is a **config track on `main`** (`PRIVATE_LIVE_GOOGLE_ENABLED`), not a deployment-branch codebase. The `deployment/live-google-demo` pointer is legacy and still must not be moved unless the operator explicitly authorizes that branch.
 - Vectors: Qdrant when configured, in-memory fallback otherwise. Cloud must not target live Qdrant clusters.
 - Recruiter presentation package lives under `docs/portfolio/` (`ARCHITECTURE_OVERVIEW.md`, `RECRUITER_DEMO_SCRIPT.md`, `RECORDING_CHECKLIST.md`, `INTERVIEW_CHEAT_SHEET.md`).
 - Cloud execution reports are public/sanitized and live only on `agent/cloud-state`. Cloud cannot write iCloud.
@@ -104,7 +104,8 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 ## Tests / status
 
 - Latest green CI on `main` @ `87eef7d5c2565181b94aff06be97374b22bdf4f9` (run 34020499895): backend **821 passed, 3 skipped**; frontend **171 passed** (30 files); scripts **53 passed**. README uses durable wording (**800+** / **170+**).
-- This branch (`feat/private-live-google-v1`): targeted provider/HITL/demo/config tests **119 passed**; full backend **846 passed, 3 skipped**; `python3 -m pytest -q scripts/tests` — **53 passed**; sanitizer `--check --no-fetch` — **ok**. No frontend changes.
+- This branch (`fix/private-demo-routing-response-polish`): targeted private-demo routing tests **passed**; full backend **871 passed, 3 skipped**; frontend **176 passed** (30 files); `pnpm typecheck` **ok**; `pnpm build` **ok**; `python3 -m pytest -q scripts/tests` — **53 passed**; sanitizer `--check --no-fetch` — **ok**.
+- Deterministic eval after new fixtures: intent **57/57 (100%)**, routing **57/57 (100%)**, combined suite **79 cases, 0 failed**. Do not treat these as live-model quality scores. Do not fabricate live RAGAS/model scores.
 - CI (`.github/workflows/ci.yml`) runs backend pytest + frontend typecheck/tests/build on PRs to `main` and `deployment/**`, plus `scripts/tests`.
 - Public-demo smoke: `python scripts/smoke_test_public_demo.py --base-url <public-api>` (never print tokens).
 - Cloud-handoff / report-bridge tests: `python -m pytest -q scripts/tests`
@@ -125,7 +126,7 @@ Cloud (and any agent) must **not** touch:
 
 ## Recommended next task
 
-Review and merge `feat/private-live-google-v1` if the private-track gates are accepted. After merge, **Sofien** still must create a dedicated Google demo account, enable Gmail + Calendar APIs, generate a refresh token on an operator machine, and set env names from `docs/private_demo/LIVE_GOOGLE_SETUP.md` on a **new** private Railway/Vercel host. Do not change the public production env. Do not move `deployment/public-demo` or `deployment/live-google-demo` unless explicitly authorized. Keep public `gpt-5-nano`. Remaining P2 audit items stay deferred.
+Review PR #36 (`fix/private-demo-routing-response-polish`, READY FOR REVIEW) and merge only if the private-demo routing/UX fixes are accepted. After merge, deploying to the **private** host is still **user-gated** (Railway/Vercel). Do not change the public production env. Do not move `deployment/public-demo` or `deployment/live-google-demo` unless explicitly authorized. Keep public `gpt-5-nano`. Remaining P2 audit items stay deferred.
 
 Do not re-run live Qdrant or modify deployment branches unless the operator explicitly authorizes that exact branch.
 

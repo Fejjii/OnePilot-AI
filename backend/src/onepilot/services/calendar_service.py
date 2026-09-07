@@ -28,6 +28,15 @@ from onepilot.schemas.calendar import (
 )
 from onepilot.security.auth import Principal
 from onepilot.services import audit_service, usage_service
+from onepilot.services.calendar_intent import (
+    extract_meeting_title,
+    is_scheduling_continuation,
+    looks_like_availability,
+    looks_like_list_events,
+    looks_like_scheduling,
+    looks_like_suggest_slots,
+    parse_duration_minutes,
+)
 
 log = get_logger(__name__)
 
@@ -69,7 +78,6 @@ _SCHEDULE_INTENT = re.compile(
 _CALENDAR_TOOLS = frozenset(
     {"list_events", "check_availability", "suggest_slots", "create_event_request"}
 )
-_DURATION_MINUTES = re.compile(r"\b(\d{1,3})\s*(?:minute|min)\b", re.IGNORECASE)
 _MAX_SLOTS = re.compile(r"\b(\d{1,2})\s+(?:meeting )?slots?\b", re.IGNORECASE)
 
 
@@ -80,12 +88,19 @@ def infer_calendar_tool(message: str, context: dict | None = None) -> str:
     if explicit in _CALENDAR_TOOLS:
         return str(explicit)
 
-    schedule_hit = bool(_SCHEDULE_INTENT.search(message))
-    list_hit = bool(_LIST_EVENTS_INTENT.search(message))
-    availability_hit = bool(_AVAILABILITY_INTENT.search(message))
-    suggest_hit = bool(_SUGGEST_SLOTS_INTENT.search(message))
+    schedule_hit = looks_like_scheduling(message) and not looks_like_suggest_slots(message)
+    list_hit = looks_like_list_events(message)
+    availability_hit = looks_like_availability(message)
+    suggest_hit = looks_like_suggest_slots(message)
+    # Keep regex fallbacks so older explicit phrases still resolve.
+    schedule_hit = schedule_hit or bool(_SCHEDULE_INTENT.search(message))
+    list_hit = list_hit or bool(_LIST_EVENTS_INTENT.search(message))
+    availability_hit = availability_hit or bool(_AVAILABILITY_INTENT.search(message))
+    suggest_hit = suggest_hit or bool(_SUGGEST_SLOTS_INTENT.search(message))
+    if is_scheduling_continuation(message):
+        schedule_hit = False
 
-    if schedule_hit:
+    if schedule_hit and not suggest_hit:
         return "create_event_request"
     if suggest_hit and not list_hit:
         return "suggest_slots"
@@ -141,10 +156,9 @@ def _resolve_calendar_provider_mode(provider: object) -> str:
 
 
 def _parse_duration_minutes(message: str, settings: Settings) -> int:
-    match = _DURATION_MINUTES.search(message)
-    if match:
-        return max(15, min(480, int(match.group(1))))
-    return int(settings.GOOGLE_CALENDAR_SLOT_DURATION_MINUTES)
+    return parse_duration_minutes(
+        message, int(settings.GOOGLE_CALENDAR_SLOT_DURATION_MINUTES)
+    )
 
 
 def _parse_max_slots(message: str) -> int:
@@ -158,6 +172,9 @@ def _infer_summary(message: str, context: dict | None = None) -> str:
     ctx = context or {}
     if ctx.get("meeting_summary"):
         return str(ctx["meeting_summary"])[:200]
+    titled = extract_meeting_title(message)
+    if titled:
+        return titled
     if "lead" in message.lower():
         return "Follow-up meeting with high priority lead"
     return "OnePilot scheduled meeting"

@@ -62,6 +62,10 @@ from onepilot.services.calendar_format import (
     format_proposal_response,
     format_suggestion_response,
 )
+from onepilot.services.calendar_intent import (
+    missing_prior_scheduling_request,
+    resolve_calendar_source_message,
+)
 from onepilot.tools import registry as _tools_bootstrap  # noqa: F401  ensures tool registration
 from onepilot.schemas.web_search import WebSearchCitation, WebSearchResponse
 from onepilot.services import web_synthesis
@@ -206,7 +210,7 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
     def classify_message_node(state: AgentState) -> dict:
         """Stage 1: Classify message into high-level message class."""
         started = time.monotonic()
-        result = classify_message_fn(state.message)
+        result = classify_message_fn(state.message, history=state.history)
         duration_ms = int((time.monotonic() - started) * 1000)
         update: dict[str, Any] = {
             "message_class": result.message_class,
@@ -299,6 +303,7 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             message_class=state.message_class,
             settings=deps.settings,
             use_llm=False,
+            history=state.history,
         )
         duration_ms = int((time.monotonic() - started) * 1000)
         update: dict[str, Any] = {
@@ -385,11 +390,25 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             "safety_flags": list(state.safety_flags),
             "usage_metadata": dict(state.usage_metadata),
         }
-        tool_key = calendar_service.infer_calendar_tool(state.message, state.context)
+        calendar_message = resolve_calendar_source_message(
+            state.message, state.history
+        )
+        if missing_prior_scheduling_request(state.message, state.history):
+            flags = list(state.safety_flags)
+            if "clarification_requested" not in flags:
+                flags.append("clarification_requested")
+            lang = LanguageCode(state.response_language)
+            update["draft_output"] = i18n_messages.get_message(
+                i18n_messages.SCHEDULING_CONTINUATION_CLARIFICATION, lang
+            )
+            update["safety_flags"] = flags
+            _append_trace(update, "execute_tool:clarification")
+            return update
+        tool_key = calendar_service.infer_calendar_tool(calendar_message, state.context)
         tool_name = f"calendar.{tool_key}"
         result = registry.get(tool_name).run(
             _ctx(deps),
-            message=state.message,
+            message=calendar_message,
             context=state.context,
         )
         _record_tool_call(update, result)
@@ -741,8 +760,14 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
         if "clarification_requested" not in flags:
             flags.append("clarification_requested")
         lang = LanguageCode(state.response_language)
+        if missing_prior_scheduling_request(state.message, state.history):
+            draft = i18n_messages.get_message(
+                i18n_messages.SCHEDULING_CONTINUATION_CLARIFICATION, lang
+            )
+        else:
+            draft = i18n_messages.get_message(i18n_messages.CLARIFICATION, lang)
         return {
-            "draft_output": i18n_messages.get_message(i18n_messages.CLARIFICATION, lang),
+            "draft_output": draft,
             "safety_flags": flags,
             "trace_steps": list(state.trace_steps)
             + [TraceStep(step="execute_tool:clarification").model_dump()],
@@ -979,16 +1004,31 @@ def _create_email_approval(
 
 
 def _format_email(draft: dict, tool_output: dict | None = None) -> str:
+    output = tool_output or {}
     subject = draft.get("subject", "(no subject)")
     body = draft.get("body", "")
-    lines = [f"Subject: {subject}", "", body]
-    output = tool_output or {}
+    recipient = (
+        output.get("recipient_name")
+        or draft.get("recipient_placeholder")
+        or output.get("recipient_email")
+        or ""
+    )
+    recipient_display = str(recipient).strip() or "Not specified"
+    approval_required = bool(output.get("gmail_action_pending", True))
+    approval_status = "pending" if approval_required else "not required"
+    lines = [
+        f"Recipient: {recipient_display}",
+        f"Subject: {subject}",
+        "",
+        body,
+        "",
+        f"Approval status: {approval_status}",
+    ]
     gmail_status = output.get("gmail_status")
-    draft_id = output.get("gmail_draft_id")
-    if gmail_status == "created" and draft_id:
-        lines.extend(["", f"Gmail draft created (id: {draft_id}). Send remains disabled."])
+    if gmail_status == "created":
+        lines.append("Gmail draft created. Send remains disabled.")
     elif gmail_status == "preview_only":
-        lines.extend(["", "Preview only — Gmail draft was not created."])
+        lines.append("Preview only — Gmail draft was not created.")
     return "\n".join(lines)
 
 

@@ -845,7 +845,7 @@ describe("WorkspacePage", () => {
 
     await waitFor(() => {
       expect(screen.queryByText(/high confidence/i)).not.toBeInTheDocument();
-      expect(screen.getAllByText(/medium confidence/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/weak evidence/i).length).toBeGreaterThan(0);
     });
   });
 

@@ -61,6 +61,25 @@ CLARIFICATION: dict[LanguageCode, str] = {
     ),
 }
 
+SCHEDULING_CONTINUATION_CLARIFICATION: dict[LanguageCode, str] = {
+    LanguageCode.EN: (
+        "I need the meeting details before I can schedule it. "
+        "Please share the title, date, time, and duration."
+    ),
+    LanguageCode.DE: (
+        "Ich brauche die Meeting-Details, bevor ich es einplanen kann. "
+        "Bitte nennen Sie Titel, Datum, Uhrzeit und Dauer."
+    ),
+    LanguageCode.FR: (
+        "J'ai besoin des détails de la réunion avant de la planifier. "
+        "Indiquez le titre, la date, l'heure et la durée."
+    ),
+    LanguageCode.ES: (
+        "Necesito los detalles de la reunión antes de programarla. "
+        "Indique el título, la fecha, la hora y la duración."
+    ),
+}
+
 RAG_WEAK_EVIDENCE: dict[LanguageCode, str] = {
     LanguageCode.EN: (
         "I don't have a confident answer based on the knowledge I have. "

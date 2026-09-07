@@ -58,6 +58,26 @@ def format_local_slot_range(start: datetime, end: datetime, timezone: str) -> st
     )
 
 
+def format_wall_clock_slot_range(start: datetime, end: datetime, timezone: str) -> str:
+    """Format naive datetimes that are already local wall-clock in ``timezone``."""
+    del timezone
+    if start.tzinfo is not None:
+        start = start.replace(tzinfo=None)
+    if end.tzinfo is not None:
+        end = end.replace(tzinfo=None)
+    if start.date() == end.date():
+        return (
+            f"{start.strftime('%A')}, {start.day} {start.strftime('%B')}, "
+            f"{start.strftime('%H:%M')} to {end.strftime('%H:%M')}"
+        )
+    return (
+        f"{start.strftime('%A')}, {start.day} {start.strftime('%B')}, "
+        f"{start.strftime('%H:%M')} to "
+        f"{end.strftime('%A')}, {end.day} {end.strftime('%B')}, "
+        f"{end.strftime('%H:%M')}"
+    )
+
+
 def public_person_label(value: str) -> str:
     """Turn an email or raw attendee string into a recruiter-facing name."""
     text = value.strip()
@@ -225,7 +245,7 @@ def format_proposal_response(raw: dict) -> str:
     end_raw = slot.get("end_time") or payload.get("end_time")
     when = ""
     if start_raw and end_raw:
-        when = format_local_slot_range(
+        when = format_wall_clock_slot_range(
             _parse_utc_naive(start_raw),
             _parse_utc_naive(end_raw),
             timezone,

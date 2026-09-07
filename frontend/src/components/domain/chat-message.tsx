@@ -47,7 +47,14 @@ export function ChatMessage({ message }: ChatMessageProps) {
               <ToolBadge key={label} label={label} />
             ))}
           {isAssistant && message.confidence > 0 && (
-            <ConfidenceBadge value={message.confidence} />
+            <ConfidenceBadge
+              value={message.confidence}
+              citationCount={message.citations?.length ?? 0}
+              weakEvidence={
+                message.intent === "knowledge_search" &&
+                (message.citations?.length ?? 0) === 0
+              }
+            />
           )}
         </div>
         <div

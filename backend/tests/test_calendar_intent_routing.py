@@ -18,6 +18,10 @@ AVAILABILITY_PROMPTS = (
     "Find open slots tomorrow",
     "Check my availability next week",
     "When am I free this week?",
+    "When am I available tomorrow between 9 AM and 5 PM?",
+    "What times am I free?",
+    "Do I have availability?",
+    "available tomorrow between 9 AM and 5 PM",
 )
 
 SUGGEST_PROMPTS = (

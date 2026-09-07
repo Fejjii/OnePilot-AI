@@ -25,6 +25,13 @@ from onepilot.core.logging import get_logger
 from onepilot.providers import get_llm_provider
 from onepilot.providers.llm.base import LLMProvider
 from onepilot.providers.llm.fallback_provider import FallbackLLMProvider
+from onepilot.services.calendar_intent import (
+    is_scheduling_continuation,
+    looks_like_availability,
+    looks_like_scheduling,
+    missing_prior_scheduling_request,
+    recover_prior_scheduling_request,
+)
 
 logger = get_logger(__name__)
 
@@ -120,8 +127,13 @@ _EMAIL_DRAFT_BLOCK = re.compile(
 
 _CALENDAR_AVAILABILITY_PATTERNS = [
     re.compile(
-        r"\b(am i free|are we free|check (my )?(calendar )?availability|availability|"
+        r"\b(am i free|are we free|when am i (available|free)|"
+        r"what times? am i (available|free)|what times? are we (available|free)|"
+        r"am i available|are we available|"
+        r"do i have (any )?availability|do we have (any )?availability|"
+        r"check (my )?(calendar )?availability|availability|"
         r"open (time )?slots?|find (an? )?(open|available|free)|"
+        r"available tomorrow|availability tomorrow|available between|"
         r"busy tomorrow|free tomorrow|free next)\b",
         re.IGNORECASE,
     ),
@@ -194,6 +206,7 @@ def classify(
     settings: Settings | None = None,
     llm: LLMProvider | None = None,
     use_llm: bool = False,
+    history: list[dict] | None = None,
 ) -> IntentResult:
     """Classify a message into an Intent (Stage 2 of routing).
 
@@ -221,7 +234,7 @@ def classify(
 
     # Stage 2: Use message class if provided
     if message_class is not None:
-        return _classify_from_message_class(cleaned, message_class)
+        return _classify_from_message_class(cleaned, message_class, history=history)
 
     # Legacy fallback: keyword-based classification for backward compatibility
     # This path is used when Stage 1 is skipped (e.g., in old tests)
@@ -229,16 +242,51 @@ def classify(
     return _classify_legacy(cleaned, settings=settings, llm=llm, use_llm=use_llm)
 
 
-def _classify_from_message_class(message: str, message_class: MessageClass) -> IntentResult:
+def _classify_from_message_class(
+    message: str,
+    message_class: MessageClass,
+    *,
+    history: list[dict] | None = None,
+) -> IntentResult:
     """Stage 2: Map message class to specific intent.
 
     Args:
         message: The user message
         message_class: Message class from Stage 1
+        history: Optional bounded same-conversation turns
 
     Returns:
         IntentResult with mapped intent
     """
+    if is_scheduling_continuation(message):
+        if missing_prior_scheduling_request(message, history):
+            return IntentResult(
+                intent=Intent.CLARIFICATION,
+                confidence=0.84,
+                source="rules",
+                reason="calendar_scheduling_continuation_missing_details",
+            )
+        if recover_prior_scheduling_request(history):
+            return IntentResult(
+                intent=Intent.CALENDAR_SCHEDULING,
+                confidence=0.86,
+                source="rules",
+                reason="calendar_scheduling_continuation",
+            )
+
+    if (
+        message_class != MessageClass.OUT_OF_SCOPE
+        and looks_like_availability(message)
+        and not looks_like_scheduling(message)
+        and not _EMAIL_DRAFT_BLOCK.search(message)
+    ):
+        return IntentResult(
+            intent=Intent.CALENDAR_AVAILABILITY,
+            confidence=0.86,
+            source="rules",
+            reason="calendar_availability",
+        )
+
     # Workspace insights (internal CRM / approvals / activity) before 1:1 mappings
     if message_class != MessageClass.OUT_OF_SCOPE and not _EMAIL_DRAFT_BLOCK.search(
         message
@@ -484,7 +532,8 @@ _LEGACY_KEYWORD_RULES: list[tuple[re.Pattern[str], Intent, float]] = [
     # Calendar availability
     (
         re.compile(
-            r"\b(am i free|check (my )?availability|free tomorrow|busy tomorrow)\b",
+            r"\b(am i free|when am i (available|free)|check (my )?availability|"
+            r"available tomorrow|free tomorrow|busy tomorrow)\b",
             re.IGNORECASE,
         ),
         Intent.CALENDAR_AVAILABILITY,

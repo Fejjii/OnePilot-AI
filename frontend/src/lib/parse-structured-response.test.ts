@@ -83,6 +83,28 @@ describe("parseStructuredResponse", () => {
     expect(slots.list.items[0]?.title).toContain("Friday");
   });
 
+  it("parses Answer and Top findings aliases", () => {
+    const parsed = parseStructuredResponse(
+      [
+        "## Answer",
+        "The internal launch codename is ORION-47.",
+        "",
+        "## Top findings",
+        "- Codename is documented internally",
+        "",
+        "## Sources",
+        "- [OnePilot Private Knowledge Test]: ORION-47",
+      ].join("\n"),
+    );
+    expect(parsed.kind).toBe("structured");
+    if (parsed.kind !== "structured") return;
+    expect(parsed.sections.map((section) => section.id)).toEqual([
+      "summary",
+      "key-points",
+      "evidence",
+    ]);
+  });
+
   it("parses email drafts without markdown headings", () => {
     const parsed = parseStructuredResponse(
       "Subject: Follow-up on demo\n\nHi Alex,\n\nThanks for your time today.",

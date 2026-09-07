@@ -23,6 +23,8 @@ def synthesize_web_only(
         key_points=key_points,
         evidence=evidence,
         next_action=next_action,
+        findings_heading="Top findings",
+        sources_heading="Sources",
     )
 
 
@@ -62,12 +64,14 @@ def _format_structured_answer(
     key_points: list[str],
     evidence: str,
     next_action: str,
+    findings_heading: str = "Key points",
+    sources_heading: str = "Evidence or sources",
 ) -> str:
     sections = [
         "## Summary",
         summary.strip(),
         "",
-        "## Key points",
+        f"## {findings_heading}",
     ]
     if key_points:
         sections.extend(f"- {point}" for point in key_points)
@@ -77,7 +81,7 @@ def _format_structured_answer(
     sections.extend(
         [
             "",
-            "## Evidence or sources",
+            f"## {sources_heading}",
             evidence.strip(),
             "",
             "## Suggested next action",
@@ -100,6 +104,8 @@ def _format_web_evidence(citations: list[WebSearchCitation]) -> str:
         if url:
             line += f" ({url})"
         if snippet:
+            if len(snippet) > 180:
+                snippet = snippet[:180].rsplit(" ", 1)[0].rstrip(".,;") + "…"
             line += f": {snippet}"
         if item.published_date:
             line += f" [published: {item.published_date}]"
@@ -130,7 +136,7 @@ def _web_key_points(web: WebSearchResponse) -> list[str]:
         if not snippet:
             continue
         title = item.title or item.url or "Web source"
-        points.append(f"{title}: {snippet[:220]}")
+        points.append(f"{title}: {snippet[:140]}")
     if not points and web.result_count == 0:
         points.append("No live web snippets were returned for this query.")
     return points[:5]
