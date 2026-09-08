@@ -28,7 +28,7 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 | `origin/main` (canonical) | `2445400db7489830fcba205fabcaac22644e4d72` | Includes PR #39 (landing capability architecture) |
 | `origin/deployment/public-demo` | `87eef7d5c2565181b94aff06be97374b22bdf4f9` | Product SHA behind `main`. **READY TO SHARE**. Do not fast-forward |
 | `origin/deployment/live-google-demo` | `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332` | Legacy private pointer; **untouched** |
-| `fix/public-web-response-language` | (open PR) | Explicit response language must control WEB_SEARCH / WEB_AND_KNOWLEDGE synthesis |
+| `fix/public-web-response-language` | (PR #40, open) | Explicit response language must control WEB_SEARCH / WEB_AND_KNOWLEDGE synthesis |
 
 `deployment/live-google-demo` is a stale ancestor of `main` (no unique code). Current `main` is authoritative. Do **not** move that pointer.
 
@@ -64,7 +64,7 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 
 ## Current task / in progress
 
-- **Public web-search multilingual fix** — `fix/public-web-response-language`. English Serper snippets were copied into Summary / findings when LLM polish failed, so explicit fr/de/es still rendered English answers. Fix: polish must satisfy the selected language; rejected/English polish gets a bounded translation pass; if that also fails, generated prose falls back to localized copy while Sources stay original. No deployment/env changes.
+- **Public web-search multilingual fix** — PR #40 (`fix/public-web-response-language`). English Serper snippets were copied into Summary / findings when LLM polish failed, so explicit fr/de/es still rendered English answers. Fix: polish must satisfy the selected language; rejected/English polish gets a bounded translation pass; if that also fails, generated prose falls back to localized copy while Sources stay original. No deployment/env changes. Do **not** merge unless asked.
 - RAG/email/calendar explicit language behavior was already passing and is unchanged.
 - Private host remains user-gated (`PRIVATE_LIVE_GOOGLE_ENABLED=true`, Gmail send disabled, Calendar create and Gmail draft approval-gated).
 - `origin/main` at task start: `2445400db7489830fcba205fabcaac22644e4d72`.
@@ -104,7 +104,10 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 ## Tests / status
 
 - Latest green CI on `main` @ `2445400db7489830fcba205fabcaac22644e4d72` includes PR #39.
-- This branch (`fix/public-web-response-language`): backend web-language / synthesis tests plus full backend pytest, evaluation, and sanitizer. No frontend, deployment, or env changes.
+- This branch (`fix/public-web-response-language`, PR #40):
+  - backend pytest: **924 passed**, 3 skipped
+  - evaluation suite and sanitizer run on this branch
+  - No frontend, deployment, or env changes.
 - CI (`.github/workflows/ci.yml`) runs backend pytest + frontend typecheck/tests/build on PRs to `main` and `deployment/**`, plus `scripts/tests`.
 - Public-demo smoke: `python scripts/smoke_test_public_demo.py --base-url <public-api>` (never print tokens).
 - Cloud-handoff / report-bridge tests: `python -m pytest -q scripts/tests`
