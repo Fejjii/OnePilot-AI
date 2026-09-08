@@ -1,7 +1,7 @@
 # Cloud agent handoff (sanitized)
 
-Generated: 2026-09-08 15:20 UTC  
-Generator: Cloud agent (manual, sanitized; public web-search response language on `fix/public-web-response-language`; no local `HANDOFF.md`)
+Generated: 2026-09-08 16:05 UTC  
+Generator: Cloud agent (manual, sanitized; rebase `fix/landing-premium-hero` onto `main` after PR #40; no local `HANDOFF.md`)
 
 This file is the **only** committed project-state brief for Cursor Cloud / phone agents.
 It is intentionally smaller than any local `HANDOFF.md` and contains **no secrets**.
@@ -25,15 +25,16 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 
 | Ref | SHA | Notes |
 |-----|-----|-------|
-| `origin/main` (canonical) | `2445400db7489830fcba205fabcaac22644e4d72` | Includes PR #39 (landing capability architecture) |
-| `origin/deployment/public-demo` | `87eef7d5c2565181b94aff06be97374b22bdf4f9` | Product SHA behind `main`. **READY TO SHARE**. Do not fast-forward |
+| `origin/main` (canonical) | `a26bb15c37d31a40c83071eca79da33864450cda` | Includes PR #40 (explicit web-search response language) |
+| `origin/deployment/public-demo` | `2445400db7489830fcba205fabcaac22644e4d72` | Behind `main` (missing PR #40). **Do not fast-forward** unless authorized |
 | `origin/deployment/live-google-demo` | `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332` | Legacy private pointer; **untouched** |
-| `fix/public-web-response-language` | (PR #40, open) | Explicit response language must control WEB_SEARCH / WEB_AND_KNOWLEDGE synthesis |
+| `fix/landing-premium-hero` | (PR #41, open) | Landing hero visual only: compact operating-layer visual |
 
 `deployment/live-google-demo` is a stale ancestor of `main` (no unique code). Current `main` is authoritative. Do **not** move that pointer.
 
 ## Completed
 
+- PR #40 — public web-search / WEB_AND_KNOWLEDGE generated prose honors exact requested language (fr/de/es); merged to `main` (`a26bb15`)
 - PR #39 — landing hero capability architecture merged to `main` (`2445400`)
 - PR #38 — final product UX / i18n / recruiter polish merged to `main` (`716c3fa`)
 - PR #37 — last-mile recruiter-demo quality merged to `main` (calendar title preservation, Gmail recipient + HITL draft gating, web-search synthesis polish)
@@ -42,7 +43,7 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 - PR #34 — recruiter demo presentation package merged to `main`
 - PR #33 — recruiter-facing README polish merged to `main`
 - Public demo **READY TO SHARE** at `https://one-pilot-ai.vercel.app` (backend `https://onepilot-ai-production.up.railway.app`)
-- OP-034 deployed and accepted (PR #32 merged; public-demo pointer remains `87eef7d5c2565181b94aff06be97374b22bdf4f9`)
+- OP-034 deployed and accepted (PR #32 merged)
 - PR #31 — OP-033 final public-demo P1 audit fixes merged to `main`
 - PR #30 — Cloud Agent report bridge merged to `main` (`infra/cloud-agent-report-bridge`)
 - OP-032 — final recruiter-facing public-demo polish (merged to `main`, PR #29)
@@ -64,10 +65,11 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 
 ## Current task / in progress
 
-- **Public web-search multilingual fix** — PR #40 (`fix/public-web-response-language`). Generated Summary/findings must match the exact requested language (fr/de/es). Wrong non-English polish triggers the localization pass, then the language-safe fallback. Do **not** merge unless asked.
-- RAG/email/calendar explicit language behavior was already passing and is unchanged.
-- Private host remains user-gated (`PRIVATE_LIVE_GOOGLE_ENABLED=true`, Gmail send disabled, Calendar create and Gmail draft approval-gated).
-- `origin/main` at task start: `2445400db7489830fcba205fabcaac22644e4d72`.
+- **PR #41 on `fix/landing-premium-hero`** — landing hero visual only. Replaces the right-side capability-architecture matrix with a compact operating-layer visual (Understand → Reason → Execute → Connect). Do **not** merge unless asked. No backend, deployment, provider, env, or product-behavior changes.
+- Accuracy constraints on that visual: do not claim MCP; do not claim HubSpot, Salesforce, Stripe, Slack, or Twilio are live; Memory is authenticated/private; Payments and Communications are labeled integration-ready; public Gmail/Calendar remain simulated; private Google remains live/org-restricted.
+- PR #40 web-search language behavior is already on `main` and must not be altered by this frontend-only PR.
+- Private host remains user-gated (`PRIVATE_LIVE_GOOGLE_ENABLED=true`, Gmail send disabled, Calendar create and Gmail draft approval-gated). This PR does **not** change Railway/Vercel env, OAuth, or deployment branches.
+- `origin/main` at rebase: `a26bb15c37d31a40c83071eca79da33864450cda`.
 - `deployment/live-google-demo` remains untouched at `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332`.
 - Product work belongs on a feature/fix branch off `main`, never on a deployment branch.
 
@@ -99,16 +101,19 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 - Vectors: Qdrant when configured, in-memory fallback otherwise. Cloud must not target live Qdrant clusters.
 - Recruiter presentation package lives under `docs/portfolio/` (`ARCHITECTURE_OVERVIEW.md`, `RECRUITER_DEMO_SCRIPT.md`, `RECORDING_CHECKLIST.md`, `INTERVIEW_CHEAT_SHEET.md`).
 - Cloud execution reports are public/sanitized and live only on `agent/cloud-state`. Cloud cannot write iCloud.
-- Public landing hero uses a compact capability architecture on the right of the hero. Voice and persistent memory are labeled as authenticated/private. Connector/adapter architecture is claimed; MCP and live HubSpot are not.
+- Explicit response language (fr/de/es) controls WEB_SEARCH / WEB_AND_KNOWLEDGE generated Summary/findings. Wrong-language polish triggers a localization pass, then a language-safe fallback. Original Sources (titles, URLs, snippets) stay unchanged. AUTO still follows detected input language. RAG/email/calendar explicit-language behavior is unchanged.
+- Public landing hero (this branch): compact operating-layer visual on the right of the hero (Understand, Reason, Execute, Connect). Memory is labeled as authenticated/private. Payments and Communications are marked integration-ready. MCP and live HubSpot/Salesforce/Stripe/Slack/Twilio are not claimed.
 
 ## Tests / status
 
-- Latest green CI on `main` @ `2445400db7489830fcba205fabcaac22644e4d72` includes PR #39.
-- This branch (`fix/public-web-response-language`, PR #40):
-  - Review correction: generated prose must match the exact requested language (fr/de/es), not merely "not English".
-  - backend pytest: **927 passed**, 3 skipped
-  - evaluation suite and sanitizer run on this branch
-  - No frontend, deployment, or env changes.
+- Latest `main` @ `a26bb15c37d31a40c83071eca79da33864450cda` includes PR #40 (web-search response language).
+- PR #40 on `main`: generated prose must match the exact requested language (fr/de/es), not merely "not English". Backend pytest on that PR: **927 passed**, 3 skipped. No frontend/deployment/env changes in PR #40.
+- This branch (`fix/landing-premium-hero`, PR #41), rebased onto that `main`:
+  - frontend vitest: **180 passed** (30 files)
+  - `pnpm typecheck` **ok**; `pnpm build` **ok**
+  - sanitizer `--check --no-fetch` — **ok**
+  - scripts/tests: **53 passed**
+  - No backend, deployment, or product-behavior changes. Does not alter PR #40 web-search language behavior.
 - CI (`.github/workflows/ci.yml`) runs backend pytest + frontend typecheck/tests/build on PRs to `main` and `deployment/**`, plus `scripts/tests`.
 - Public-demo smoke: `python scripts/smoke_test_public_demo.py --base-url <public-api>` (never print tokens).
 - Cloud-handoff / report-bridge tests: `python -m pytest -q scripts/tests`
@@ -129,7 +134,7 @@ Cloud (and any agent) must **not** touch:
 
 ## Recommended next task
 
-Review `fix/public-web-response-language` (explicit web-search response language) and merge only if accepted. Do not change the public production env. Do not move `deployment/public-demo` or `deployment/live-google-demo` unless explicitly authorized. Keep public `gpt-5-nano`. Keep `GMAIL_SEND_ENABLED=false`. Remaining P2 audit items stay deferred.
+Review PR #41 (`fix/landing-premium-hero`) and merge only if accepted. Do not change the public production env. Do not move `deployment/public-demo` or `deployment/live-google-demo` unless explicitly authorized. Keep public `gpt-5-nano`. Keep `GMAIL_SEND_ENABLED=false`. Remaining P2 audit items stay deferred.
 
 Do not re-run live Qdrant or modify deployment branches unless the operator explicitly authorizes that exact branch.
 

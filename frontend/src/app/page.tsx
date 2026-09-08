@@ -12,7 +12,7 @@ import {
 import { TryDemoButton } from "@/components/landing/try-demo-button";
 import { LandingHeader } from "@/components/landing/landing-header";
 import { LandingFooter } from "@/components/landing/landing-footer";
-import { HeroCapabilityArchitecture } from "@/components/landing/hero-capability-architecture";
+import { HeroOperatingLayer } from "@/components/landing/hero-operating-layer";
 import { PRODUCT_GITHUB_URL } from "@/lib/product";
 
 const NOVAEDGE_NOTE =
@@ -155,7 +155,7 @@ export default function LandingPage() {
               <p className="mt-4 text-xs text-slate-500">{NOVAEDGE_NOTE}</p>
             </div>
 
-            <HeroCapabilityArchitecture />
+            <HeroOperatingLayer />
           </div>
         </section>
 
