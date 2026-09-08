@@ -566,6 +566,7 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
                     response_language=state.response_language,
                 ),
                 settings=deps.settings,
+                citations=web.citations,
                 response_language=state.response_language,
             ),
         )
@@ -674,6 +675,7 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
                     response_language=state.response_language,
                 ),
                 settings=deps.settings,
+                citations=web.citations,
                 response_language=state.response_language,
             ),
         )
@@ -724,6 +726,7 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
                     response_language=state.response_language,
                 ),
                 settings=deps.settings,
+                citations=web.citations,
                 response_language=state.response_language,
             ),
         )
