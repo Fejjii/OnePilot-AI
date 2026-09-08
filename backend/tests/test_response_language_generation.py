@@ -10,9 +10,12 @@ from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
+from jose import jwt as jose_jwt
+from sqlalchemy.orm import Session
 
-from onepilot.core.config import Settings
-from onepilot.core.constants import LanguageCode, LanguagePreference, PlanCode, Role
+from onepilot.agents.workflow import run_agent
+from onepilot.core.config import Settings, get_settings
+from onepilot.core.constants import Intent, LanguageCode, LanguagePreference, PlanCode, Role
 from onepilot.providers.llm.base import LLMResponse
 from onepilot.schemas.web_search import WebSearchCitation, WebSearchResponse
 from onepilot.security.auth import Principal
@@ -24,8 +27,11 @@ from onepilot.services.language_service import (
 )
 from onepilot.services.reranker import RerankHit
 from onepilot.services.response_i18n import response_copy
-from onepilot.services.web_synthesis import synthesize_web_only
-from sqlalchemy.orm import Session
+from onepilot.services.web_synthesis import (
+    maybe_llm_polish,
+    synthesize_combined,
+    synthesize_web_only,
+)
 from tests.test_chat_endpoint import _h, _register
 
 
@@ -198,6 +204,65 @@ class TestWebAndRagExplicitPreference:
         assert "## Summary" not in text or preference == "en"
 
     @pytest.mark.parametrize("preference", ["fr", "de", "es"])
+    def test_web_user_facing_answer_uses_preference_not_english_snippets(
+        self, preference: str
+    ) -> None:
+        copy = response_copy(preference)
+        draft = synthesize_web_only(
+            query=ENGLISH_WEB,
+            web=_web_response(),
+            configured=True,
+            response_language=preference,
+        )
+        result = maybe_llm_polish(
+            query=ENGLISH_WEB,
+            draft=draft,
+            settings=Settings(OPENAI_API_KEY="", SERPER_API_KEY="test-serper"),
+            citations=_web_response().citations,
+            response_language=preference,
+        )
+        generated = result.text.split(f"## {copy.sources_heading}", 1)[0]
+        assert f"## {copy.summary_heading}" in result.text
+        assert "OpenAI launched GPT-5, describing stronger reasoning" not in generated
+        assert "OpenAI launches GPT-5 with improved reasoning" in result.text
+        assert "https://openai.com/index/gpt-5" in result.text
+        assert copy.web_see_original_excerpt in generated
+        sources = result.text.split(f"## {copy.sources_heading}", 1)[1]
+        assert "OpenAI launched GPT-5, describing stronger reasoning" in sources
+
+    @pytest.mark.parametrize("preference", ["fr", "de", "es"])
+    def test_web_and_knowledge_user_facing_answer_uses_preference(
+        self, preference: str
+    ) -> None:
+        copy = response_copy(preference)
+        internal = {
+            "fr": "NovaEdge Solutions fournit une automatisation du support.",
+            "de": "NovaEdge Solutions bietet Automatisierung für den Kundensupport.",
+            "es": "NovaEdge Solutions ofrece automatización de soporte al cliente.",
+        }[preference]
+        draft = synthesize_combined(
+            query=ENGLISH_WEB,
+            web=_web_response(),
+            internal_answer=internal,
+            internal_weak=False,
+            configured=True,
+            response_language=preference,
+        )
+        result = maybe_llm_polish(
+            query=ENGLISH_WEB,
+            draft=draft,
+            settings=Settings(OPENAI_API_KEY=""),
+            citations=_web_response().citations,
+            response_language=preference,
+        )
+        generated = result.text.split(f"## {copy.evidence_heading}", 1)[0]
+        assert f"## {copy.summary_heading}" in result.text
+        assert internal in result.text
+        assert "OpenAI launched GPT-5, describing stronger reasoning" not in generated
+        assert "https://openai.com/index/gpt-5" in result.text
+        assert copy.combined_research_for.split("{")[0].strip() in result.text
+
+    @pytest.mark.parametrize("preference", ["fr", "de", "es"])
     def test_rag_fallback_localizes_headings_and_keeps_document_title(
         self, preference: str
     ) -> None:
@@ -291,3 +356,118 @@ class TestChatApiExplicitPreference:
             or copy.web_unconfigured_summary[:40] in text
             or copy.summary_heading in text
         )
+
+
+def _live_web_response(query: str) -> WebSearchResponse:
+    return WebSearchResponse(
+        query=query,
+        citations=[
+            WebSearchCitation(
+                title="OpenAI launches GPT-5 with improved reasoning",
+                url="https://openai.com/index/gpt-5",
+                snippet="OpenAI launched GPT-5, describing stronger reasoning.",
+                source="openai.com",
+                published_date="2026-08-20",
+                rank=1,
+                relevance_score=0.9,
+            ),
+            WebSearchCitation(
+                title="OpenAI adds EU data residency for ChatGPT Enterprise",
+                url="https://www.reuters.com/openai-eu-residency",
+                snippet="OpenAI announced EU data residency options for ChatGPT Enterprise.",
+                source="reuters.com",
+                published_date="2026-09-01",
+                rank=2,
+                relevance_score=0.88,
+            ),
+        ],
+        provider_mode="live",
+        fallback_used=False,
+        latency_ms=8,
+        result_count=2,
+    )
+
+
+def _patch_live_web_search(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _fake_search(*_args, **kwargs):
+        request = kwargs.get("request")
+        query = getattr(request, "query", ENGLISH_WEB)
+        return _live_web_response(query)
+
+    monkeypatch.setattr(
+        "onepilot.tools.web_search_tool.web_search_service.search_web",
+        _fake_search,
+    )
+
+
+class TestWebWorkflowExplicitPreference:
+    @pytest.mark.parametrize("preference", ["fr", "de", "es"])
+    def test_english_web_search_final_answer_uses_response_language(
+        self, client_with_session, monkeypatch: pytest.MonkeyPatch, preference: str
+    ) -> None:
+        client, session = client_with_session
+        token = _register(client, suffix=f"_web_wf_{preference}")
+        claims = jose_jwt.get_unverified_claims(token)
+        _patch_live_web_search(monkeypatch)
+        settings = get_settings().model_copy(
+            update={"SERPER_API_KEY": "test-serper-key", "OPENAI_API_KEY": ""}
+        )
+        state = run_agent(
+            session=session,
+            principal=Principal(
+                user_id=claims["sub"],
+                organization_id=claims["org"],
+                role=Role.OWNER,
+                plan_code=PlanCode.FREE,
+            ),
+            settings=settings,
+            conversation_id=f"conv_web_lang_{preference}",
+            message=ENGLISH_WEB,
+            language_preference=preference,
+        )
+        copy = response_copy(preference)
+        text = state.final_response or ""
+        generated = text.split(f"## {copy.sources_heading}", 1)[0]
+        assert state.intent == Intent.WEB_SEARCH
+        assert state.response_language == preference
+        assert f"## {copy.summary_heading}" in text
+        assert "OpenAI launched GPT-5, describing stronger reasoning" not in generated
+        assert "https://openai.com/index/gpt-5" in text
+        assert "OpenAI launches GPT-5 with improved reasoning" in text
+
+    @pytest.mark.parametrize("preference", ["fr", "de", "es"])
+    def test_english_web_and_knowledge_final_answer_uses_response_language(
+        self, client_with_session, monkeypatch: pytest.MonkeyPatch, preference: str
+    ) -> None:
+        client, session = client_with_session
+        token = _register(client, suffix=f"_webkb_wf_{preference}")
+        claims = jose_jwt.get_unverified_claims(token)
+        _patch_live_web_search(monkeypatch)
+        settings = get_settings().model_copy(
+            update={"SERPER_API_KEY": "test-serper-key", "OPENAI_API_KEY": ""}
+        )
+        state = run_agent(
+            session=session,
+            principal=Principal(
+                user_id=claims["sub"],
+                organization_id=claims["org"],
+                role=Role.OWNER,
+                plan_code=PlanCode.FREE,
+            ),
+            settings=settings,
+            conversation_id=f"conv_webkb_lang_{preference}",
+            message=(
+                "Find recent OpenAI news and compare them with "
+                "NovaEdge Solutions services."
+            ),
+            language_preference=preference,
+        )
+        copy = response_copy(preference)
+        text = state.final_response or ""
+        generated = text.split(f"## {copy.evidence_heading}", 1)[0]
+        assert state.intent == Intent.WEB_AND_KNOWLEDGE
+        assert state.response_language == preference
+        assert f"## {copy.summary_heading}" in text
+        assert "OpenAI launched GPT-5, describing stronger reasoning" not in generated
+        assert "https://openai.com/index/gpt-5" in text
+        assert copy.combined_research_for.split("{")[0].strip() in text

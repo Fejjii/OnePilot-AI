@@ -5,14 +5,19 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from onepilot.agents.workflow import _merge_polish_usage
 from onepilot.providers.llm.base import LLMResponse
 from onepilot.providers.llm.fallback_provider import FallbackLLMProvider
 from onepilot.schemas.web_search import WebSearchCitation, WebSearchResponse
+from onepilot.services.response_i18n import response_copy
 from onepilot.services.web_synthesis import (
     maybe_llm_polish,
     requested_finding_count,
+    synthesize_combined,
     synthesize_web_only,
+    _output_satisfies_language,
 )
 
 OPENAI_QUERY = (
@@ -200,3 +205,372 @@ def test_merge_polish_usage_adds_tokens_without_clobbering() -> None:
     assert update["usage_metadata"]["output_tokens"] == 30
     assert update["usage_metadata"]["model"] == "gpt-4o-mini"
     assert update["usage_metadata"]["provider"] == "rag"
+
+
+def _generated_without_sources(text: str, language: str = "en") -> str:
+    copy = response_copy(language)
+    generated = text
+    for heading in (copy.sources_heading, copy.evidence_heading):
+        marker = f"## {heading}"
+        if marker in generated:
+            generated = generated.split(marker, 1)[0]
+    return generated
+
+
+def test_explicit_language_fallback_without_llm_does_not_leak_english_snippets() -> None:
+    draft = synthesize_web_only(
+        query=OPENAI_QUERY,
+        web=_openai_web(),
+        configured=True,
+        response_language="fr",
+    )
+    result = maybe_llm_polish(
+        query=OPENAI_QUERY,
+        draft=draft,
+        settings=SimpleNamespace(has_openai=False),
+        citations=OPENAI_CITATIONS,
+        response_language="fr",
+    )
+    copy = response_copy("fr")
+    generated = _generated_without_sources(result.text, "fr")
+    assert f"## {copy.summary_heading}" in result.text
+    assert f"## {copy.top_findings_heading}" in result.text
+    assert f"## {copy.sources_heading}" in result.text
+    assert "OpenAI launched GPT-5" not in generated
+    assert "describing stronger reasoning" not in generated
+    assert "EU data residency options" not in generated
+    assert "OpenAI launches GPT-5 with improved reasoning" in result.text
+    assert "https://openai.com/index/gpt-5" in result.text
+    assert "https://www.reuters.com/openai-eu-residency" in result.text
+    assert copy.web_see_original_excerpt in result.text
+    assert copy.web_related_summary.split("{")[0].strip() in result.text
+    sources = result.text.split(f"## {copy.sources_heading}", 1)[1]
+    assert "OpenAI launched GPT-5" in sources
+
+
+def test_auto_english_still_uses_snippet_findings() -> None:
+    draft = synthesize_web_only(
+        query=OPENAI_QUERY, web=_openai_web(), configured=True, response_language="en"
+    )
+    result = maybe_llm_polish(
+        query=OPENAI_QUERY,
+        draft=draft,
+        settings=SimpleNamespace(has_openai=False),
+        citations=OPENAI_CITATIONS,
+        response_language="en",
+    )
+    assert result.text == draft
+    assert "OpenAI launched GPT-5" in result.text
+
+
+def test_polish_rejected_then_localize_uses_target_language_and_counts_tokens() -> None:
+    draft = synthesize_web_only(
+        query=OPENAI_QUERY,
+        web=_openai_web(),
+        configured=True,
+        response_language="de",
+    )
+    llm = MagicMock()
+    llm.chat.side_effect = [
+        LLMResponse(
+            content=(
+                "## Summary\nRewrite of the research brief should mention sources.\n\n"
+                "## Top findings\n1. Explain how a brief should be written.\n\n"
+                "## Sources\n- **OpenAI launches GPT-5 with improved reasoning** "
+                "(https://openai.com/index/gpt-5): OpenAI launched GPT-5."
+            ),
+            model="gpt-5-nano",
+            input_tokens=20,
+            output_tokens=12,
+            finish_reason="stop",
+        ),
+        LLMResponse(
+            content=(
+                "## Zusammenfassung\nOpenAI hat GPT-5 vorgestellt und die "
+                "EU-Datenresidenz erweitert.\n\n"
+                "## Wichtigste Erkenntnisse\n"
+                "1. OpenAI hat GPT-5 mit stärkerem Reasoning vorgestellt.\n"
+                "2. OpenAI hat EU-Datenresidenz für ChatGPT Enterprise ergänzt."
+            ),
+            model="gpt-5-nano",
+            input_tokens=30,
+            output_tokens=40,
+            finish_reason="stop",
+        ),
+    ]
+    with patch("onepilot.providers.get_llm_provider", return_value=llm):
+        result = maybe_llm_polish(
+            query=OPENAI_QUERY,
+            draft=draft,
+            settings=SimpleNamespace(has_openai=True),
+            citations=OPENAI_CITATIONS,
+            response_language="de",
+        )
+    generated = _generated_without_sources(result.text, "de")
+    assert "hat GPT-5 vorgestellt" in generated or "EU-Datenresidenz" in generated
+    assert "OpenAI launched GPT-5" not in generated
+    assert "https://openai.com/index/gpt-5" in result.text
+    assert "https://www.reuters.com/openai-eu-residency" in result.text
+    assert result.input_tokens == 50
+    assert result.output_tokens == 52
+    assert result.model == "gpt-5-nano"
+    assert llm.chat.call_count == 2
+    localize_system = llm.chat.call_args_list[1].kwargs["messages"][0]["content"]
+    assert "German" in localize_system
+    assert "Do not include a Sources section" in localize_system
+
+
+def test_polish_and_localize_failure_falls_back_without_english_findings() -> None:
+    draft = synthesize_web_only(
+        query=OPENAI_QUERY,
+        web=_openai_web(),
+        configured=True,
+        response_language="es",
+    )
+    llm = MagicMock()
+    llm.chat.side_effect = [
+        LLMResponse(
+            content="## Summary\nRewrite the research brief as a poem.",
+            model="gpt-5-nano",
+            input_tokens=11,
+            output_tokens=8,
+            finish_reason="stop",
+        ),
+        LLMResponse(
+            content=(
+                "## Summary\nOpenAI launched GPT-5, describing stronger reasoning "
+                "and coding performance for enterprise assistants."
+            ),
+            model="gpt-5-nano",
+            input_tokens=15,
+            output_tokens=9,
+            finish_reason="stop",
+        ),
+    ]
+    with patch("onepilot.providers.get_llm_provider", return_value=llm):
+        result = maybe_llm_polish(
+            query=OPENAI_QUERY,
+            draft=draft,
+            settings=SimpleNamespace(has_openai=True),
+            citations=OPENAI_CITATIONS,
+            response_language="es",
+        )
+    copy = response_copy("es")
+    generated = _generated_without_sources(result.text, "es")
+    assert "OpenAI launched GPT-5" not in generated
+    assert "describing stronger reasoning" not in generated
+    assert copy.web_see_original_excerpt in generated
+    assert "https://techcrunch.com/openai-custom-chips" in result.text
+    assert result.input_tokens == 26
+    assert result.output_tokens == 17
+
+
+def test_successful_polish_in_french_keeps_sources_and_skips_second_call() -> None:
+    draft = synthesize_web_only(
+        query=OPENAI_QUERY,
+        web=_openai_web(),
+        configured=True,
+        response_language="fr",
+    )
+    llm = MagicMock()
+    llm.chat.return_value = LLMResponse(
+        content=(
+            "## Résumé\nOpenAI a lancé GPT-5 et a annoncé la résidence des "
+            "données dans l'UE pour ChatGPT Enterprise.\n\n"
+            "## Principales conclusions\n"
+            "1. OpenAI a lancé GPT-5 avec un raisonnement plus solide.\n"
+            "2. OpenAI a ajouté la résidence des données dans l'UE.\n\n"
+            "## Sources\n"
+            "- **OpenAI launches GPT-5 with improved reasoning** "
+            "(https://openai.com/index/gpt-5): OpenAI launched GPT-5, describing "
+            "stronger reasoning and coding performance for enterprise assistants.\n"
+            "- **OpenAI adds EU data residency for ChatGPT Enterprise** "
+            "(https://www.reuters.com/openai-eu-residency): OpenAI announced EU "
+            "data residency options for ChatGPT Enterprise customers following "
+            "regulator pressure."
+        ),
+        model="gpt-5-nano",
+        input_tokens=40,
+        output_tokens=55,
+        finish_reason="stop",
+    )
+    with patch("onepilot.providers.get_llm_provider", return_value=llm):
+        result = maybe_llm_polish(
+            query=OPENAI_QUERY,
+            draft=draft,
+            settings=SimpleNamespace(has_openai=True),
+            citations=OPENAI_CITATIONS,
+            response_language="fr",
+        )
+    generated = _generated_without_sources(result.text, "fr")
+    assert "a lancé GPT-5" in generated
+    assert "résidence des données" in generated
+    assert "OpenAI launched GPT-5, describing stronger reasoning" not in generated
+    assert "https://openai.com/index/gpt-5" in result.text
+    assert result.input_tokens == 40
+    assert result.output_tokens == 55
+    llm.chat.assert_called_once()
+
+
+_WRONG_LANGUAGE_POLISH = {
+    "de": (
+        "## Zusammenfassung\n"
+        "OpenAI hat GPT-5 vorgestellt und die EU-Datenresidenz für ChatGPT "
+        "Enterprise ergänzt. Welche Entwicklungen sind relevant?\n\n"
+        "## Wichtigste Erkenntnisse\n"
+        "1. OpenAI hat GPT-5 mit stärkerem Reasoning vorgestellt.\n"
+        "2. OpenAI hat die Richtlinie zur Datenresidenz in der EU unterstützt.\n\n"
+        "## Sources\n"
+        "- **OpenAI launches GPT-5 with improved reasoning** "
+        "(https://openai.com/index/gpt-5): OpenAI launched GPT-5, describing "
+        "stronger reasoning and coding performance for enterprise assistants."
+    ),
+    "es": (
+        "## Resumen\n"
+        "OpenAI ha anunciado GPT-5 y la residencia de datos en la UE para los "
+        "clientes. Esta actualización ofrece servicios más sólidos.\n\n"
+        "## Hallazgos principales\n"
+        "1. OpenAI ofrece GPT-5 con mejor razonamiento.\n"
+        "2. OpenAI admite residencia de datos y ofrece integraciones para las empresas.\n\n"
+        "## Sources\n"
+        "- **OpenAI launches GPT-5 with improved reasoning** "
+        "(https://openai.com/index/gpt-5): OpenAI launched GPT-5, describing "
+        "stronger reasoning and coding performance for enterprise assistants."
+    ),
+    "fr": (
+        "## Résumé\n"
+        "OpenAI a lancé GPT-5 et a annoncé la résidence des données dans l'UE "
+        "pour ChatGPT Enterprise. Quelles sont les principales conclusions?\n\n"
+        "## Principales conclusions\n"
+        "1. OpenAI a lancé GPT-5 avec un raisonnement plus solide.\n"
+        "2. La politique de résidence des données est proposée pour les clients.\n\n"
+        "## Sources\n"
+        "- **OpenAI launches GPT-5 with improved reasoning** "
+        "(https://openai.com/index/gpt-5): OpenAI launched GPT-5, describing "
+        "stronger reasoning and coding performance for enterprise assistants."
+    ),
+}
+
+_CORRECT_LANGUAGE_LOCALIZE = {
+    "fr": (
+        "## Résumé\n"
+        "OpenAI a lancé GPT-5 et a annoncé la résidence des données dans l'UE "
+        "pour ChatGPT Enterprise. Quelles sont les principales conclusions?\n\n"
+        "## Principales conclusions\n"
+        "1. OpenAI a lancé GPT-5 avec un raisonnement plus solide.\n"
+        "2. La politique de résidence des données est proposée pour les clients."
+    ),
+    "de": (
+        "## Zusammenfassung\n"
+        "OpenAI hat GPT-5 vorgestellt und die EU-Datenresidenz für ChatGPT "
+        "Enterprise ergänzt. Welche Entwicklungen sind relevant?\n\n"
+        "## Wichtigste Erkenntnisse\n"
+        "1. OpenAI hat GPT-5 mit stärkerem Reasoning vorgestellt.\n"
+        "2. OpenAI hat die Richtlinie zur Datenresidenz in der EU unterstützt."
+    ),
+    "es": (
+        "## Resumen\n"
+        "OpenAI ha anunciado GPT-5 y la residencia de datos en la UE para los "
+        "clientes. Esta actualización ofrece servicios más sólidos.\n\n"
+        "## Hallazgos principales\n"
+        "1. OpenAI ofrece GPT-5 con mejor razonamiento.\n"
+        "2. OpenAI admite residencia de datos y ofrece integraciones para las empresas."
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("requested", "wrong", "expected_marker"),
+    [
+        ("fr", "de", "a lancé GPT-5"),
+        ("de", "es", "hat GPT-5 vorgestellt"),
+        ("es", "fr", "ofrece GPT-5"),
+    ],
+)
+def test_wrong_non_english_polish_is_rejected_and_localized(
+    requested: str, wrong: str, expected_marker: str
+) -> None:
+    draft = synthesize_web_only(
+        query=OPENAI_QUERY,
+        web=_openai_web(),
+        configured=True,
+        response_language=requested,
+    )
+    assert _output_satisfies_language(
+        _WRONG_LANGUAGE_POLISH[wrong],
+        response_language=requested,
+        query=OPENAI_QUERY,
+        citations=OPENAI_CITATIONS,
+    ) is False
+    llm = MagicMock()
+    llm.chat.side_effect = [
+        LLMResponse(
+            content=_WRONG_LANGUAGE_POLISH[wrong],
+            model="gpt-5-nano",
+            input_tokens=18,
+            output_tokens=22,
+            finish_reason="stop",
+        ),
+        LLMResponse(
+            content=_CORRECT_LANGUAGE_LOCALIZE[requested],
+            model="gpt-5-nano",
+            input_tokens=24,
+            output_tokens=35,
+            finish_reason="stop",
+        ),
+    ]
+    with patch("onepilot.providers.get_llm_provider", return_value=llm):
+        result = maybe_llm_polish(
+            query=OPENAI_QUERY,
+            draft=draft,
+            settings=SimpleNamespace(has_openai=True),
+            citations=OPENAI_CITATIONS,
+            response_language=requested,
+        )
+    generated = _generated_without_sources(result.text, requested)
+    copy = response_copy(requested)
+    assert expected_marker in generated
+    assert f"## {copy.summary_heading}" in result.text
+    assert "https://openai.com/index/gpt-5" in result.text
+    assert llm.chat.call_count == 2
+    localize_system = llm.chat.call_args_list[1].kwargs["messages"][0]["content"]
+    assert {
+        "fr": "French",
+        "de": "German",
+        "es": "Spanish",
+    }[requested] in localize_system
+    assert result.input_tokens == 42
+    assert result.output_tokens == 57
+
+
+def test_combined_fallback_keeps_internal_and_web_evidence() -> None:
+    web = _openai_web()
+    internal = (
+        "NovaEdge Solutions fournit une automatisation du support client "
+        "pour les équipes commerciales."
+    )
+    draft = synthesize_combined(
+        query=OPENAI_QUERY,
+        web=web,
+        internal_answer=internal,
+        internal_weak=False,
+        configured=True,
+        response_language="fr",
+    )
+    result = maybe_llm_polish(
+        query=OPENAI_QUERY,
+        draft=draft,
+        settings=SimpleNamespace(has_openai=False),
+        citations=OPENAI_CITATIONS,
+        response_language="fr",
+    )
+    copy = response_copy("fr")
+    generated = _generated_without_sources(result.text, "fr")
+    assert f"## {copy.summary_heading}" in result.text
+    assert f"**{copy.internal_knowledge_label}**" in result.text
+    assert "NovaEdge Solutions fournit une automatisation" in result.text
+    assert "https://openai.com/index/gpt-5" in result.text
+    assert "OpenAI launched GPT-5, describing stronger reasoning" not in generated
+    assert copy.web_see_original_excerpt in generated
+    sources = result.text.split(f"## {copy.evidence_heading}", 1)[1]
+    assert "OpenAI launched GPT-5" in sources

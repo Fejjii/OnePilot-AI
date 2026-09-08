@@ -39,6 +39,7 @@ class ResponseCopy:
     web_related_summary: str
     web_unconfigured_next: str
     web_refine_next: str
+    web_see_original_excerpt: str
     combined_research_for: str
     combined_with_internal: str
     combined_web_unconfigured: str
@@ -135,6 +136,7 @@ _EN = ResponseCopy(
         "Configure SERPER_API_KEY to research '{query}' with live web results."
     ),
     web_refine_next="Refine the search query or try a more specific timeframe or topic.",
+    web_see_original_excerpt="See the original excerpt under Sources.",
     combined_research_for="Combined research for: {query}.",
     combined_with_internal=(
         "External web search (Serper) was combined with internal company knowledge."
@@ -252,6 +254,7 @@ _DE = ResponseCopy(
         "Konfigurieren Sie SERPER_API_KEY, um '{query}' mit Live-Web-Ergebnissen zu recherchieren."
     ),
     web_refine_next="Verfeinern Sie die Suchanfrage oder wählen Sie einen engeren Zeitraum oder ein engeres Thema.",
+    web_see_original_excerpt="Siehe den Originalauszug unter Quellen.",
     combined_research_for="Kombinierte Recherche für: {query}.",
     combined_with_internal=(
         "Externe Websuche (Serper) wurde mit internem Unternehmenswissen kombiniert."
@@ -369,6 +372,7 @@ _FR = ResponseCopy(
         "Configurez SERPER_API_KEY pour rechercher « {query} » avec des résultats web en direct."
     ),
     web_refine_next="Affinez la requête ou précisez une période ou un sujet.",
+    web_see_original_excerpt="Voir l'extrait original dans les Sources.",
     combined_research_for="Recherche combinée pour : {query}.",
     combined_with_internal=(
         "La recherche web externe (Serper) a été combinée aux connaissances internes de l'entreprise."
@@ -486,6 +490,7 @@ _ES = ResponseCopy(
         "Configure SERPER_API_KEY para investigar '{query}' con resultados web en vivo."
     ),
     web_refine_next="Refine la consulta o pruebe un periodo o tema más específico.",
+    web_see_original_excerpt="Véase el extracto original en Fuentes.",
     combined_research_for="Investigación combinada para: {query}.",
     combined_with_internal=(
         "La búsqueda web externa (Serper) se combinó con el conocimiento interno de la empresa."
