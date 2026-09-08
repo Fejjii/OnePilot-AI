@@ -42,6 +42,13 @@ class TestLanguageDetectionHeuristic:
         assert result.language == LanguageCode.EN
         assert result.confidence > 0
 
+    def test_english_compare_query_is_not_french(self) -> None:
+        result = detect_language_heuristic(
+            "Find recent SMB automation trends and compare them with "
+            "NovaEdge Solutions services."
+        )
+        assert result.language == LanguageCode.EN
+
     @pytest.mark.parametrize("query", GERMAN_QUERIES)
     def test_detects_german(self, query: str) -> None:
         result = detect_language_heuristic(query)

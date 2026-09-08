@@ -104,7 +104,14 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 ## Tests / status
 
 - Latest green CI on `main` @ `1efdf9bfaa6344b492e882428d55a7bc682d1c0f` includes PR #37.
-- This branch (`fix/final-product-ux-i18n-polish`): validation in progress in the same PR.
+- This branch (`fix/final-product-ux-i18n-polish`):
+  - targeted multilingual generation + detection: **61 passed**
+  - full backend: **906 passed, 3 skipped**
+  - frontend vitest: **179 passed** (30 files)
+  - `pnpm typecheck` **ok**; `pnpm build` **ok**
+  - `python3 -m pytest -q scripts/tests` — **53 passed**
+  - sanitizer `--check --no-fetch` — **ok**
+  - deterministic eval: intent **57/57 (100%)**, routing **57/57 (100%)**, combined **79 cases, 0 failed**. Harness scores, not live-model quality.
 - CI (`.github/workflows/ci.yml`) runs backend pytest + frontend typecheck/tests/build on PRs to `main` and `deployment/**`, plus `scripts/tests`.
 - Public-demo smoke: `python scripts/smoke_test_public_demo.py --base-url <public-api>` (never print tokens).
 - Cloud-handoff / report-bridge tests: `python -m pytest -q scripts/tests`
