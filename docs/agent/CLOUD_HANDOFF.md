@@ -1,6 +1,6 @@
 # Cloud agent handoff (sanitized)
 
-Generated: 2026-09-08 11:10 UTC  
+Generated: 2026-09-08 11:20 UTC  
 Generator: Cloud agent (manual, sanitized; final product UX / i18n polish on `fix/final-product-ux-i18n-polish`; no local `HANDOFF.md`)
 
 This file is the **only** committed project-state brief for Cursor Cloud / phone agents.
@@ -28,7 +28,7 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 | `origin/main` (canonical) | `1efdf9bfaa6344b492e882428d55a7bc682d1c0f` | Includes PR #37 (last-mile demo quality). Task-start SHA for this polish |
 | `origin/deployment/public-demo` | `87eef7d5c2565181b94aff06be97374b22bdf4f9` | Product SHA behind `main`. **READY TO SHARE**. Do not fast-forward |
 | `origin/deployment/live-google-demo` | `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332` | Legacy private pointer; **untouched** |
-| `fix/final-product-ux-i18n-polish` (this work) | see latest commit on that branch | Final recruiter UX / i18n polish PR into `main`; do not merge unless asked |
+| `fix/final-product-ux-i18n-polish` (PR #38) | `1264eabfb6f85085a88862dc1cdc2cdc421aedad` | Final recruiter UX / i18n polish into `main`. **Open, not merged** |
 
 `deployment/live-google-demo` is a stale ancestor of `main` (no unique code). Current `main` is authoritative. Do **not** move that pointer.
 
@@ -59,14 +59,15 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 - OP-016 / OP-019 — OpenAI client timeouts/retries and secret redaction
 - Public demo live on Vercel + Railway with **mock** Gmail/Calendar
 - Canonical branch consolidation: `main` + thin `deployment/public-demo`
-
-## Current task / in progress
-
-- **Final product UX / multilingual / recruiter polish** on `fix/final-product-ux-i18n-polish` (one PR into `main`, **not merged**):
-  - **P0 Response language:** explicit `en`/`de`/`fr`/`es` now drives generated email body, web/RAG synthesis, calendar prose, and surrounding assistant copy — not only the approval footnote. AUTO still follows detected input/speech language. Literals (emails, URLs, source titles, names, quoted values, explicit subjects) are preserved.
+- PR #38 — final product UX / i18n / recruiter polish (**open, not merged**) on `fix/final-product-ux-i18n-polish`:
+  - **P0 Response language:** explicit `en`/`de`/`fr`/`es` drives generated email body, web/RAG synthesis, calendar prose, and surrounding assistant copy — not only the approval footnote. AUTO still follows detected input/speech language. Literals (emails, URLs, source titles, names, quoted values, explicit subjects) are preserved.
   - **P1 Landing:** simplified public page (hero, four capability groups, public vs private track, concise architecture). Simulated chat UI removed. NovaEdge is labeled as the sample demo customer.
   - **Voice:** anonymous public demo still hides `MicrophoneInput` and rejects `/speech/transcribe`. Authenticated/private microphone path unchanged.
   - Public Gmail/Calendar stay mock. Private live-Google path unchanged. HubSpot remains a mock adapter.
+
+## Current task / in progress
+
+- **PR #38 review** — `fix/final-product-ux-i18n-polish` is ready for operator review. Do **not** merge unless asked.
 - Private host remains user-gated (`PRIVATE_LIVE_GOOGLE_ENABLED=true`, Gmail send disabled, Calendar create and Gmail draft approval-gated). This PR does **not** change Railway/Vercel env, OAuth, or deployment branches.
 - `origin/main` at task start: `1efdf9bfaa6344b492e882428d55a7bc682d1c0f`.
 - `deployment/live-google-demo` remains untouched at `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332`.
@@ -132,7 +133,7 @@ Cloud (and any agent) must **not** touch:
 
 ## Recommended next task
 
-Review the final polish PR (`fix/final-product-ux-i18n-polish`) and merge only if accepted. After merge, deploying to the **private** host is still **user-gated** (Railway/Vercel). Do not change the public production env. Do not move `deployment/public-demo` or `deployment/live-google-demo` unless explicitly authorized. Keep public `gpt-5-nano`. Keep `GMAIL_SEND_ENABLED=false`. Remaining P2 audit items stay deferred.
+Review PR #38 (`fix/final-product-ux-i18n-polish` @ `1264eabfb6f85085a88862dc1cdc2cdc421aedad`) and merge only if accepted. After merge, deploying to the **private** host is still **user-gated** (Railway/Vercel). Do not change the public production env. Do not move `deployment/public-demo` or `deployment/live-google-demo` unless explicitly authorized. Keep public `gpt-5-nano`. Keep `GMAIL_SEND_ENABLED=false`. Remaining P2 audit items stay deferred.
 
 Do not re-run live Qdrant or modify deployment branches unless the operator explicitly authorizes that exact branch.
 
