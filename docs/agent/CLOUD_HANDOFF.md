@@ -1,7 +1,7 @@
 # Cloud agent handoff (sanitized)
 
-Generated: 2026-09-08 11:20 UTC  
-Generator: Cloud agent (manual, sanitized; final product UX / i18n polish on `fix/final-product-ux-i18n-polish`; no local `HANDOFF.md`)
+Generated: 2026-09-08 13:40 UTC  
+Generator: Cloud agent (manual, sanitized; landing hero capability architecture on `fix/landing-capability-architecture`; no local `HANDOFF.md`)
 
 This file is the **only** committed project-state brief for Cursor Cloud / phone agents.
 It is intentionally smaller than any local `HANDOFF.md` and contains **no secrets**.
@@ -13,7 +13,7 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 ## How to read this file
 
 | Layer | What it is | Cloud can use it? |
-|-------|------------|-------------------|
+|-------|-----------|-------------------|
 | **Canonical repository** | `main` at the SHA below | Yes — default base for product work |
 | **Deployed public-demo** | `deployment/public-demo` (Vercel + Railway, mock Gmail/Calendar) | Read SHAs only. Do not push/fast-forward unless explicitly authorized |
 | **Private live-demo** | `deployment/live-google-demo` (legacy pointer) | **No** unless the operator names that branch and authorizes the change. Implementation lives on `main` via `PRIVATE_LIVE_GOOGLE_ENABLED` |
@@ -25,15 +25,16 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 
 | Ref | SHA | Notes |
 |-----|-----|-------|
-| `origin/main` (canonical) | `1efdf9bfaa6344b492e882428d55a7bc682d1c0f` | Includes PR #37 (last-mile demo quality). Task-start SHA for this polish |
+| `origin/main` (canonical) | `716c3fa7153ef988804b72a13827900f504210be` | Includes PR #38 (final product UX / i18n polish) |
 | `origin/deployment/public-demo` | `87eef7d5c2565181b94aff06be97374b22bdf4f9` | Product SHA behind `main`. **READY TO SHARE**. Do not fast-forward |
 | `origin/deployment/live-google-demo` | `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332` | Legacy private pointer; **untouched** |
-| `fix/final-product-ux-i18n-polish` (PR #38) | `1264eabfb6f85085a88862dc1cdc2cdc421aedad` | Final recruiter UX / i18n polish into `main`. **Open, not merged** |
+| `fix/landing-capability-architecture` | (open PR into `main`) | Landing hero visual only: replace Ask → Ground → Act → Approve with a compact capability architecture |
 
 `deployment/live-google-demo` is a stale ancestor of `main` (no unique code). Current `main` is authoritative. Do **not** move that pointer.
 
 ## Completed
 
+- PR #38 — final product UX / i18n / recruiter polish merged to `main` (`716c3fa`)
 - PR #37 — last-mile recruiter-demo quality merged to `main` (calendar title preservation, Gmail recipient + HITL draft gating, web-search synthesis polish)
 - PR #36 — private-demo routing + response UX merged to `main`
 - PR #35 — private live-Google v1 track merged to `main` (`PRIVATE_LIVE_GOOGLE_ENABLED`)
@@ -59,17 +60,13 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 - OP-016 / OP-019 — OpenAI client timeouts/retries and secret redaction
 - Public demo live on Vercel + Railway with **mock** Gmail/Calendar
 - Canonical branch consolidation: `main` + thin `deployment/public-demo`
-- PR #38 — final product UX / i18n / recruiter polish (**open, not merged**) on `fix/final-product-ux-i18n-polish`:
-  - **P0 Response language:** explicit `en`/`de`/`fr`/`es` drives generated email body, web/RAG synthesis, calendar prose, and surrounding assistant copy — not only the approval footnote. AUTO still follows detected input/speech language. Literals (emails, URLs, source titles, names, quoted values, explicit subjects) are preserved.
-  - **P1 Landing:** simplified public page (hero, four capability groups, public vs private track, concise architecture). Simulated chat UI removed. NovaEdge is labeled as the sample demo customer.
-  - **Voice:** anonymous public demo still hides `MicrophoneInput` and rejects `/speech/transcribe`. Authenticated/private microphone path unchanged.
-  - Public Gmail/Calendar stay mock. Private live-Google path unchanged. HubSpot remains a mock adapter.
 
 ## Current task / in progress
 
-- **PR #38 review** — `fix/final-product-ux-i18n-polish` is ready for operator review. Do **not** merge unless asked.
+- **Landing hero visual only** on `fix/landing-capability-architecture` (one PR into `main`, do not merge). Replaces the right-side "Ask → Ground → Act → Approve" hero with a compact capability architecture (Interaction, Context & Intelligence, Agent Orchestration, Business Actions, trust footer). No backend, deployment, provider, env, or product-behavior changes.
+- Accuracy constraints on that visual: do not claim MCP; do not claim HubSpot is live; Voice and persistent memory are authenticated/private; public Gmail/Calendar remain simulated; private Google remains live/org-restricted.
 - Private host remains user-gated (`PRIVATE_LIVE_GOOGLE_ENABLED=true`, Gmail send disabled, Calendar create and Gmail draft approval-gated). This PR does **not** change Railway/Vercel env, OAuth, or deployment branches.
-- `origin/main` at task start: `1efdf9bfaa6344b492e882428d55a7bc682d1c0f`.
+- `origin/main` at task start: `716c3fa7153ef988804b72a13827900f504210be`.
 - `deployment/live-google-demo` remains untouched at `04e9df2e05f56d0733c7f7d76b32c4ab1a7e3332`.
 - Product work belongs on a feature/fix branch off `main`, never on a deployment branch.
 
@@ -101,18 +98,12 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 - Vectors: Qdrant when configured, in-memory fallback otherwise. Cloud must not target live Qdrant clusters.
 - Recruiter presentation package lives under `docs/portfolio/` (`ARCHITECTURE_OVERVIEW.md`, `RECRUITER_DEMO_SCRIPT.md`, `RECORDING_CHECKLIST.md`, `INTERVIEW_CHEAT_SHEET.md`).
 - Cloud execution reports are public/sanitized and live only on `agent/cloud-state`. Cloud cannot write iCloud.
+- Public landing hero (this branch): compact capability architecture on the right of the hero. Voice and persistent memory are labeled as authenticated/private. Connector/adapter architecture is claimed; MCP and live HubSpot are not.
 
 ## Tests / status
 
-- Latest green CI on `main` @ `1efdf9bfaa6344b492e882428d55a7bc682d1c0f` includes PR #37.
-- This branch (`fix/final-product-ux-i18n-polish`):
-  - targeted multilingual generation + detection: **61 passed**
-  - full backend: **906 passed, 3 skipped**
-  - frontend vitest: **179 passed** (30 files)
-  - `pnpm typecheck` **ok**; `pnpm build` **ok**
-  - `python3 -m pytest -q scripts/tests` — **53 passed**
-  - sanitizer `--check --no-fetch` — **ok**
-  - deterministic eval: intent **57/57 (100%)**, routing **57/57 (100%)**, combined **79 cases, 0 failed**. Harness scores, not live-model quality.
+- Latest green CI on `main` @ `716c3fa7153ef988804b72a13827900f504210be` includes PR #38.
+- This branch (`fix/landing-capability-architecture`): validation in progress (frontend tests, typecheck, build, sanitizer).
 - CI (`.github/workflows/ci.yml`) runs backend pytest + frontend typecheck/tests/build on PRs to `main` and `deployment/**`, plus `scripts/tests`.
 - Public-demo smoke: `python scripts/smoke_test_public_demo.py --base-url <public-api>` (never print tokens).
 - Cloud-handoff / report-bridge tests: `python -m pytest -q scripts/tests`
@@ -133,7 +124,7 @@ Cloud (and any agent) must **not** touch:
 
 ## Recommended next task
 
-Review PR #38 (`fix/final-product-ux-i18n-polish` @ `1264eabfb6f85085a88862dc1cdc2cdc421aedad`) and merge only if accepted. After merge, deploying to the **private** host is still **user-gated** (Railway/Vercel). Do not change the public production env. Do not move `deployment/public-demo` or `deployment/live-google-demo` unless explicitly authorized. Keep public `gpt-5-nano`. Keep `GMAIL_SEND_ENABLED=false`. Remaining P2 audit items stay deferred.
+Review the landing hero capability-architecture PR and merge only if accepted. Do not change the public production env. Do not move `deployment/public-demo` or `deployment/live-google-demo` unless explicitly authorized. Keep public `gpt-5-nano`. Keep `GMAIL_SEND_ENABLED=false`. Remaining P2 audit items stay deferred.
 
 Do not re-run live Qdrant or modify deployment branches unless the operator explicitly authorizes that exact branch.
 

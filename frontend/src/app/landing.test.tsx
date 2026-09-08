@@ -80,7 +80,7 @@ describe("LandingPage", () => {
       ).toBeInTheDocument();
     });
 
-    it("renders four capability groups and a lightweight workflow", () => {
+    it("renders four capability groups below the hero", () => {
       renderLanding();
       expect(
         screen.getByRole("heading", { name: /what onepilot can do/i }),
@@ -89,12 +89,48 @@ describe("LandingPage", () => {
       expect(screen.getByText(/crm & leads/i)).toBeInTheDocument();
       expect(screen.getByText(/email & calendar/i)).toBeInTheDocument();
       expect(screen.getByText(/safe agentic execution/i)).toBeInTheDocument();
-      expect(screen.getByText(/^ask$/i)).toBeInTheDocument();
-      expect(screen.getByText(/^ground$/i)).toBeInTheDocument();
-      expect(screen.getByText(/^act$/i)).toBeInTheDocument();
-      expect(screen.getByText(/^approve$/i)).toBeInTheDocument();
       expect(
         screen.queryByText(/draft a follow-up email to our most promising lead/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it("renders a compact capability architecture in the hero", () => {
+      renderLanding();
+      expect(screen.getByText(/capability architecture/i)).toBeInTheDocument();
+      expect(screen.getByText(/^interaction$/i)).toBeInTheDocument();
+      expect(screen.getByText(/context & intelligence/i)).toBeInTheDocument();
+      expect(screen.getByText(/agent orchestration/i)).toBeInTheDocument();
+      expect(screen.getByText(/business actions/i)).toBeInTheDocument();
+      expect(screen.getByText(/^chat$/i)).toBeInTheDocument();
+      expect(screen.getByText(/^voice$/i)).toBeInTheDocument();
+      expect(screen.getByText(/^multilingual$/i)).toBeInTheDocument();
+      expect(screen.getByText(/rag \/ company knowledge/i)).toBeInTheDocument();
+      expect(screen.getByText(/memory & personalization/i)).toBeInTheDocument();
+      expect(screen.getByText(/crm context/i)).toBeInTheDocument();
+      expect(screen.getByText(/web research/i)).toBeInTheDocument();
+      expect(screen.getByText(/intent routing/i)).toBeInTheDocument();
+      expect(screen.getByText(/^langgraph$/i)).toBeInTheDocument();
+      expect(screen.getByText(/tool calling/i)).toBeInTheDocument();
+      expect(screen.getByText(/connectors \/ adapters/i)).toBeInTheDocument();
+      expect(screen.getByText(/^email$/i)).toBeInTheDocument();
+      expect(screen.getByText(/^calendar$/i)).toBeInTheDocument();
+      expect(screen.getByText(/^leads$/i)).toBeInTheDocument();
+      expect(screen.getByText(/human approvals/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /tenant-isolated · traced · evaluated · human-controlled/i,
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /voice and persistent memory are available in authenticated private workspaces/i,
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/^ask$/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/^ground$/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/MCP/i)).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/how a request moves/i),
       ).not.toBeInTheDocument();
     });
 
