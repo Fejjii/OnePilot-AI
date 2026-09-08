@@ -94,55 +94,86 @@ describe("LandingPage", () => {
       ).not.toBeInTheDocument();
     });
 
-    it("renders a compact capability architecture in the hero", () => {
+    it("renders a compact operating-layer visual in the hero", () => {
       renderLanding();
-      const architecture = screen.getByRole("complementary", {
-        name: /capability architecture/i,
+      const operatingLayer = screen.getByRole("complementary", {
+        name: /from scattered business tools/i,
       });
-      expect(within(architecture).getByText("Interaction")).toBeInTheDocument();
       expect(
-        within(architecture).getByText("Context & Intelligence"),
+        within(operatingLayer).getByText(/from scattered business tools/i),
       ).toBeInTheDocument();
       expect(
-        within(architecture).getByText("Agent Orchestration"),
+        within(operatingLayer).getByText(/to one intelligent operating layer/i),
       ).toBeInTheDocument();
-      expect(
-        within(architecture).getByText("Business Actions"),
-      ).toBeInTheDocument();
-      for (const label of [
-        "Chat",
-        "Voice",
-        "Multilingual",
-        "RAG / company knowledge",
-        "Memory & personalization",
-        "CRM context",
-        "Web research",
-        "Intent routing",
-        "LangGraph",
-        "Tool calling",
-        "Connectors / adapters",
-        "Email",
-        "Calendar",
-        "Leads",
-        "Human approvals",
-      ]) {
-        expect(within(architecture).getByText(label)).toBeInTheDocument();
+      for (const layer of ["Understand", "Reason", "Execute", "Connect"]) {
+        expect(within(operatingLayer).getByText(layer)).toBeInTheDocument();
       }
+      for (const label of [
+        "Knowledge",
+        "RAG",
+        "Memory",
+        "Web",
+        "Context",
+        "Lead priority",
+        "Agent workflows",
+        "Tool calling",
+        "Email",
+        "Scheduling",
+        "Follow-ups",
+        "CRM actions",
+        "Approvals",
+        "Google Workspace",
+        "APIs",
+        "Payments",
+        "Communications",
+      ]) {
+        expect(within(operatingLayer).getByText(label)).toBeInTheDocument();
+      }
+      expect(within(operatingLayer).getAllByText("CRM").length).toBe(2);
       expect(
-        within(architecture).getByText(
-          "Tenant-isolated · Traced · Evaluated · Human-controlled",
+        within(operatingLayer).getByText(
+          "Grounded in context. Connected to tools. Controlled by humans.",
         ),
       ).toBeInTheDocument();
       expect(
-        within(architecture).getByText(
-          /voice and persistent memory are available in authenticated private workspaces/i,
+        within(operatingLayer).getByText(
+          /memory is available in authenticated private workspaces/i,
         ),
       ).toBeInTheDocument();
+      expect(
+        within(operatingLayer).getByLabelText(
+          /authenticated \/ private workspace/i,
+        ),
+      ).toBeInTheDocument();
+      expect(within(operatingLayer).getByText("Ready")).toBeInTheDocument();
+      expect(
+        within(operatingLayer).getByLabelText(/payments.*integration-ready/i),
+      ).toBeInTheDocument();
+      expect(
+        within(operatingLayer).getByLabelText(
+          /communications.*integration-ready/i,
+        ),
+      ).toBeInTheDocument();
+      expect(
+        within(operatingLayer).queryByText(/capability architecture/i),
+      ).not.toBeInTheDocument();
+      expect(within(operatingLayer).queryByText("Interaction")).not.toBeInTheDocument();
       expect(screen.queryByText(/^ask$/i)).not.toBeInTheDocument();
-      expect(screen.queryByText(/^ground$/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/MCP/i)).not.toBeInTheDocument();
       expect(
-        screen.queryByText(/how a request moves/i),
+        within(operatingLayer).queryByText(/HubSpot/i),
+      ).not.toBeInTheDocument();
+      expect(
+        within(operatingLayer).queryByText(/Salesforce/i),
+      ).not.toBeInTheDocument();
+      expect(
+        within(operatingLayer).queryByText(/Stripe/i),
+      ).not.toBeInTheDocument();
+      expect(
+        within(operatingLayer).queryByText(/Slack/i),
+      ).not.toBeInTheDocument();
+      expect(
+        within(operatingLayer).queryByText(/Twilio/i),
       ).not.toBeInTheDocument();
     });
 
