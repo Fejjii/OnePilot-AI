@@ -29,6 +29,11 @@ from onepilot.services.crm_email_grounding import (
     format_crm_prompt_block,
     sanitize_draft_text,
 )
+from onepilot.services.language_service import (
+    language_display_name,
+    response_language_instruction,
+)
+from onepilot.services.response_i18n import response_copy
 
 logger = get_logger(__name__)
 
@@ -46,7 +51,9 @@ class EmailDraftOutcome:
     model: str
 
 
-def _system_prompt(tone: str, *, has_recipient: bool) -> str:
+def _system_prompt(
+    tone: str, *, has_recipient: bool, response_language: str = "en"
+) -> str:
     tone = tone if tone in VALID_TONES else DEFAULT_TONE
     greeting_rule = (
         "Address the recipient by the provided name."
@@ -56,6 +63,7 @@ def _system_prompt(tone: str, *, has_recipient: bool) -> str:
             "recipient name, company, or outcome."
         )
     )
+    output_lang = language_display_name(response_language)
     return (
         "You are an email drafting assistant for a SaaS company. Write a "
         f"{tone}, on-brand email. Use clear paragraphs. Do not invent facts. "
@@ -63,7 +71,9 @@ def _system_prompt(tone: str, *, has_recipient: bool) -> str:
         "explicitly provided. If a detail is missing, omit it rather than "
         "guessing. Never use bracketed placeholders such as [recipient] or "
         f"[relevant outcome]. {greeting_rule} Return only the subject line "
-        "and body. Never claim the email has been sent."
+        "and body. Never claim the email has been sent. "
+        f"{response_language_instruction(response_language)} "
+        f"The required output language is {output_lang}."
     )
 
 
@@ -74,8 +84,19 @@ def _build_user_prompt(
     recipient_email: str | None,
     citations_block: str | None,
     crm_facts: dict[str, str] | None,
+    response_language: str = "en",
 ) -> str:
-    parts: list[str] = [f"Request: {context.strip()}"]
+    output_lang = language_display_name(response_language)
+    parts: list[str] = [
+        f"Request: {context.strip()}",
+        (
+            f"Required output language: {output_lang}. Write the Subject line "
+            f"and the entire email body in {output_lang}, even if this request "
+            "is in another language. Keep names, email addresses, company "
+            "names, quoted text, and an explicit subject the user asked to "
+            "preserve unchanged."
+        ),
+    ]
     if recipient_name:
         parts.append(f"Recipient name: {recipient_name}")
     if recipient_email:
@@ -116,24 +137,31 @@ def _fallback_draft(
     tone: str,
     recipient_name: str | None,
     crm_facts: dict[str, str] | None = None,
+    response_language: str = "en",
 ) -> tuple[str, str]:
     """Deterministic draft using only provided CRM facts and the request."""
+    del tone
+    copy = response_copy(response_language)
     facts = crm_facts or {}
     name = recipient_name or facts.get("name")
     company = facts.get("company")
     pain = facts.get("pain_point")
     next_action = facts.get("recommended_next_action")
 
-    greeting = f"Hi {name}," if name else "Hello,"
+    greeting = (
+        copy.email_greeting_named.format(name=name)
+        if name
+        else copy.email_greeting_generic
+    )
     explicit_subject = _explicit_subject(context)
     if explicit_subject:
         subject = explicit_subject
     elif company:
-        subject = f"Following up with {company}"
+        subject = copy.email_subject_with_company.format(company=company)
     elif name:
-        subject = f"Following up with {name}"
+        subject = copy.email_subject_with_name.format(name=name)
     else:
-        subject = "Following up"
+        subject = copy.email_default_subject
 
     saying = _explicit_saying(context)
     paragraphs: list[str] = [greeting, ""]
@@ -143,24 +171,23 @@ def _fallback_draft(
             sentence += "."
         paragraphs.append(sentence)
     elif company:
-        paragraphs.append(f"I wanted to follow up with you at {company}.")
+        paragraphs.append(copy.email_followup_company.format(company=company))
     else:
-        paragraphs.append("I wanted to follow up as you requested.")
+        paragraphs.append(copy.email_followup_generic)
 
     if pain and not saying:
-        paragraphs.append(f"You mentioned {pain[0].lower() + pain[1:] if pain else pain}.")
+        pain_text = pain[0].lower() + pain[1:] if pain else pain
+        paragraphs.append(copy.email_mentioned.format(pain=pain_text))
     if next_action and not saying:
-        paragraphs.append(f"Suggested next step: {next_action}")
+        paragraphs.append(copy.email_next_step.format(action=next_action))
     elif not saying and (
         "intro" in context.lower() or "call" in context.lower() or "schedul" in context.lower()
     ):
-        paragraphs.append(
-            "If a short intro call would help, please share a time that works."
-        )
+        paragraphs.append(copy.email_intro_call)
     elif not saying:
-        paragraphs.append("Please let me know if a short conversation would be helpful.")
+        paragraphs.append(copy.email_conversation)
 
-    paragraphs.append("\nBest regards,\nThe OnePilot team")
+    paragraphs.append("\n" + copy.email_signoff)
     body = "\n".join(paragraphs)
     return subject, body
 
@@ -200,8 +227,13 @@ def _finalize_subject_body(
     body: str,
     *,
     recipient_name: str | None,
+    response_language: str = "en",
 ) -> tuple[str, str]:
-    subject = sanitize_draft_text(subject, recipient_name=recipient_name) or "Following up"
+    copy = response_copy(response_language)
+    subject = (
+        sanitize_draft_text(subject, recipient_name=recipient_name)
+        or copy.email_default_subject
+    )
     body = sanitize_draft_text(body, recipient_name=recipient_name)
     return subject, body
 
@@ -219,6 +251,7 @@ def draft_email(
     settings: Settings,
     llm: LLMProvider | None = None,
     enforce_quota: bool = True,
+    response_language: str = "en",
 ) -> EmailDraftOutcome:
     if enforce_quota:
         quota_service.check_and_increment(
@@ -235,7 +268,9 @@ def draft_email(
 
     started = time.monotonic()
     if is_fallback:
-        subject, body = _fallback_draft(context, tone, recipient_name, facts)
+        subject, body = _fallback_draft(
+            context, tone, recipient_name, facts, response_language
+        )
         model_name = "fallback-email-v1"
         input_tokens = max(1, len(context) // 4)
         output_tokens = max(1, len(body) // 4)
@@ -250,7 +285,11 @@ def draft_email(
             messages=[
                 {
                     "role": "system",
-                    "content": _system_prompt(tone, has_recipient=bool(recipient_name)),
+                    "content": _system_prompt(
+                        tone,
+                        has_recipient=bool(recipient_name),
+                        response_language=response_language,
+                    ),
                 },
                 {
                     "role": "user",
@@ -260,6 +299,7 @@ def draft_email(
                         recipient_email=recipient_email,
                         citations_block=citations_block,
                         crm_facts=facts or None,
+                        response_language=response_language,
                     ),
                 },
             ],
@@ -275,7 +315,9 @@ def draft_email(
                 finish_reason=response.finish_reason,
                 output_tokens=response.output_tokens,
             )
-            subject, body = _fallback_draft(context, tone, recipient_name, facts)
+            subject, body = _fallback_draft(
+                context, tone, recipient_name, facts, response_language
+            )
         model_name = response.model
         input_tokens = response.input_tokens
         output_tokens = response.output_tokens
@@ -283,15 +325,20 @@ def draft_email(
     latency_ms = int((time.monotonic() - started) * 1000)
 
     if not body.strip():
-        subject, body = _fallback_draft(context, tone, recipient_name, facts)
+        subject, body = _fallback_draft(
+            context, tone, recipient_name, facts, response_language
+        )
 
     subject, body = _finalize_subject_body(
-        subject, body, recipient_name=recipient_name
+        subject, body, recipient_name=recipient_name, response_language=response_language
     )
     if not body.strip():
         subject, body = _finalize_subject_body(
-            *_fallback_draft(context, tone, recipient_name, facts),
+            *_fallback_draft(
+                context, tone, recipient_name, facts, response_language
+            ),
             recipient_name=recipient_name,
+            response_language=response_language,
         )
 
     draft = EmailDraft(

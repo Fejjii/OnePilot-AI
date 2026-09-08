@@ -6,7 +6,9 @@ instead of returning vague placeholder text.
 
 from __future__ import annotations
 
+from onepilot.services.i18n_messages import RAG_WEAK_EVIDENCE, get_message
 from onepilot.services.reranker import RerankHit
+from onepilot.services.response_i18n import response_copy
 
 # Minimum relevance threshold for using chunks in answers
 # Aligned with weak evidence detection to prevent inconsistencies
@@ -53,19 +55,13 @@ def synthesize_answer(
         Synthesized answer with citations
     """
     if not hits:
-        return (
-            "I don't have a confident answer based on the knowledge I have. "
-            "I'm forwarding this to a human teammate."
-        )
+        return get_message(RAG_WEAK_EVIDENCE, response_language)
     
     # Filter hits by relevance threshold
     relevant_hits = [h for h in hits if h.rerank_score >= min_relevance]
     
     if not relevant_hits:
-        return (
-            "I don't have a confident answer based on the knowledge I have. "
-            "I'm forwarding this to a human teammate."
-        )
+        return get_message(RAG_WEAK_EVIDENCE, response_language)
     
     # Extract unique document titles for citation (only from relevant hits)
     unique_titles = list({hit.document_title for hit in relevant_hits[:3]})
@@ -106,6 +102,7 @@ def synthesize_answer(
     answer_text = " ".join(answer_parts)
     
     lang = response_language if response_language in _CITATION_PREFIX else "en"
+    copy = response_copy(lang)
     if len(unique_titles) == 1:
         citation_prefix = _CITATION_PREFIX[lang].format(title=unique_titles[0])
     else:
@@ -116,24 +113,24 @@ def synthesize_answer(
     if len(answer_text) > max_answer_len:
         answer_text = answer_text[:max_answer_len].rsplit(" ", 1)[0] + "..."
 
-    summary = answer_text.strip() or "The knowledge base contains relevant information on this topic."
+    summary = answer_text.strip() or copy.rag_empty_summary
     key_points = extract_key_points(relevant_hits, max_points=5) or [summary[:220]]
     key_points = key_points[:5]
     evidence = f"- {citation_prefix.strip()} {answer_text.strip()}".strip()
-    next_action = "Review the cited internal documents and confirm details with your team if needed."
+    next_action = copy.rag_next_action
 
     return "\n".join(
         [
-            "## Summary",
+            f"## {copy.summary_heading}",
             summary,
             "",
-            "## Key points",
+            f"## {copy.key_points_heading}",
             *[f"- {point}" for point in key_points],
             "",
-            "## Evidence or sources",
+            f"## {copy.evidence_heading}",
             evidence,
             "",
-            "## Suggested next action",
+            f"## {copy.next_action_heading}",
             next_action,
         ]
     ).strip()

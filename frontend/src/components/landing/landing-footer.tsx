@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PRODUCT_GITHUB_URL } from "@/lib/product";
 
 export function LandingFooter() {
   return (
@@ -14,9 +15,8 @@ export function LandingFooter() {
             </span>
           </div>
           <p className="mt-3 text-xs leading-relaxed text-slate-500">
-            An AI operations platform with human-in-the-loop safety. Public
-            demo actions are simulated — no real emails are sent and no real
-            calendar events are created.
+            An AI operations workspace with human-in-the-loop safety. Public
+            demo Gmail and Calendar side effects are simulated.
           </p>
         </div>
 
@@ -32,13 +32,23 @@ export function LandingFooter() {
                 </a>
               </li>
               <li>
-                <a href="#safety" className="text-slate-600 hover:text-slate-900">
-                  Safety model
+                <a href="#public-vs-live" className="text-slate-600 hover:text-slate-900">
+                  Public vs live
                 </a>
               </li>
               <li>
-                <a href="#whats-real" className="text-slate-600 hover:text-slate-900">
-                  What&apos;s real
+                <a href="#architecture" className="text-slate-600 hover:text-slate-900">
+                  Architecture
+                </a>
+              </li>
+              <li>
+                <a
+                  href={PRODUCT_GITHUB_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-slate-600 hover:text-slate-900"
+                >
+                  GitHub
                 </a>
               </li>
             </ul>
@@ -64,8 +74,8 @@ export function LandingFooter() {
       </div>
       <div className="border-t border-slate-100">
         <p className="mx-auto max-w-6xl px-4 py-4 text-xs text-slate-400 sm:px-6">
-          © {new Date().getFullYear()} OnePilot AI. All demo activity runs
-          against simulated integrations.
+          © {new Date().getFullYear()} OnePilot AI. Public demo Gmail and
+          Calendar actions stay simulated.
         </p>
       </div>
     </footer>

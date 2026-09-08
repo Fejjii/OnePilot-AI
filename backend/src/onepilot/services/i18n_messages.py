@@ -106,6 +106,13 @@ APPROVAL_FOOTNOTE: dict[LanguageCode, str] = {
     LanguageCode.ES: "\n\n*Aprobación pendiente antes de ejecutar cualquier acción externa.*",
 }
 
+EMPTY_RESPONSE: dict[LanguageCode, str] = {
+    LanguageCode.EN: "I don't have a response for that yet.",
+    LanguageCode.DE: "Ich habe dazu noch keine Antwort.",
+    LanguageCode.FR: "Je n'ai pas encore de réponse à cela.",
+    LanguageCode.ES: "Todavía no tengo una respuesta para eso.",
+}
+
 
 def get_message(table: dict[LanguageCode, str], lang: LanguageCode | str) -> str:
     try:

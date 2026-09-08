@@ -36,6 +36,12 @@ export function WorkspaceEmptyState({
           ranks leads, and prepares emails and meeting proposals. External
           sends stay behind human approval.
         </p>
+        {isDemo && (
+          <p className="text-xs leading-relaxed text-slate-500">
+            NovaEdge Solutions is the preloaded sample company used to
+            demonstrate RAG, leads and workflows.
+          </p>
+        )}
         <p className="flex items-center justify-center gap-1.5 text-xs text-slate-600">
           <ShieldCheck
             className="h-3.5 w-3.5 shrink-0 text-emerald-600"

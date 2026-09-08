@@ -11,6 +11,7 @@ from onepilot.services.language_service import (
     detect_language,
     detect_language_heuristic,
     resolve_response_language,
+    response_language_instruction,
 )
 
 GERMAN_QUERIES = [
@@ -40,6 +41,13 @@ class TestLanguageDetectionHeuristic:
         )
         assert result.language == LanguageCode.EN
         assert result.confidence > 0
+
+    def test_english_compare_query_is_not_french(self) -> None:
+        result = detect_language_heuristic(
+            "Find recent SMB automation trends and compare them with "
+            "NovaEdge Solutions services."
+        )
+        assert result.language == LanguageCode.EN
 
     @pytest.mark.parametrize("query", GERMAN_QUERIES)
     def test_detects_german(self, query: str) -> None:
@@ -93,6 +101,12 @@ class TestResolveResponseLanguage:
             0.95,
         )
         assert lang == LanguageCode.DE
+
+    def test_instruction_requires_output_language_even_if_prompt_differs(self) -> None:
+        text = response_language_instruction(LanguageCode.FR)
+        assert "French" in text
+        assert "even if" in text.lower()
+        assert "quoted values" in text
 
     def test_low_confidence_auto_defaults_english(self) -> None:
         lang = resolve_response_language(
