@@ -64,7 +64,7 @@ lives at `agent/cloud-state:docs/agent/LATEST_AGENT_REPORT.md`. Do not conflate 
 
 ## Current task / in progress
 
-- **Public web-search multilingual fix** — PR #40 (`fix/public-web-response-language`). English Serper snippets were copied into Summary / findings when LLM polish failed, so explicit fr/de/es still rendered English answers. Fix: polish must satisfy the selected language; rejected/English polish gets a bounded translation pass; if that also fails, generated prose falls back to localized copy while Sources stay original. No deployment/env changes. Do **not** merge unless asked.
+- **Public web-search multilingual fix** — PR #40 (`fix/public-web-response-language`). Generated Summary/findings must match the exact requested language (fr/de/es). Wrong non-English polish triggers the localization pass, then the language-safe fallback. Do **not** merge unless asked.
 - RAG/email/calendar explicit language behavior was already passing and is unchanged.
 - Private host remains user-gated (`PRIVATE_LIVE_GOOGLE_ENABLED=true`, Gmail send disabled, Calendar create and Gmail draft approval-gated).
 - `origin/main` at task start: `2445400db7489830fcba205fabcaac22644e4d72`.
@@ -105,7 +105,8 @@ Do **not** treat host-console work (Railway / Vercel / Qdrant Cloud env) as Clou
 
 - Latest green CI on `main` @ `2445400db7489830fcba205fabcaac22644e4d72` includes PR #39.
 - This branch (`fix/public-web-response-language`, PR #40):
-  - backend pytest: **924 passed**, 3 skipped
+  - Review correction: generated prose must match the exact requested language (fr/de/es), not merely "not English".
+  - backend pytest: **927 passed**, 3 skipped
   - evaluation suite and sanitizer run on this branch
   - No frontend, deployment, or env changes.
 - CI (`.github/workflows/ci.yml`) runs backend pytest + frontend typecheck/tests/build on PRs to `main` and `deployment/**`, plus `scripts/tests`.

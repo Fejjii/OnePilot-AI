@@ -395,9 +395,9 @@ def maybe_llm_polish(
 
     Explicit non-English response language always controls user-facing Summary
     and findings. Serper snippets may stay in any language in the Sources
-    section. If polish fails or stays in English, a bounded translation pass
-    runs; if that also fails, generated prose falls back to localized copy
-    instead of leaking English snippet sentences.
+    section. If polish fails, stays in English, or returns the wrong non-English
+    language, a bounded translation pass runs; if that also fails, generated
+    prose falls back to localized copy instead of leaking mismatched sentences.
     """
     if not draft.strip():
         return PolishResult(text=draft)
@@ -672,6 +672,12 @@ def _output_satisfies_language(
     query: str,
     citations: list[WebSearchCitation] | None,
 ) -> bool:
+    """Return True when generated prose matches the exact requested language.
+
+    English (explicit or AUTO-resolved) is handled separately and skips this
+    check so snippet-derived English findings remain valid. Explicit fr/de/es
+    must match that exact target; another non-English language is a mismatch.
+    """
     if not _needs_language_enforcement(response_language):
         return True
     generated, _frozen = _split_generated_and_frozen(text)
@@ -682,11 +688,7 @@ def _output_satisfies_language(
         return True
     target = coerce_language(response_language)
     detected = detect_language_heuristic(cleaned)
-    if detected.language == target:
-        return True
-    if detected.language == LanguageCode.EN and detected.confidence >= 0.45:
-        return False
-    return detected.language != LanguageCode.EN
+    return detected.language == target
 
 
 def _citation_snippets_leaked(
