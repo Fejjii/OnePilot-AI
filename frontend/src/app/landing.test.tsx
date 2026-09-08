@@ -96,33 +96,45 @@ describe("LandingPage", () => {
 
     it("renders a compact capability architecture in the hero", () => {
       renderLanding();
-      expect(screen.getByText(/capability architecture/i)).toBeInTheDocument();
-      expect(screen.getByText(/^interaction$/i)).toBeInTheDocument();
-      expect(screen.getByText(/context & intelligence/i)).toBeInTheDocument();
-      expect(screen.getByText(/agent orchestration/i)).toBeInTheDocument();
-      expect(screen.getByText(/business actions/i)).toBeInTheDocument();
-      expect(screen.getByText(/^chat$/i)).toBeInTheDocument();
-      expect(screen.getByText(/^voice$/i)).toBeInTheDocument();
-      expect(screen.getByText(/^multilingual$/i)).toBeInTheDocument();
-      expect(screen.getByText(/rag \/ company knowledge/i)).toBeInTheDocument();
-      expect(screen.getByText(/memory & personalization/i)).toBeInTheDocument();
-      expect(screen.getByText(/crm context/i)).toBeInTheDocument();
-      expect(screen.getByText(/web research/i)).toBeInTheDocument();
-      expect(screen.getByText(/intent routing/i)).toBeInTheDocument();
-      expect(screen.getByText(/^langgraph$/i)).toBeInTheDocument();
-      expect(screen.getByText(/tool calling/i)).toBeInTheDocument();
-      expect(screen.getByText(/connectors \/ adapters/i)).toBeInTheDocument();
-      expect(screen.getByText(/^email$/i)).toBeInTheDocument();
-      expect(screen.getByText(/^calendar$/i)).toBeInTheDocument();
-      expect(screen.getByText(/^leads$/i)).toBeInTheDocument();
-      expect(screen.getByText(/human approvals/i)).toBeInTheDocument();
+      const architecture = screen.getByRole("complementary", {
+        name: /capability architecture/i,
+      });
+      expect(within(architecture).getByText("Interaction")).toBeInTheDocument();
       expect(
-        screen.getByText(
-          /tenant-isolated · traced · evaluated · human-controlled/i,
+        within(architecture).getByText("Context & Intelligence"),
+      ).toBeInTheDocument();
+      expect(
+        within(architecture).getByText("Agent Orchestration"),
+      ).toBeInTheDocument();
+      expect(
+        within(architecture).getByText("Business Actions"),
+      ).toBeInTheDocument();
+      for (const label of [
+        "Chat",
+        "Voice",
+        "Multilingual",
+        "RAG / company knowledge",
+        "Memory & personalization",
+        "CRM context",
+        "Web research",
+        "Intent routing",
+        "LangGraph",
+        "Tool calling",
+        "Connectors / adapters",
+        "Email",
+        "Calendar",
+        "Leads",
+        "Human approvals",
+      ]) {
+        expect(within(architecture).getByText(label)).toBeInTheDocument();
+      }
+      expect(
+        within(architecture).getByText(
+          "Tenant-isolated · Traced · Evaluated · Human-controlled",
         ),
       ).toBeInTheDocument();
       expect(
-        screen.getByText(
+        within(architecture).getByText(
           /voice and persistent memory are available in authenticated private workspaces/i,
         ),
       ).toBeInTheDocument();
@@ -140,6 +152,8 @@ describe("LandingPage", () => {
       expect(screen.queryByText("FastAPI")).not.toBeInTheDocument();
 
       await user.click(screen.getByText(/engineering details/i));
+      const details = screen.getByText(/engineering details/i).closest("details");
+      expect(details).not.toBeNull();
       for (const tech of [
         "FastAPI",
         "Next.js",
@@ -150,7 +164,7 @@ describe("LandingPage", () => {
         "Railway",
         "Vercel",
       ]) {
-        expect(screen.getByText(tech)).toBeInTheDocument();
+        expect(within(details as HTMLElement).getByText(tech)).toBeInTheDocument();
       }
     });
 
