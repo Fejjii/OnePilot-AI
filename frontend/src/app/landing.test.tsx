@@ -65,37 +65,37 @@ describe("LandingPage", () => {
       expect(
         screen.getByRole("heading", {
           level: 1,
-          name: /one workspace\. one ai copilot/i,
+          name: /one ai workspace for business knowledge and operations/i,
         }),
       ).toBeInTheDocument();
       expect(
-        screen.getByText(/operations copilot for small businesses/i),
+        screen.getByText(
+          /search company knowledge, research the web, work with leads/i,
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /novaedge solutions is the preloaded sample company/i,
+        ),
       ).toBeInTheDocument();
     });
 
-    it("renders the capability, safety, and architecture sections", () => {
+    it("renders four capability groups and a lightweight workflow", () => {
       renderLanding();
       expect(
         screen.getByRole("heading", { name: /what onepilot can do/i }),
       ).toBeInTheDocument();
-      expect(screen.getByText(/ai workspace & chat/i)).toBeInTheDocument();
-      expect(screen.getByText(/knowledge & retrieval/i)).toBeInTheDocument();
+      expect(screen.getByText(/knowledge & research/i)).toBeInTheDocument();
+      expect(screen.getByText(/crm & leads/i)).toBeInTheDocument();
+      expect(screen.getByText(/email & calendar/i)).toBeInTheDocument();
+      expect(screen.getByText(/safe agentic execution/i)).toBeInTheDocument();
+      expect(screen.getByText(/^ask$/i)).toBeInTheDocument();
+      expect(screen.getByText(/^ground$/i)).toBeInTheDocument();
+      expect(screen.getByText(/^act$/i)).toBeInTheDocument();
+      expect(screen.getByText(/^approve$/i)).toBeInTheDocument();
       expect(
-        screen.getByText(/approvals & human control/i),
-      ).toBeInTheDocument();
-      expect(screen.getByText(/business insights/i)).toBeInTheDocument();
-      expect(
-        screen.getByText(/gmail & calendar workflows/i),
-      ).toBeInTheDocument();
-      expect(screen.getByText(/demo-safe by design/i)).toBeInTheDocument();
-      expect(
-        screen.getByRole("heading", {
-          name: /the ai proposes\. humans approve\./i,
-        }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("heading", { name: /what is real in this demo/i }),
-      ).toBeInTheDocument();
+        screen.queryByText(/draft a follow-up email to our most promising lead/i),
+      ).not.toBeInTheDocument();
     });
 
     it("lists the technology stack behind engineering details", async () => {
@@ -118,25 +118,28 @@ describe("LandingPage", () => {
       }
     });
 
-    it("distinguishes real AI work from simulated Gmail and Calendar side effects", () => {
+    it("distinguishes the public demo from the private live-Google track", () => {
       renderLanding();
-      expect(screen.getByText(/working for real/i)).toBeInTheDocument();
       expect(
-        screen.getByText(/simulated in the public demo/i),
+        screen.getByRole("heading", {
+          name: /public demo vs live integrations/i,
+        }),
       ).toBeInTheDocument();
+      expect(screen.getByText(/^public$/i)).toBeInTheDocument();
+      expect(screen.getByText(/private validated track/i)).toBeInTheDocument();
+      expect(screen.getByText(/gmail simulated/i)).toBeInTheDocument();
+      expect(screen.getByText(/calendar simulated/i)).toBeInTheDocument();
+      expect(screen.getByText(/org-restricted live gmail/i)).toBeInTheDocument();
       expect(
-        screen.getByText(/gmail side effects/i),
+        screen.getByText(/hubspot is a mock adapter today/i),
       ).toBeInTheDocument();
       expect(screen.queryByText(/send_email/i)).not.toBeInTheDocument();
     });
 
-    it("communicates that demo actions are simulated and credential-free", () => {
+    it("communicates that the public demo is credential-free", () => {
       renderLanding();
       expect(
-        screen.getAllByText(/no real emails/i).length,
-      ).toBeGreaterThan(0);
-      expect(
-        screen.getAllByText(/no credentials/i).length,
+        screen.getAllByText(/no sign-up, no credentials/i).length,
       ).toBeGreaterThan(0);
     });
 
@@ -165,17 +168,19 @@ describe("LandingPage", () => {
       }
     });
 
-    it("links View capabilities to the capabilities section", () => {
+    it("links View GitHub to the documented repository URL", () => {
       renderLanding();
-      const viewCapabilities = screen.getByRole("link", {
-        name: /view capabilities/i,
-      });
-      expect(viewCapabilities).toHaveAttribute("href", "#capabilities");
-      expect(
-        document.querySelector("#capabilities"),
-      ).toBeInTheDocument();
-      expect(document.querySelector("#safety")).toBeInTheDocument();
-      expect(document.querySelector("#whats-real")).toBeInTheDocument();
+      const githubLinks = screen.getAllByRole("link", { name: /github/i });
+      expect(githubLinks.length).toBeGreaterThan(0);
+      for (const link of githubLinks) {
+        expect(link).toHaveAttribute(
+          "href",
+          "https://github.com/Fejjii/OnePilot-AI",
+        );
+      }
+      expect(document.querySelector("#capabilities")).toBeInTheDocument();
+      expect(document.querySelector("#public-vs-live")).toBeInTheDocument();
+      expect(document.querySelector("#architecture")).toBeInTheDocument();
     });
 
     it("shows Open dashboard instead of Sign in in the header when authenticated", async () => {

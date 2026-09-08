@@ -126,14 +126,49 @@ describe("parseStructuredResponse", () => {
     expect(parsed.sections[1].items[0]).toContain("GPT-5");
   });
 
-  it("parses email drafts without markdown headings", () => {
+  it("parses French section headings as structured knowledge", () => {
     const parsed = parseStructuredResponse(
-      "Subject: Follow-up on demo\n\nHi Alex,\n\nThanks for your time today.",
+      [
+        "## Résumé",
+        "NovaEdge offre un remboursement sous 30 jours.",
+        "",
+        "## Points clés",
+        "- Les remboursements s'appliquent sous 30 jours",
+        "",
+        "## Preuves ou sources",
+        "- [NovaEdge Refund Policy]: Annual subscriptions may be refunded within 30 days.",
+      ].join("\n"),
+    );
+    expect(parsed.kind).toBe("structured");
+    if (parsed.kind !== "structured") return;
+    expect(parsed.sections.map((section) => section.id)).toEqual([
+      "summary",
+      "key-points",
+      "evidence",
+    ]);
+    expect(parsed.sections[2].content).toContain("NovaEdge Refund Policy");
+  });
+
+  it("parses a French email draft without translating the recipient", () => {
+    const parsed = parseStructuredResponse(
+      [
+        "Destinataire: Sarah Chen",
+        "Objet: Suivi avec Brightline Analytics",
+        "",
+        "Bonjour Sarah Chen,",
+        "",
+        "Cordialement,",
+        "L'équipe OnePilot",
+        "",
+        "Statut d'approbation: en attente",
+      ].join("\n"),
     );
     expect(parsed.kind).toBe("email");
     if (parsed.kind !== "email") return;
-    expect(parsed.subject).toBe("Follow-up on demo");
-    expect(parsed.body).toContain("Thanks for your time");
+    expect(parsed.recipient).toBe("Sarah Chen");
+    expect(parsed.subject).toBe("Suivi avec Brightline Analytics");
+    expect(parsed.body).toContain("Cordialement");
+    expect(parsed.approvalStatus).toBe("en attente");
   });
 
   it("falls back to plain text for short answers", () => {

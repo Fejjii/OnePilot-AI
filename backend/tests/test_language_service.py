@@ -11,6 +11,7 @@ from onepilot.services.language_service import (
     detect_language,
     detect_language_heuristic,
     resolve_response_language,
+    response_language_instruction,
 )
 
 GERMAN_QUERIES = [
@@ -93,6 +94,12 @@ class TestResolveResponseLanguage:
             0.95,
         )
         assert lang == LanguageCode.DE
+
+    def test_instruction_requires_output_language_even_if_prompt_differs(self) -> None:
+        text = response_language_instruction(LanguageCode.FR)
+        assert "French" in text
+        assert "even if" in text.lower()
+        assert "quoted values" in text
 
     def test_low_confidence_auto_defaults_english(self) -> None:
         lang = resolve_response_language(

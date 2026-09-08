@@ -9,8 +9,8 @@ import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
   { label: "Capabilities", href: "#capabilities" },
-  { label: "Safety", href: "#safety" },
-  { label: "What's real", href: "#whats-real" },
+  { label: "Public vs live", href: "#public-vs-live" },
+  { label: "Architecture", href: "#architecture" },
 ];
 
 /**

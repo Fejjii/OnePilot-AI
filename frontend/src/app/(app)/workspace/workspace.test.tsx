@@ -912,6 +912,9 @@ describe("WorkspacePage", () => {
     expect(
       screen.queryByRole("button", { name: /record voice input/i }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/novaedge solutions is the preloaded sample company/i),
+    ).toBeInTheDocument();
   });
 
   it("shows the microphone control outside public-demo mode", async () => {

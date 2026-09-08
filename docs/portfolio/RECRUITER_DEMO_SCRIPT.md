@@ -17,7 +17,7 @@ OnePilot is an Agentic AI operations workspace I built for small businesses. The
 
 ## B. Business context — ~20 sec
 
-I’ll open the live demo — no account. This is a seeded workspace. The knowledge corpus is NovaEdge Solutions: policies, services, playbooks. Around that you have CRM leads, an approvals queue, a calendar surface, and web search. Same agent, different tools, one tenant.
+I’ll open the live demo — no account. This is a seeded workspace. NovaEdge Solutions is the preloaded sample company used to demonstrate RAG, leads and workflows. Around that you have CRM leads, an approvals queue, a calendar surface, and web search. Same agent, different tools, one tenant.
 
 ---
 

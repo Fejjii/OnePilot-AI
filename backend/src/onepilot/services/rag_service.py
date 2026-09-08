@@ -24,6 +24,7 @@ from onepilot.services.language_service import (
     language_display_name,
     response_language_instruction,
 )
+from onepilot.services.response_i18n import response_copy
 from onepilot.core.errors import ProviderUnavailableError
 from onepilot.core.logging import get_logger
 from onepilot.providers import (
@@ -590,6 +591,7 @@ def answer(
         resp_lang = LanguageCode.EN
     lang_instruction = response_language_instruction(resp_lang)
     answer_lang = language_display_name(resp_lang)
+    copy = response_copy(resp_lang)
     messages = [
         {
             "role": "system",
@@ -600,13 +602,13 @@ def answer(
                 "exactly as they appear in the context — never translate document or section "
                 f"names. {lang_instruction}\n\n"
                 "Format the answer exactly with these markdown sections:\n"
-                "## Summary\n"
+                f"## {copy.summary_heading}\n"
                 "(1-2 short sentences maximum)\n"
-                "## Key points\n"
+                f"## {copy.key_points_heading}\n"
                 "(3-5 concise bullet points)\n"
-                "## Evidence or sources\n"
+                f"## {copy.evidence_heading}\n"
                 "(brief citations with document titles from context; do not invent sources)\n"
-                "## Suggested next action\n"
+                f"## {copy.next_action_heading}\n"
                 "(one sentence only)"
             ),
         },
@@ -615,8 +617,9 @@ def answer(
             "content": (
                 f"Question: {query}\n\nContext:\n{context}\n\n"
                 f"Write a grounded answer in {answer_lang} using only the context above. "
-                "Use the required section headings. Keep each section concise. Include "
-                "bracketed citations with original document titles from the context."
+                "Use the required section headings in the requested language. Keep each "
+                "section concise. Include bracketed citations with original document "
+                "titles from the context."
             ),
         },
     ]

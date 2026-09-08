@@ -34,6 +34,7 @@ class EmailDraftTool(Tool):
         crm_facts: dict[str, str] | None = None,
         action: str = "draft_only",
         citations: list[dict] | None = None,
+        response_language: str = "en",
         **_: Any,
     ) -> ToolResult:
         started = time.monotonic()
@@ -47,6 +48,7 @@ class EmailDraftTool(Tool):
             crm_facts=crm_facts,
             citations=citations,
             settings=ctx.settings,
+            response_language=response_language,
         )
         duration_ms = int((time.monotonic() - started) * 1000)
 

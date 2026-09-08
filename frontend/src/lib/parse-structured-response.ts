@@ -58,17 +58,44 @@ export type ParsedAssistantResponse =
 const STANDARD_SECTION_TITLES: Record<string, StructuredSectionId> = {
   answer: "summary",
   summary: "summary",
+  résumé: "summary",
+  resume: "summary",
+  zusammenfassung: "summary",
+  resumen: "summary",
   "key points": "key-points",
   "top findings": "key-points",
+  "points clés": "key-points",
+  "principales conclusions": "key-points",
+  kernpunkte: "key-points",
+  "wichtigste erkenntnisse": "key-points",
+  "puntos clave": "key-points",
+  "hallazgos principales": "key-points",
   sources: "evidence",
   "evidence or sources": "evidence",
+  "preuves ou sources": "evidence",
+  "belege oder quellen": "evidence",
+  quellen: "evidence",
+  "evidencia o fuentes": "evidence",
+  fuentes: "evidence",
   "suggested next action": "next-action",
+  "prochaine action suggérée": "next-action",
+  "vorgeschlagene nächste aktion": "next-action",
+  "siguiente acción sugerida": "next-action",
 };
 
 const COMPOUND_SECTION_TITLES: Record<string, StructuredSectionId> = {
   "external market research": "external-research",
+  "recherche marché externe": "external-research",
+  "externe marktrecherche": "external-research",
+  "investigación de mercado externa": "external-research",
   "draft email preview": "email-preview",
+  "aperçu de l'e-mail": "email-preview",
+  "e-mail-vorschau": "email-preview",
+  "vista previa del correo": "email-preview",
   "meeting proposal": "meeting-proposal",
+  "proposition de réunion": "meeting-proposal",
+  meetingvorschlag: "meeting-proposal",
+  "propuesta de reunión": "meeting-proposal",
 };
 
 function normalizeTitle(title: string): string {
@@ -162,28 +189,47 @@ function parseEmailDraft(content: string): {
   approvalStatus: string;
 } | null {
   const match = content.match(
-    /^(?:Recipient:\s*(.+)\n)?Subject:\s*(.+?)(?:\n\n|\n$)([\s\S]*)$/,
+    /^(?:(?:Recipient|Destinataire|Empfänger|Destinatario):\s*(.+)\n)?(?:Subject|Objet|Betreff|Asunto):\s*(.+?)(?:\n\n|\n$)([\s\S]*)$/,
   );
   if (!match) return null;
   const recipient = (match[1] || "").trim();
   const subject = match[2].trim();
   let body = match[3].trim();
   let approvalStatus = "";
-  const approvalMatch = body.match(/\nApproval status:\s*(.+)\s*$/i);
+  const approvalMatch = body.match(
+    /\n(?:Approval status|Statut d'approbation|Genehmigungsstatus|Estado de aprobación):\s*(.+)\s*$/i,
+  );
   if (approvalMatch) {
     approvalStatus = approvalMatch[1].trim();
-    body = body.replace(/\nApproval status:\s*.+\s*$/i, "").trim();
+    body = body
+      .replace(
+        /\n(?:Approval status|Statut d'approbation|Genehmigungsstatus|Estado de aprobación):\s*.+\s*$/i,
+        "",
+      )
+      .trim();
   }
   return { recipient, subject, body, approvalStatus };
 }
 
 function parseMeetingProposal(content: string): MeetingProposalDetails | null {
-  const titleMatch = content.match(/^(?:Title|Meeting proposal):\s*(.+)$/m);
-  const timeMatch = content.match(/^(?:Date and time|Proposed time):\s*(.+)$/m);
-  const timezoneMatch = content.match(/^Timezone:\s*(.+)$/m);
-  const approvalMatch = content.match(/^Approval status:\s*(.+)$/m);
-  const nextActionMatch = content.match(/^Next action:\s*(.+)$/m);
-  const attendeesMatch = content.match(/^Attendees:\s*(.+)$/m);
+  const titleMatch = content.match(
+    /^(?:Title|Titre|Titel|Título|Meeting proposal|Proposition de réunion|Meetingvorschlag|Propuesta de reunión):\s*(.+)$/m,
+  );
+  const timeMatch = content.match(
+    /^(?:Date and time|Date et heure|Datum und Uhrzeit|Fecha y hora|Proposed time):\s*(.+)$/m,
+  );
+  const timezoneMatch = content.match(
+    /^(?:Timezone|Fuseau horaire|Zeitzone|Zona horaria):\s*(.+)$/m,
+  );
+  const approvalMatch = content.match(
+    /^(?:Approval status|Statut d'approbation|Genehmigungsstatus|Estado de aprobación):\s*(.+)$/m,
+  );
+  const nextActionMatch = content.match(
+    /^(?:Next action|Prochaine action|Nächste Aktion|Siguiente acción):\s*(.+)$/m,
+  );
+  const attendeesMatch = content.match(
+    /^(?:Attendees|Participants|Teilnehmer|Asistentes):\s*(.+)$/m,
+  );
 
   if (!titleMatch || !timeMatch) {
     return null;
@@ -243,7 +289,12 @@ function parseCalendarListBlock(
   for (const line of lines.slice(1)) {
     const trimmedLine = line.trim();
     if (!trimmedLine) continue;
-    if (/^times shown in /i.test(trimmedLine)) {
+    if (
+      /^times shown in /i.test(trimmedLine) ||
+      /^horaires indiqués en /i.test(trimmedLine) ||
+      /^zeiten angezeigt in /i.test(trimmedLine) ||
+      /^horarios mostrados en /i.test(trimmedLine)
+    ) {
       footerLines.push(trimmedLine);
       continue;
     }
@@ -290,7 +341,7 @@ export function parseStructuredResponse(content: string): ParsedAssistantRespons
 
   const meetingsList = parseCalendarListBlock(
     trimmed,
-    /^(upcoming meetings|no meetings are on the calendar)/i,
+    /^(upcoming meetings|no meetings are on the calendar|réunions à venir|aucune réunion n'est au calendrier|anstehende meetings|im kalender stehen|próximas reuniones|no hay reuniones en el calendario)/i,
   );
   if (meetingsList && !trimmed.startsWith("##")) {
     return { kind: "meetings-list", list: meetingsList };
@@ -298,7 +349,7 @@ export function parseStructuredResponse(content: string): ParsedAssistantRespons
 
   const availabilityList = parseCalendarListBlock(
     trimmed,
-    /^(available time slots|available meeting times|you are available)/i,
+    /^(available time slots|available meeting times|you are available|créneaux disponibles|horaires de réunion disponibles|verfügbare zeitfenster|verfügbare meeting-zeiten|huecos disponibles|horarios de reunión disponibles)/i,
   );
   if (availabilityList && !trimmed.startsWith("##")) {
     return { kind: "availability-slots", list: availabilityList };

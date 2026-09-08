@@ -66,6 +66,7 @@ from onepilot.services.calendar_intent import (
     missing_prior_scheduling_request,
     resolve_calendar_source_message,
 )
+from onepilot.services.response_i18n import response_copy
 from onepilot.tools import registry as _tools_bootstrap  # noqa: F401  ensures tool registration
 from onepilot.schemas.web_search import WebSearchCitation, WebSearchResponse
 from onepilot.services import web_synthesis
@@ -370,11 +371,14 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             context=state.message,
             tone=state.context.get("tone", "professional"),
             action=email_action,
+            response_language=state.response_language,
             **_resolve_email_recipient_kwargs(deps, state),
         )
         _record_tool_call(update, result)
         draft = result.output.get("draft", {})
-        update["draft_output"] = _format_email(draft, result.output)
+        update["draft_output"] = _format_email(
+            draft, result.output, response_language=state.response_language
+        )
         if result.approval_required and result.approval_action_type:
             approval = _create_email_approval(deps, result, fallback_description=draft.get("body", ""))
             update["approval_required"] = True
@@ -412,7 +416,9 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             context=state.context,
         )
         _record_tool_call(update, result)
-        update["draft_output"] = _format_calendar_output(result)
+        update["draft_output"] = _format_calendar_output(
+            result, response_language=state.response_language
+        )
         output = result.output if isinstance(result.output, dict) else {}
         mode = output.get("mode") or output.get("provider_mode")
         if mode == "live" and output.get("status") != "error":
@@ -452,6 +458,7 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             context=state.message,
             tone=state.context.get("tone", "professional"),
             action=email_action,
+            response_language=state.response_language,
             **_resolve_email_recipient_kwargs(deps, state),
         )
         _record_tool_call(update, email_result)
@@ -462,12 +469,19 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
         )
         _record_tool_call(update, calendar_result)
 
+        copy = response_copy(state.response_language)
         sections = [
-            "Email draft",
-            _format_email(email_result.output.get("draft", {}), email_result.output),
+            copy.compound_email_heading,
+            _format_email(
+                email_result.output.get("draft", {}),
+                email_result.output,
+                response_language=state.response_language,
+            ),
             "",
-            "Calendar proposal",
-            _format_calendar_output(calendar_result),
+            copy.compound_calendar_heading,
+            _format_calendar_output(
+                calendar_result, response_language=state.response_language
+            ),
         ]
         update["draft_output"] = "\n".join(sections)
 
@@ -549,8 +563,10 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
                     query=state.message,
                     web=web,
                     configured=deps.settings.has_serper,
+                    response_language=state.response_language,
                 ),
                 settings=deps.settings,
+                response_language=state.response_language,
             ),
         )
 
@@ -560,6 +576,7 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
             context=state.message,
             tone=state.context.get("tone", "professional"),
             action=email_action,
+            response_language=state.response_language,
             **_resolve_email_recipient_kwargs(deps, state),
         )
         _record_tool_call(update, email_result)
@@ -571,15 +588,22 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
         )
         _record_tool_call(update, calendar_result)
 
+        copy = response_copy(state.response_language)
         sections = [
-            "## External market research",
+            f"## {copy.compound_research_heading}",
             research_summary,
             "",
-            "## Draft email preview",
-            _format_email(email_result.output.get("draft", {}), email_result.output),
+            f"## {copy.compound_email_preview_heading}",
+            _format_email(
+                email_result.output.get("draft", {}),
+                email_result.output,
+                response_language=state.response_language,
+            ),
             "",
-            "## Meeting proposal",
-            _format_calendar_output(calendar_result),
+            f"## {copy.compound_meeting_heading}",
+            _format_calendar_output(
+                calendar_result, response_language=state.response_language
+            ),
         ]
         update["draft_output"] = "\n".join(sections)
 
@@ -647,8 +671,10 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
                     query=state.message,
                     web=web,
                     configured=deps.settings.has_serper,
+                    response_language=state.response_language,
                 ),
                 settings=deps.settings,
+                response_language=state.response_language,
             ),
         )
         _append_trace(
@@ -695,8 +721,10 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
                     internal_answer=internal_answer,
                     internal_weak=internal_weak,
                     configured=deps.settings.has_serper,
+                    response_language=state.response_language,
                 ),
                 settings=deps.settings,
+                response_language=state.response_language,
             ),
         )
         rag_confidence = float(rag_result.output.get("confidence", 0.0))
@@ -849,9 +877,14 @@ def make_workflow(deps: AgentDeps):  # type: ignore[no-untyped-def]
         }
 
     def finalize_node(state: AgentState) -> dict:
-        final = state.draft_output or "I don't have a response for that yet."
+        try:
+            lang = LanguageCode(str(state.response_language).lower())
+        except ValueError:
+            lang = LanguageCode.EN
+        final = state.draft_output or i18n_messages.get_message(
+            i18n_messages.EMPTY_RESPONSE, lang
+        )
         if state.approval_required:
-            lang = LanguageCode(state.response_language)
             final = final.rstrip() + i18n_messages.get_message(
                 i18n_messages.APPROVAL_FOOTNOTE, lang
             )
@@ -1003,8 +1036,14 @@ def _create_email_approval(
     )
 
 
-def _format_email(draft: dict, tool_output: dict | None = None) -> str:
+def _format_email(
+    draft: dict,
+    tool_output: dict | None = None,
+    *,
+    response_language: str = "en",
+) -> str:
     output = tool_output or {}
+    copy = response_copy(response_language)
     subject = draft.get("subject", "(no subject)")
     body = draft.get("body", "")
     recipient = (
@@ -1014,37 +1053,43 @@ def _format_email(draft: dict, tool_output: dict | None = None) -> str:
         or draft.get("recipient_email")
         or ""
     )
-    recipient_display = str(recipient).strip() or "Not specified"
+    recipient_display = str(recipient).strip() or copy.email_recipient_unspecified
     approval_required = bool(output.get("gmail_action_pending", True))
-    approval_status = "pending" if approval_required else "not required"
+    approval_status = (
+        copy.email_approval_pending
+        if approval_required
+        else copy.email_approval_not_required
+    )
     lines = [
-        f"Recipient: {recipient_display}",
-        f"Subject: {subject}",
+        f"{copy.email_recipient_label}: {recipient_display}",
+        f"{copy.email_subject_label}: {subject}",
         "",
         body,
         "",
-        f"Approval status: {approval_status}",
+        f"{copy.email_approval_label}: {approval_status}",
     ]
     gmail_status = output.get("gmail_status")
     if gmail_status == "created":
-        lines.append("Gmail draft created. Send remains disabled.")
+        lines.append(copy.email_gmail_created)
     elif gmail_status == "preview_only":
-        lines.append("Preview only — Gmail draft was not created.")
+        lines.append(copy.email_preview_only)
     return "\n".join(lines)
 
 
-def _format_calendar_output(result: ToolResult) -> str:
+def _format_calendar_output(
+    result: ToolResult, *, response_language: str = "en"
+) -> str:
     output = result.output if isinstance(result.output, dict) else {}
     if result.tool_name == "calendar.list_events":
-        return format_meetings_response(output)
+        return format_meetings_response(output, response_language=response_language)
 
     if result.tool_name == "calendar.check_availability":
-        return format_availability_response(output)
+        return format_availability_response(output, response_language=response_language)
 
     if result.tool_name == "calendar.suggest_slots":
-        return format_suggestion_response(output)
+        return format_suggestion_response(output, response_language=response_language)
 
-    return format_proposal_response(output)
+    return format_proposal_response(output, response_language=response_language)
 
 
 def _format_lead(lead: dict) -> str:

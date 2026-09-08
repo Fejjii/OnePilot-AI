@@ -479,7 +479,10 @@ def cap_confidence_for_weak_evidence(confidence: float, *, weak_evidence: bool) 
 
 def response_language_instruction(code: LanguageCode | str) -> str:
     """System-prompt suffix instructing the model which language to use."""
-    lang = code if isinstance(code, LanguageCode) else LanguageCode(str(code).lower())
+    try:
+        lang = code if isinstance(code, LanguageCode) else LanguageCode(str(code).lower())
+    except ValueError:
+        lang = LanguageCode.EN
     names = {
         LanguageCode.EN: "English",
         LanguageCode.DE: "German",
@@ -488,7 +491,13 @@ def response_language_instruction(code: LanguageCode | str) -> str:
     }
     name = names.get(lang, "English")
     return (
-        f"Respond entirely in {name}. "
-        "Keep source document titles and section names in their original language "
-        "when citing; do not translate citation labels."
+        f"Write ALL generated user-facing content entirely in {name}, even if "
+        "the user's request is written in a different language. This includes "
+        "email subject and body, summaries, headings, status descriptions, "
+        "clarifications, and any surrounding prose. Do not write the answer in "
+        f"the language of the prompt when it differs from {name}. "
+        "Preserve these literals without translating them: email addresses, "
+        "URLs, citation and source titles, explicit meeting titles, company "
+        "and person names, explicit quoted values, and explicit subject text "
+        "when the user provided it to keep as-is."
     )

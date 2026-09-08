@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 from onepilot.providers.calendar.slot_utils import events_overlap
 from onepilot.schemas.calendar import CalendarEvent
+from onepilot.services.response_i18n import ResponseCopy, response_copy
 
 _ISO_LIKE = re.compile(r"\d{4}[- ]?\d{2}[- ]?\d{2}T\d{2}:\d{2}")
 _PROVIDER_JARGON = re.compile(
@@ -89,12 +90,12 @@ def public_person_label(value: str) -> str:
     return text
 
 
-def _timezone_footer(timezone: str) -> str:
-    return f"Times shown in {timezone}."
+def _timezone_footer(timezone: str, copy: ResponseCopy) -> str:
+    return copy.calendar_timezone_footer.format(timezone=timezone)
 
 
-def _unavailable_calendar_message(*, action: str) -> str:
-    return f"I couldn't {action} right now. Please try again in a moment."
+def _unavailable_calendar_message(*, action: str, copy: ResponseCopy) -> str:
+    return copy.calendar_unavailable.format(action=action)
 
 
 def _window_phrase(label: str) -> str:
@@ -104,10 +105,11 @@ def _window_phrase(label: str) -> str:
     return ""
 
 
-def format_meetings_response(raw: dict) -> str:
+def format_meetings_response(raw: dict, *, response_language: str = "en") -> str:
     """Render a seeded/live meeting list. Never returns availability slots."""
+    copy = response_copy(response_language)
     if raw.get("mode") == "unhealthy" or raw.get("status") == "error":
-        return _unavailable_calendar_message(action="read the calendar")
+        return _unavailable_calendar_message(action="read the calendar", copy=copy)
 
     timezone = raw.get("timezone", "Europe/Berlin")
     phrase = _window_phrase(str(raw.get("window_label") or ""))
@@ -116,52 +118,53 @@ def format_meetings_response(raw: dict) -> str:
 
     if not events:
         if phrase:
-            return f"No meetings are on the calendar {phrase}."
-        return "No meetings are on the calendar in that window."
+            return copy.calendar_no_meetings_window.format(window=phrase)
+        return copy.calendar_no_meetings
 
-    heading = "Upcoming meetings"
+    heading = copy.calendar_upcoming
     if phrase:
-        heading = f"Upcoming meetings {phrase}"
+        heading = copy.calendar_upcoming_window.format(window=phrase)
     lines = [f"{heading}:"]
     for idx, event in enumerate(events, start=1):
         when = format_local_slot_range(event.start_time, event.end_time, timezone)
-        title = event.summary.strip() or "Meeting"
+        title = event.summary.strip() or copy.calendar_default_title
         lines.append(f"{idx}. {title} — {when}")
         detail = _meeting_detail_line(event)
         if detail:
             lines.append(f"   {detail}")
-    lines.append(_timezone_footer(timezone))
+    lines.append(_timezone_footer(timezone, copy))
     return "\n".join(lines)
 
 
-def format_availability_response(raw: dict) -> str:
+def format_availability_response(raw: dict, *, response_language: str = "en") -> str:
+    copy = response_copy(response_language)
     timezone = raw.get("timezone", "Europe/Berlin")
 
     if raw.get("mode") == "unhealthy" or raw.get("status") == "error":
-        return _unavailable_calendar_message(action="check availability")
+        return _unavailable_calendar_message(action="check availability", copy=copy)
 
     query_type = raw.get("query_type", "range")
     busy = _load_busy_events(raw.get("busy_events") or [])
     slots = raw.get("available_slots") or []
 
     if query_type == "specific":
-        return _format_specific_availability(raw, busy, slots, timezone)
+        return _format_specific_availability(raw, busy, slots, timezone, copy=copy)
 
     free = [s for s in slots if s.get("available", True)]
     label = str(raw.get("window_label") or "").strip().lower()
-    lines = ["Available time slots:", "These are open times, not existing meetings."]
+    lines = [copy.calendar_available_slots, copy.calendar_open_not_meetings]
     if free:
         if label == "tomorrow afternoon":
-            lines.append("Open times tomorrow afternoon:")
+            lines.append(copy.calendar_open_tomorrow_afternoon)
         elif label in {"this week", "next week"}:
-            lines.append(f"Open times {label}:")
+            lines.append(copy.calendar_open_window.format(window=label))
         for idx, slot in enumerate(free[:5], start=1):
             start = _parse_utc_naive(slot.get("start_time"))
             end = _parse_utc_naive(slot.get("end_time"))
             lines.append(f"{idx}. {format_local_slot_range(start, end, timezone)}")
     else:
-        lines.append("No open times in the requested window.")
-    lines.append(_timezone_footer(timezone))
+        lines.append(copy.calendar_no_open_times)
+    lines.append(_timezone_footer(timezone, copy))
     return "\n".join(lines)
 
 
@@ -170,8 +173,10 @@ def _format_specific_availability(
     busy: list[CalendarEvent],
     slots: list[dict],
     timezone: str,
+    *,
+    copy: ResponseCopy,
 ) -> str:
-    lines = ["Available time slots:", "These are open times, not existing meetings."]
+    lines = [copy.calendar_available_slots, copy.calendar_open_not_meetings]
     requested_slots = slots or []
     if not requested_slots and raw.get("time_min") and raw.get("time_max"):
         requested_slots = [
@@ -189,55 +194,55 @@ def _format_specific_availability(
         is_free = bool(slot.get("available", True)) and not events_overlap(start, end, busy)
         when = format_local_slot_range(start, end, timezone)
         if is_free:
-            lines.append(f"That time is open ({when}).")
+            lines.append(copy.calendar_that_time_open.format(when=when))
         else:
             at_time = format_local_time(start, timezone)
-            lines.append(
-                f"That time is not open ({at_time}). It overlaps an existing meeting."
-            )
-        lines.append(_timezone_footer(timezone))
+            lines.append(copy.calendar_that_time_busy.format(at_time=at_time))
+        lines.append(_timezone_footer(timezone, copy))
         return "\n".join(lines)
 
     if busy:
-        lines.append("That time overlaps an existing meeting.")
-        lines.append(_timezone_footer(timezone))
+        lines.append(copy.calendar_that_time_busy_short)
+        lines.append(_timezone_footer(timezone, copy))
         return "\n".join(lines)
 
-    lines.append("That time is open.")
-    lines.append(_timezone_footer(timezone))
+    lines.append(copy.calendar_that_time_open_short)
+    lines.append(_timezone_footer(timezone, copy))
     return "\n".join(lines)
 
 
-def format_suggestion_response(raw: dict) -> str:
+def format_suggestion_response(raw: dict, *, response_language: str = "en") -> str:
+    copy = response_copy(response_language)
     timezone = raw.get("timezone", "Europe/Berlin")
 
     if raw.get("mode") == "unhealthy" or raw.get("status") == "error":
-        return _unavailable_calendar_message(action="find open meeting times")
+        return _unavailable_calendar_message(action="find open meeting times", copy=copy)
 
     slots = raw.get("suggested_slots") or []
     label = str(raw.get("window_label") or "").strip().lower()
     lines = [
-        "Available meeting times:",
-        "These are open slots you can book, not existing meetings.",
+        copy.calendar_available_meeting_times,
+        copy.calendar_open_slots_not_meetings,
     ]
     if not slots:
-        lines.append("No open meeting times could be suggested for that window.")
-        lines.append(_timezone_footer(timezone))
+        lines.append(copy.calendar_no_suggested)
+        lines.append(_timezone_footer(timezone, copy))
         return "\n".join(lines)
 
     if label == "next week":
-        lines.append("Suggested open times next week:")
+        lines.append(copy.calendar_suggested_next_week)
     elif label == "this week":
-        lines.append("Suggested open times this week:")
+        lines.append(copy.calendar_suggested_this_week)
     for idx, slot in enumerate(slots, start=1):
         start = _parse_utc_naive(slot.get("start_time"))
         end = _parse_utc_naive(slot.get("end_time"))
         lines.append(f"{idx}. {format_local_slot_range(start, end, timezone)}")
-    lines.append(_timezone_footer(timezone))
+    lines.append(_timezone_footer(timezone, copy))
     return "\n".join(lines)
 
 
-def format_proposal_response(raw: dict) -> str:
+def format_proposal_response(raw: dict, *, response_language: str = "en") -> str:
+    copy = response_copy(response_language)
     payload = raw.get("approval_payload") or {}
     slot = raw.get("selected_slot") or {}
     timezone = str(payload.get("timezone") or raw.get("timezone") or "Europe/Berlin")
@@ -250,13 +255,19 @@ def format_proposal_response(raw: dict) -> str:
             _parse_utc_naive(end_raw),
             timezone,
         )
+    title = payload.get("summary") or copy.calendar_default_title
+    when_line = (
+        f"{copy.calendar_when_label}: {when}"
+        if when
+        else f"{copy.calendar_when_label}: {copy.calendar_date_tbc}"
+    )
     lines = [
-        f"Title: {payload.get('summary', 'Meeting')}",
-        f"Date and time: {when}" if when else "Date and time: To be confirmed",
-        f"Timezone: {timezone}",
-        f"Approval status: {raw.get('approval_status', 'pending')}",
-        "Next action: Review and approve to create this meeting.",
-        "This meeting will be created only after you approve it.",
+        f"{copy.calendar_title_label}: {title}",
+        when_line,
+        f"{copy.calendar_timezone_label}: {timezone}",
+        f"{copy.calendar_approval_label}: {raw.get('approval_status', 'pending')}",
+        f"{copy.calendar_next_action_label}: {copy.calendar_next_action}",
+        copy.calendar_created_after_approve,
     ]
     attendees = [
         public_person_label(str(item))
@@ -265,7 +276,7 @@ def format_proposal_response(raw: dict) -> str:
     ]
     attendees = [name for name in attendees if name]
     if attendees:
-        lines.insert(3, f"Attendees: {', '.join(attendees)}")
+        lines.insert(3, f"{copy.calendar_attendees_label}: {', '.join(attendees)}")
     return "\n".join(lines)
 
 

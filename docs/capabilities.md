@@ -10,11 +10,11 @@ Honest matrix of what OnePilot AI can do, what the **public demo** exposes, and 
 | Public landing + **Try the demo** | Live | One-click JWT session via `POST /demo/start` | No credentials on the public entry path |
 | AI Workspace (guided prompts) | Live | Real chat against the LangGraph agent | Prompt chips submit through `POST /chat` |
 | Two-stage intent routing | Live | Live | Message class → intent → tools |
-| Knowledge upload + RAG answers | Live | Seeded **19** NovaEdge docs; search/answer work | Citations from internal KB only |
+| Knowledge upload + RAG answers | Live | Seeded **19** NovaEdge docs; search/answer work | Citations from internal KB only. NovaEdge is the sample demo customer, not OnePilot itself |
 | Weak-evidence / confidence guards | Live | Live | Refuses or hedges when retrieval is thin |
 | External web search (Serper) | Live when keyed | Live or mock canned results | Without `SERPER_API_KEY`, mock + clear optional mode |
 | Hybrid web + knowledge answers | Live | Live (web may be mock) | Internal vs external evidence labeled separately |
-| Email drafting (in-app) | Live | Live | Draft text generated in workspace |
+| Email drafting (in-app) | Live | Live | Draft text generated in workspace; honors explicit response language |
 | Gmail draft / send | Live when OAuth configured | **Simulated (mock provider)** | Approval-gated; send off by default (`GMAIL_SEND_ENABLED=false`). Private track: [LIVE_GOOGLE_SETUP.md](private_demo/LIVE_GOOGLE_SETUP.md) |
 | Calendar availability / slots | Live when OAuth configured | **Simulated (mock provider)** | Busy/free only — no private event titles |
 | Calendar event creation | Live when OAuth configured | **Simulated after approval** | Creates `ApprovalRequest` first |
@@ -24,12 +24,13 @@ Honest matrix of what OnePilot AI can do, what the **public demo** exposes, and 
 | Audit log | Live | Live | Sensitive actions and approvals |
 | User / org memory CRUD | Live | Live (tenant-scoped) | Shared-demo **agent** memory disabled (ADR 007) |
 | Agent memory recall / persist | Live | Disabled on shared-demo tenant | `/demo/start` clears memories for isolation |
+| Voice / microphone input | Live when authenticated and not on the public demo | **Hidden and rejected** on anonymous public demo | `POST /speech/transcribe` is blocked when `PUBLIC_DEMO_ENABLED`; microphone UI is hidden in demo mode. Private/authenticated mode keeps the existing recorder |
 | Mobile workspace layout | Live | Live | Bottom tabs + Chat / History / Details panels |
 | Multi-tenant isolation | Live | Shared demo org for reviewers | Repository-scoped `organization_id` |
 | Prompt-injection guards | Live | Live | Blocked before agent execution |
 | Rate limiting | Live | Live (Redis on Railway) | In-memory fallback without Redis |
 | Evaluation harness | Live | Offline reports in UI | Deterministic routing/RAG/safety suites |
-| HubSpot CRM | Mock adapter | Mock | Not a live CRM integration |
+| HubSpot CRM | Mock adapter | Mock | Integration-ready design, **not** a live production connector |
 | Twilio | Mock adapter | Mock | Not live telephony |
 | Streaming chat (SSE/WebSocket) | Not implemented | — | Synchronous responses today |
 
