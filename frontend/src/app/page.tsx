@@ -2,26 +2,21 @@
 
 import { useState } from "react";
 import {
-  ArrowRight,
   BookOpen,
-  CalendarClock,
   CheckCircle2,
   FlaskConical,
-  Globe,
   Mail,
-  Search,
   ShieldCheck,
   Users,
 } from "lucide-react";
 import { TryDemoButton } from "@/components/landing/try-demo-button";
 import { LandingHeader } from "@/components/landing/landing-header";
 import { LandingFooter } from "@/components/landing/landing-footer";
+import { HeroCapabilityArchitecture } from "@/components/landing/hero-capability-architecture";
 import { PRODUCT_GITHUB_URL } from "@/lib/product";
 
 const NOVAEDGE_NOTE =
   "NovaEdge Solutions is the preloaded sample company used to demonstrate RAG, leads and workflows.";
-
-const WORKFLOW_STEPS = ["Ask", "Ground", "Act", "Approve"] as const;
 
 const CAPABILITY_GROUPS = [
   {
@@ -160,7 +155,7 @@ export default function LandingPage() {
               <p className="mt-4 text-xs text-slate-500">{NOVAEDGE_NOTE}</p>
             </div>
 
-            <HeroWorkflow />
+            <HeroCapabilityArchitecture />
           </div>
         </section>
 
@@ -336,50 +331,5 @@ function EngineeringStack() {
         </div>
       )}
     </details>
-  );
-}
-
-function HeroWorkflow() {
-  return (
-    <div aria-hidden="true" className="relative">
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-indigo-500/5">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-          How a request moves
-        </p>
-        <ol className="mt-5 flex flex-wrap items-center gap-2">
-          {WORKFLOW_STEPS.map((step, index) => (
-            <li key={step} className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-800">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-semibold text-white">
-                  {index + 1}
-                </span>
-                {step}
-              </span>
-              {index < WORKFLOW_STEPS.length - 1 ? (
-                <ArrowRight className="h-4 w-4 text-slate-300" />
-              ) : null}
-            </li>
-          ))}
-        </ol>
-        <ul className="mt-6 grid gap-3 sm:grid-cols-2">
-          <li className="flex items-start gap-2 text-xs text-slate-600">
-            <Search className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" />
-            Retrieve company knowledge or the web
-          </li>
-          <li className="flex items-start gap-2 text-xs text-slate-600">
-            <Globe className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" />
-            Rank leads and draft the next action
-          </li>
-          <li className="flex items-start gap-2 text-xs text-slate-600">
-            <CalendarClock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" />
-            Propose meetings from availability
-          </li>
-          <li className="flex items-start gap-2 text-xs text-slate-600">
-            <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" />
-            Stop for human approval before send
-          </li>
-        </ul>
-      </div>
-    </div>
   );
 }

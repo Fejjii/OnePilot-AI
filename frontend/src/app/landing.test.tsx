@@ -80,7 +80,7 @@ describe("LandingPage", () => {
       ).toBeInTheDocument();
     });
 
-    it("renders four capability groups and a lightweight workflow", () => {
+    it("renders four capability groups below the hero", () => {
       renderLanding();
       expect(
         screen.getByRole("heading", { name: /what onepilot can do/i }),
@@ -89,12 +89,60 @@ describe("LandingPage", () => {
       expect(screen.getByText(/crm & leads/i)).toBeInTheDocument();
       expect(screen.getByText(/email & calendar/i)).toBeInTheDocument();
       expect(screen.getByText(/safe agentic execution/i)).toBeInTheDocument();
-      expect(screen.getByText(/^ask$/i)).toBeInTheDocument();
-      expect(screen.getByText(/^ground$/i)).toBeInTheDocument();
-      expect(screen.getByText(/^act$/i)).toBeInTheDocument();
-      expect(screen.getByText(/^approve$/i)).toBeInTheDocument();
       expect(
         screen.queryByText(/draft a follow-up email to our most promising lead/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it("renders a compact capability architecture in the hero", () => {
+      renderLanding();
+      const architecture = screen.getByRole("complementary", {
+        name: /capability architecture/i,
+      });
+      expect(within(architecture).getByText("Interaction")).toBeInTheDocument();
+      expect(
+        within(architecture).getByText("Context & Intelligence"),
+      ).toBeInTheDocument();
+      expect(
+        within(architecture).getByText("Agent Orchestration"),
+      ).toBeInTheDocument();
+      expect(
+        within(architecture).getByText("Business Actions"),
+      ).toBeInTheDocument();
+      for (const label of [
+        "Chat",
+        "Voice",
+        "Multilingual",
+        "RAG / company knowledge",
+        "Memory & personalization",
+        "CRM context",
+        "Web research",
+        "Intent routing",
+        "LangGraph",
+        "Tool calling",
+        "Connectors / adapters",
+        "Email",
+        "Calendar",
+        "Leads",
+        "Human approvals",
+      ]) {
+        expect(within(architecture).getByText(label)).toBeInTheDocument();
+      }
+      expect(
+        within(architecture).getByText(
+          "Tenant-isolated · Traced · Evaluated · Human-controlled",
+        ),
+      ).toBeInTheDocument();
+      expect(
+        within(architecture).getByText(
+          /voice and persistent memory are available in authenticated private workspaces/i,
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/^ask$/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/^ground$/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/MCP/i)).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/how a request moves/i),
       ).not.toBeInTheDocument();
     });
 
@@ -104,6 +152,8 @@ describe("LandingPage", () => {
       expect(screen.queryByText("FastAPI")).not.toBeInTheDocument();
 
       await user.click(screen.getByText(/engineering details/i));
+      const details = screen.getByText(/engineering details/i).closest("details");
+      expect(details).not.toBeNull();
       for (const tech of [
         "FastAPI",
         "Next.js",
@@ -114,7 +164,7 @@ describe("LandingPage", () => {
         "Railway",
         "Vercel",
       ]) {
-        expect(screen.getByText(tech)).toBeInTheDocument();
+        expect(within(details as HTMLElement).getByText(tech)).toBeInTheDocument();
       }
     });
 
