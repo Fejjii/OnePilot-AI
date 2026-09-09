@@ -10,10 +10,12 @@ OnePilot AI is a **multi-tenant AI operations workspace**: a Next.js client talk
 | API layer | Thin routers, JWT principal, validation |
 | Services | Business logic, quotas, audit, memory, RAG, approvals |
 | Agent | Two-stage routing → tools → structured response |
-| Providers | OpenAI / Serper / Gmail / Calendar / Stripe / HubSpot with mock or live modes |
+| Providers | OpenAI / Serper live when keyed; Gmail / Calendar mock on public, live on private authenticated track; Stripe / HubSpot mock adapters |
 | Data | PostgreSQL (tenant-scoped), Redis (rate limits), Qdrant or in-memory vectors |
 
-**Public demo track:** Vercel frontend + Railway backend. Gmail and Calendar are **mock**. Shared-demo agent memory is disabled and cleared on demo start. See [capabilities.md](capabilities.md) and [safety_and_privacy.md](safety_and_privacy.md).
+**Public demo track:** Vercel frontend + Railway backend. Gmail and Calendar are **mock**. Shared-demo agent memory is disabled and cleared on demo start. Public runtime model is `gpt-5-nano`. See [capabilities.md](capabilities.md) and [safety_and_privacy.md](safety_and_privacy.md).
+
+**Private authenticated track:** organization-restricted live Gmail draft creation and Google Calendar event creation, plus voice and persistent tenant-scoped memory. Gmail send remains disabled. Drafts and calendar writes remain approval-gated. Operator variable names only: [private_demo/LIVE_GOOGLE_SETUP.md](private_demo/LIVE_GOOGLE_SETUP.md). This is not a public demo CTA.
 
 ```mermaid
 flowchart TB

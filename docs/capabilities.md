@@ -36,10 +36,15 @@ Honest matrix of what OnePilot AI can do, what the **public demo** exposes, and 
 
 ## Private live-Google track
 
+The public deployment proves real AI infrastructure without exposing anonymous
+users to write-capable business integrations. The private deployment validates
+the real provider path in a controlled authenticated environment.
+
 A separate, authenticated host can select live Gmail and Google Calendar for one
 allowlisted organization. That track is opt-in (`PRIVATE_LIVE_GOOGLE_ENABLED`)
-and **cannot** share a process with `PUBLIC_DEMO_ENABLED`. Operator steps
-(variable names only): [private_demo/LIVE_GOOGLE_SETUP.md](private_demo/LIVE_GOOGLE_SETUP.md).
+and **cannot** share a process with `PUBLIC_DEMO_ENABLED`. It is **not** a public
+demo CTA. Operator steps (variable names only):
+[private_demo/LIVE_GOOGLE_SETUP.md](private_demo/LIVE_GOOGLE_SETUP.md).
 
 ## Public-demo safety summary
 

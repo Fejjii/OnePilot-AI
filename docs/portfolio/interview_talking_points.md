@@ -46,9 +46,9 @@ Keep each point to ~30–60 seconds. Verify against code if asked for depth.
 
 ## 8. Testing & evaluation honesty
 
-- Backend pytest + frontend Vitest in CI on `main` and `deployment/**`
-- Deterministic offline evaluation (routing / RAG / safety) — not a substitute for production RAGAS
-- Prefer stating verified counts from the latest green CI run
+- **900+** backend tests, **180** frontend tests, **53** release/script tests in CI on `main` and `deployment/**`
+- **79-case deterministic evaluation suite** (routing / RAG / safety) — demo-quality regression checks, not a production SLO or RAGAS substitute
+- Prefer the stable wording above rather than implying universal 100% accuracy
 
 ## 9. What you’d improve next
 
