@@ -65,7 +65,7 @@ This Cloud session did not checkout, fast-forward, or push either deployment bra
 
 ## Current task / in progress
 
-- **Docs-only recruiter README polish** on `docs/final-recruiter-readme`. Engineering is frozen: no backend, frontend, tests, runtime, env, providers, or deployment-branch changes.
+- **Docs-only recruiter README polish** on `docs/final-recruiter-readme` (PR #42). Follow-up: high-level architecture / HITL diagrams now split read-only vs approval-gated external actions. Engineering remains frozen.
 - Goal: transform the root README into a premium recruiter/general-public entry point, with `docs/portfolio/ARCHITECTURE_OVERVIEW.md` as the 30–60 second next scan. Deep implementation stays in `docs/architecture.md` and related engineering docs.
 - Accuracy constraints unchanged: do not claim MCP; do not claim HubSpot, Salesforce, Stripe, Slack, or Twilio are live; public Gmail/Calendar remain simulated; private Google remains live/org-restricted and is not a public CTA; Gmail send stays disabled; evaluation 100% figures are demo-quality regression checks, not a universal accuracy claim.
 - Private host remains user-gated (`PRIVATE_LIVE_GOOGLE_ENABLED=true`, Gmail send disabled, Calendar create and Gmail draft approval-gated). This PR does **not** change Railway/Vercel env, OAuth, or deployment branches.

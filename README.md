@@ -130,9 +130,14 @@ Operator setup (variable names only): [docs/private_demo/LIVE_GOOGLE_SETUP.md](d
 
 ## High-level architecture
 
+Most requests are **read / reason** only. Approval is required only when the
+agent prepares a sensitive **external side effect**, such as a Gmail draft or a
+Calendar write — not for RAG, web research, CRM reads, availability checks, or
+general answers.
+
 ```mermaid
 flowchart TB
-    User["User / Workspace"] --> API["FastAPI API"]
+    User["User / Workspace"] --> API["FastAPI"]
     API --> Agent["LangGraph Agent"]
 
     Agent --> RAG["RAG"]
@@ -140,13 +145,18 @@ flowchart TB
     Agent --> Web["Web"]
     Agent --> Mem["Memory"]
 
-    RAG --> Actions["Business Actions"]
-    CRM --> Actions
-    Web --> Actions
-    Mem --> Actions
+    RAG --> Decide["Response / Decision"]
+    CRM --> Decide
+    Web --> Decide
+    Mem --> Decide
 
-    Actions --> HITL["Human Approval"]
-    HITL --> Adapters["Provider Adapters"]
+    Decide --> Read["Read-only"]
+    Decide --> Ext["External action"]
+
+    Read --> Return["Return to user"]
+    Ext --> Prep["Prepare action"]
+    Prep --> HITL["Approval"]
+    HITL --> Adapter["Provider adapter"]
 
     subgraph Data["Data"]
         PG["PostgreSQL"]
@@ -162,7 +172,7 @@ flowchart TB
     end
 
     API -.-> Data
-    Adapters -.-> Providers
+    Adapter -.-> Providers
 ```
 
 **Deep technical architecture → [docs/architecture.md](docs/architecture.md)**
@@ -194,19 +204,23 @@ Details: [docs/rag_system.md](docs/rag_system.md)
 ## Agent / HITL flow
 
 ```mermaid
-flowchart LR
+flowchart TD
     Req["Request"] --> Route["Route"]
     Route --> Tools["Retrieve / Tool"]
-    Tools --> Draft["Draft Action"]
-    Draft --> AR["ApprovalRequest"]
-    AR --> Human["Human Decision"]
+    Tools --> Syn["Synthesize"]
+    Syn --> Side{"External side effect?"}
+    Side -->|No| Return["Return response"]
+    Side -->|Yes| Prep["Prepare action"]
+    Prep --> AR["ApprovalRequest"]
+    AR --> Human["Human decision"]
     Human --> Provider["Provider"]
 ```
 
 The AI may **prepare** an action. It does not autonomously bypass approval.
 
-Gmail send stays disabled. Public Gmail and Calendar writes stay simulated.
-Private Google writes still require a human decision.
+No approval is required when no external side effect is requested. Gmail draft
+creation and Calendar writes do require a human decision. Gmail send stays
+disabled. Public Gmail and Calendar writes stay simulated.
 
 Details: [docs/agent_workflow.md](docs/agent_workflow.md)
 

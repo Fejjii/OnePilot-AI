@@ -28,9 +28,13 @@ Those are different claims.
 
 ## System at a glance
 
+Most requests are **read / reason** only. Approval is required only for
+sensitive external side effects, not for RAG, web research, CRM reads, or
+availability checks.
+
 ```mermaid
 flowchart TB
-    User["User / Workspace"] --> API["FastAPI API"]
+    User["User / Workspace"] --> API["FastAPI"]
     API --> Agent["LangGraph Agent"]
 
     Agent --> RAG["RAG"]
@@ -38,13 +42,18 @@ flowchart TB
     Agent --> Web["Web"]
     Agent --> Mem["Memory"]
 
-    RAG --> Actions["Business Actions"]
-    CRM --> Actions
-    Web --> Actions
-    Mem --> Actions
+    RAG --> Decide["Response / Decision"]
+    CRM --> Decide
+    Web --> Decide
+    Mem --> Decide
 
-    Actions --> HITL["Human Approval"]
-    HITL --> Adapters["Provider Adapters"]
+    Decide --> Read["Read-only"]
+    Decide --> Ext["External action"]
+
+    Read --> Return["Return to user"]
+    Ext --> Prep["Prepare action"]
+    Prep --> HITL["Approval"]
+    HITL --> Adapter["Provider adapter"]
 ```
 
 Underneath: **PostgreSQL · Redis · Qdrant**  
@@ -55,8 +64,8 @@ authenticated track**. MCP, HubSpot, Salesforce, Stripe, Slack, and Twilio are
 not live.
 
 The browser never talks to models or providers directly. FastAPI owns auth and
-tenancy. LangGraph decides the path. Tools go through a registry. External
-writes stop at human approval.
+tenancy. LangGraph decides the path. Tools go through a registry. Ordinary
+answers return to the user. External writes stop at human approval.
 
 | Layer | What it does |
 |-------|----------------|
@@ -95,10 +104,14 @@ If the request is blocked (injection, quota, missing auth), it never reaches too
 ## Agent / HITL lifecycle
 
 ```text
-Request → Route → Retrieve / Tool → Draft Action → ApprovalRequest → Human Decision → Provider
+Request → Route → Retrieve / Tool → Synthesize → External side effect?
+  No  → Return response
+  Yes → Prepare action → ApprovalRequest → Human decision → Provider
 ```
 
 The AI may prepare an action. It does not autonomously bypass approval.
+Read-only paths (RAG, web research, CRM reads, availability) return without
+an approval.
 
 - Stage 1 classifies the message. Stage 2 selects the intent and tools.
 - Calendar distinguishes *list meetings* from *availability* from *create event*. Only creation is gated.
