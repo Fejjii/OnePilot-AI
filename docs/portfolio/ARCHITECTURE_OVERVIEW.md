@@ -1,44 +1,62 @@
 # Architecture Overview — OnePilot AI
 
-Recruiter-facing map of the live public demo. Use this to scan GitHub in 30 seconds, or as a speaking outline in an interview.
+30–60 second technical scan after the [README](../../README.md).
 
-**Live demo:** [https://one-pilot-ai.vercel.app](https://one-pilot-ai.vercel.app)  
-**Deeper internals:** [architecture.md](../architecture.md) · [agent_workflow.md](../agent_workflow.md) · [rag_system.md](../rag_system.md)  
-**Honest live-vs-simulated matrix:** [capabilities.md](../capabilities.md)
+This is not a substitute for the deep implementation document:
+**[docs/architecture.md](../architecture.md)**
 
-This page does not replace the [README](../../README.md). It explains how a request actually moves through the system.
+**Live public demo:** [https://one-pilot-ai.vercel.app](https://one-pilot-ai.vercel.app)  
+**Also:** [agent workflow](../agent_workflow.md) · [RAG](../rag_system.md) · [capabilities](../capabilities.md)
+
+---
+
+## Two tracks
+
+| Track | What it proves | What stays restricted |
+|-------|----------------|------------------------|
+| **Public recruiter demo** | Live OpenAI, embeddings, Qdrant, Postgres, Redis, Serper, routing, RAG, citations, traces, HITL | Gmail simulated · Calendar writes simulated · speech disabled · shared-demo memory disabled |
+| **Private authenticated track** | Real Gmail **draft** creation, real Calendar **event** creation, voice, tenant-scoped memory | Still approval-gated · Gmail **send disabled** · org-restricted · not a public CTA |
+
+The public track proves real AI infrastructure without exposing anonymous users
+to write-capable Google integrations. The private track validates the live
+provider path in a controlled environment.
+
+Public runtime model: **`gpt-5-nano`**. Local repo default: `gpt-4o-mini`.
+Those are different claims.
 
 ---
 
 ## System at a glance
 
 ```mermaid
-flowchart LR
-    User["User / Browser"] --> FE["Next.js frontend"]
-    FE -->|"JWT REST"| API["FastAPI API"]
-    API --> LG["LangGraph orchestration"]
-    LG --> Route["Routing / tools"]
-    Route --> RAG["RAG"]
-    Route --> CRM["CRM / business logic"]
-    Route --> Web["Serper web search"]
-    Route --> HITL["HITL approval layer"]
-    HITL --> Adapters["Provider adapters"]
-    Route --> Adapters
+flowchart TB
+    User["User / Workspace"] --> API["FastAPI API"]
+    API --> Agent["LangGraph Agent"]
 
-    RAG --> PG[("PostgreSQL")]
-    CRM --> PG
-    HITL --> PG
-    API --> Redis[("Redis")]
-    RAG --> Qdrant[("Qdrant")]
+    Agent --> RAG["RAG"]
+    Agent --> CRM["CRM"]
+    Agent --> Web["Web"]
+    Agent --> Mem["Memory"]
 
-    LG --> LLM["OpenAI gpt-5-nano"]
-    RAG --> Emb["OpenAI text-embedding-3-small"]
-    Web --> Serper["Serper"]
+    RAG --> Actions["Business Actions"]
+    CRM --> Actions
+    Web --> Actions
+    Mem --> Actions
 
-    Adapters --> Sim["Public demo: Gmail simulated · Calendar writes simulated · speech disabled"]
+    Actions --> HITL["Human Approval"]
+    HITL --> Adapters["Provider Adapters"]
 ```
 
-Read left to right: the browser never talks to models or providers directly. FastAPI owns auth and tenancy. LangGraph decides the path. Tools go through a registry. External writes stop at human approval. On the public demo, Gmail and Calendar adapters stay in mock mode.
+Underneath: **PostgreSQL · Redis · Qdrant**  
+Providers: **OpenAI · Serper · Gmail · Google Calendar**
+
+Gmail and Calendar are **simulated on public**, **live only on the private
+authenticated track**. MCP, HubSpot, Salesforce, Stripe, Slack, and Twilio are
+not live.
+
+The browser never talks to models or providers directly. FastAPI owns auth and
+tenancy. LangGraph decides the path. Tools go through a registry. External
+writes stop at human approval.
 
 | Layer | What it does |
 |-------|----------------|
@@ -47,10 +65,8 @@ Read left to right: the browser never talks to models or providers directly. Fas
 | LangGraph | Two-stage routing, tool selection, structured response |
 | Tools | RAG, CRM, email draft, calendar, Serper — never call providers directly |
 | HITL | `ApprovalRequest` in Postgres before any external side effect |
-| Adapters | OpenAI / Serper live; Gmail / Calendar mock on the public track |
+| Adapters | OpenAI / Serper live; Gmail / Calendar mock on public, live on private |
 | Data | Postgres (tenant rows), Redis (rate limits), Qdrant (vectors) |
-
-Public runtime model is **`gpt-5-nano`**. Repo local default is `gpt-4o-mini`. Those are different claims.
 
 ---
 
@@ -68,47 +84,59 @@ If the request is blocked (injection, quota, missing auth), it never reaches too
 
 ## RAG lifecycle
 
-1. Seeded NovaEdge documents (19) are chunked with section-aware boundaries and embedded with `text-embedding-3-small`.
+1. Seeded **NovaEdge** documents (**19**, fictional sample company) are chunked with section-aware boundaries and embedded with `text-embedding-3-small`.
 2. Chunks live in Postgres. Vectors live in a tenant-scoped Qdrant collection (`documents_{organization_id}`), with `organization_id` also filtered on read.
 3. A question is embedded, retrieved, and scored. Weak evidence (cosine below `0.30`) returns a safe hedge and **does not call the LLM**.
-4. Strong evidence is passed to `gpt-5-nano` with the retrieved context. Citations stay as document title + section.
+4. Strong evidence is passed to the chat model with the retrieved context. Citations stay as document title + section.
 5. Internal KB citations and Serper URLs are never mixed at retrieval time. Hybrid answers keep the two evidence lanes separate.
 
 ---
 
-## Agent / tool lifecycle
+## Agent / HITL lifecycle
 
-1. Stage 1 classifies the message (knowledge, workflow, conversational, out of scope).
-2. Stage 2 selects an intent (`knowledge_search`, `email_drafting`, calendar variants, `workspace_insights`, and others).
-3. The graph calls tools only through the registry: `rag.answer`, `lead.support` / workspace insights, `email.draft`, calendar tools, `external.web_search`.
-4. CRM ranking uses `rank_leads()` — urgency, then pipeline status, then name. Seeded data makes **Sarah Chen / Brightline Analytics** the top open lead.
-5. Email drafts resolve an org-scoped lead and must not invent customer facts. The draft is structured; Gmail is not called yet.
-6. Calendar tools distinguish *list meetings* from *availability / slots* from *create event*. Only creation is gated.
+```text
+Request → Route → Retrieve / Tool → Draft Action → ApprovalRequest → Human Decision → Provider
+```
 
----
+The AI may prepare an action. It does not autonomously bypass approval.
 
-## HITL lifecycle
-
-1. Gated actions (`gmail_create_draft`, calendar create, CRM-style writes) create an `ApprovalRequest` with payload and risk.
-2. The workspace shows an approval-gated banner. The item also appears on **Approvals**.
-3. Owner / Admin approve or reject. Rejected work is not auto-retried.
-4. After approval, the provider adapter runs. On the public demo that adapter is **mock** — no real Gmail message and no live Calendar write.
-5. The decision and execution metadata are audited.
-
-In-app draft text can be generated without approval. Provider execution cannot.
+- Stage 1 classifies the message. Stage 2 selects the intent and tools.
+- Calendar distinguishes *list meetings* from *availability* from *create event*. Only creation is gated.
+- CRM ranking uses `rank_leads()`. Seeded data makes **Sarah Chen / Brightline Analytics** the top open lead.
+- Email drafts resolve an org-scoped lead and must not invent customer facts.
+- After approval, the adapter runs. On the public demo that adapter is **mock**. On the private track, Gmail draft and Calendar create are live and still gated. Gmail send stays disabled.
 
 ---
 
 ## Safety / tenant isolation
 
-- Every tenant-scoped row carries `organization_id`. Repositories filter on it. `ensure_same_org()` returns 403 on cross-org access.
+- Every tenant-scoped row carries `organization_id`. Repositories filter on it.
 - Qdrant collections are per organization; payload filters are applied on search.
 - JWT + RBAC (Owner / Admin / Member / Viewer). Approvals are Owner/Admin only.
 - Prompt-injection patterns are blocked before the graph.
 - Logs and recruiter traces strip secrets, tokens, prompts, and raw provider payloads.
-- Shared public-demo agent memory is disabled and cleared on `/demo/start`. Reviewers share one seeded org; they should not treat that as private-tenant isolation.
+- Shared public-demo agent memory is disabled and cleared on `/demo/start`.
 
 This is implemented product safety, not a SOC2 / enterprise certification claim.
+
+---
+
+## Quality / evaluation
+
+Stable wording for this release:
+
+- **900+** backend tests
+- **180** frontend tests
+- **53** release/script tests
+- Type checking, production builds, GitHub Actions CI, public smoke testing
+
+**79-case deterministic evaluation suite:** intent 100%, routing 100%, RAG golden 100%, citation presence 100%, source hit 90%, weak-evidence 100%, safety/HITL 100%, failed cases 0.
+
+These are deterministic demo-quality regression checks on a small labeled
+dataset. They are not a claim that the AI system is universally 100% accurate.
+
+Not a production SLO. Not RAGAS. Not a human evaluation study.
+See [evaluation.md](../evaluation.md).
 
 ---
 
@@ -122,21 +150,12 @@ This is implemented product safety, not a SOC2 / enterprise certification claim.
 | Qdrant | Configured live retrieval for the seeded corpus |
 | CI | GitHub Actions: backend pytest, frontend typecheck/tests/build, `scripts/tests` |
 
-Local Docker Compose can run the same stack with mock/fallback providers when keys are absent.
+Private live-Google is a config track on `main`, not a public URL. Operator
+variable names only: [LIVE_GOOGLE_SETUP.md](../private_demo/LIVE_GOOGLE_SETUP.md).
 
 ---
 
-## Real vs simulated
+## Next document
 
-Aligned with the current README and the live public demo.
-
-| Real | Simulated / disabled |
-|------|----------------------|
-| `gpt-5-nano` chat | Gmail draft/send (mock; send disabled) |
-| `text-embedding-3-small` | Calendar event writes (mock; create disabled) |
-| Qdrant retrieval + citations | Public speech transcription |
-| Serper web search | Shared-demo agent memory persist |
-| CRM ranking, routing, HITL, traces | Stripe / HubSpot / Twilio adapters |
-| Vercel + Railway hosting | Live Google OAuth on this public URL |
-
-Calendar **reads** (this week’s meetings, open slots) still go through the mock calendar provider. The routing and approval path are real; the inbox and calendar writes are not.
+For classes, services, sequence diagrams, and provider internals, continue to
+**[docs/architecture.md](../architecture.md)**.

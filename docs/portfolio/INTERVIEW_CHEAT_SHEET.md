@@ -49,7 +49,7 @@ Shared rate limits and light cache across Railway workers. Without Redis, limits
 
 ### How do you evaluate the system?
 
-Offline suites: two-stage routing labels, RAG golden cases, safety/HITL policy. Reports land on the Evaluation page. Small labeled set, keyword RAG checks in CI — not RAGAS, not a production quality gate. Backend/frontend tests run on every `main` PR.
+Offline **79-case deterministic evaluation suite**: two-stage routing labels, RAG golden cases, safety/HITL policy. Reports land on the Evaluation page. Current labeled-set results: intent/routing/RAG golden/citation/weak-evidence/safety 100%, source hit 90%, 0 failures. These are deterministic demo-quality regression checks on a small labeled dataset. They are not a claim that the AI system is universally 100% accurate. Not RAGAS, not a production SLO. CI also runs **900+** backend tests, **180** frontend tests, and **53** release/script tests.
 
 ### How do you control LLM cost?
 
@@ -61,7 +61,7 @@ Adapters have live / mock / deterministic fallback. OpenAI timeouts retry, then 
 
 ### What is real vs mocked?
 
-Real on the public URL: `gpt-5-nano`, embeddings, Qdrant, Postgres, Redis, Serper, routing, CRM ranking, citations, traces, HITL records. Simulated: Gmail, Calendar writes, Stripe/HubSpot/Twilio. Disabled: speech, shared-demo agent memory persist.
+Two tracks. Public URL: live `gpt-5-nano`, embeddings, Qdrant, Postgres, Redis, Serper, routing, CRM ranking, citations, traces, HITL. Simulated: Gmail and Calendar writes. Disabled: speech, shared-demo agent memory persist. Private authenticated track: live Gmail draft and Calendar create, still approval-gated; Gmail send disabled; voice and persistent tenant memory on. HubSpot, Salesforce, Stripe, Slack, Twilio, and MCP are not live.
 
 ### What are the current limitations?
 

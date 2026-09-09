@@ -6,7 +6,12 @@
 
 ## Philosophy
 
-These checks are for **demo-quality regression gating**: they show how routing, RAG, and safety are tested without requiring RAGAS, LangSmith datasets, or OpenAI keys in CI. They are **not** a replacement for full production RAGAS scoring or human evaluation.
+These checks are for **demo-quality regression gating**: they show how routing, RAG, and safety are tested without requiring RAGAS, LangSmith datasets, or OpenAI keys in CI.
+
+These are deterministic demo-quality regression checks on a small labeled
+dataset. They are not a claim that the AI system is universally 100% accurate.
+
+They are **not** a production SLO, a RAGAS scorecard, or a substitute for human evaluation.
 
 ---
 
@@ -45,17 +50,22 @@ View in the app: open **Evaluation** in the sidebar (after running the script ab
 
 ## Metrics (combined `latest.json`)
 
-| Metric | Meaning |
-|--------|---------|
-| `intent_accuracy` | Stage-2 intent matches labeled intent (two-stage routing) |
-| `routing_accuracy` | Stage-1 message class matches label |
-| `rag_golden_pass_rate` | RAG golden cases pass source + citation + weak-evidence rules |
-| `citation_presence_rate` | Cases where citations expected vs actual (offline heuristic) |
-| `source_hit_rate` | Expected demo doc appears in top retrieved stems |
-| `weak_evidence_correctness` | Out-of-KB / low-confidence cases flagged correctly |
-| `safety_guardrail_pass_rate` | Injection blocked / approval policy cases pass |
-| `total_cases` | Sum of cases across suites |
-| `failed_cases` | Count of failures (listed in report) |
+Current **79-case deterministic evaluation suite** (offline report):
+
+| Metric | Result | Meaning |
+|--------|--------|---------|
+| Intent accuracy | 100% | Stage-2 intent matches labeled intent (two-stage routing) |
+| Routing accuracy | 100% | Stage-1 message class matches label |
+| RAG golden pass | 100% | RAG golden cases pass source + citation + weak-evidence rules |
+| Citation presence | 100% | Cases where citations expected vs actual (offline heuristic) |
+| Source hit rate | 90% | Expected demo doc appears in top retrieved stems |
+| Weak-evidence correctness | 100% | Out-of-KB / low-confidence cases flagged correctly |
+| Safety / HITL pass | 100% | Injection blocked / approval policy cases pass |
+| Total cases | 79 | Sum of cases across suites |
+| Failed cases | 0 | Count of failures (listed in report) |
+
+These are deterministic demo-quality regression checks on a small labeled
+dataset. They are not a claim that the AI system is universally 100% accurate.
 
 ---
 
@@ -141,9 +151,13 @@ When budget and stability allow:
 
 ## Related testing
 
-- Backend pytest suite in CI — auth, RAG, agents, Serper, Gmail, Calendar, approvals, memory isolation, security, demo entry (see root `README.md` for latest verified counts)
-- **86** frontend Vitest cases — pages, landing, demo flow, components
-- Golden RAG integration tests: `backend/tests/test_golden_rag.py`  
-- Security basics: `backend/tests/test_security_basics.py`  
-- Evaluation API: `backend/tests/test_evaluation_summary.py`  
+Stable wording for this release (do not treat exact pytest counts as a product SLO):
+
+- **900+** backend tests in CI — auth, RAG, agents, Serper, Gmail, Calendar, approvals, memory isolation, security, demo entry
+- **180** frontend tests — pages, landing, demo flow, components
+- **53** release/script tests
+- Type checking, production builds, GitHub Actions CI, public smoke testing
+- Golden RAG integration tests: `backend/tests/test_golden_rag.py`
+- Security basics: `backend/tests/test_security_basics.py`
+- Evaluation API: `backend/tests/test_evaluation_summary.py`
 - UI: `frontend/src/app/(app)/evaluation/evaluation.test.tsx`
