@@ -443,6 +443,3 @@ Detailed debt: [docs/limitations_roadmap.md](docs/limitations_roadmap.md)
 - GitHub: [Fejjii](https://github.com/Fejjii)
 - Email: sofien.fejji93@hotmail.com
 
-## License
-
-See repository license terms.
